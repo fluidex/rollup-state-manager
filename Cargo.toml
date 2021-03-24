@@ -4,6 +4,15 @@ version = "0.1.0"
 authors = ["HAOYUatHZ <haoyu@protonmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+config_rs = { package = "config", version = "0.10.1" }
+dotenv = "0.15.0"
+env_logger = "0.5"
+log = "0.4"
+serde = { version = "1.0.124", features = ["derive"] }
+serde_derive = "1.0.90"
+serde_json = "1.0.64"
+
+[[bin]]
+name = "state_keeper"
+path = "src/bin/main.rs"
