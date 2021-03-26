@@ -1,7 +1,7 @@
 //use serde_json::Value;
 use regex::Regex;
 
-use franklin_crypto::bellman::bn256::{Bn256, Fr};
+use franklin_crypto::bellman::bn256::Fr;
 use franklin_crypto::bellman::to_hex;
 use num_bigint::BigInt;
 

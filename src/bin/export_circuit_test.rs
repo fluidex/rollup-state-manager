@@ -2,10 +2,15 @@ use state_keeper::circuit_test;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-fn write_test_case(circuit_repo: &PathBuf, test_dir: &PathBuf, t: circuit_test::types::CircuitTestCase) -> anyhow::Result<()> {
+/*
+ * cargo run --bin export_circuit_test
+ * npm -g install https://github.com/Fluidex/circom-circuit-tester
+ * npx snarkit test ../circuits/testdata/CheckLeafUpdate_2/
+ */
+
+fn write_test_case(circuit_repo: &Path, test_dir: &Path, t: circuit_test::types::CircuitTestCase) -> anyhow::Result<()> {
     //let mut t = t.clone();
     let circuit_name = circuit_test::types::format_circuit_name(&t.source.main);
     let circuit_dir = test_dir.join(circuit_name);

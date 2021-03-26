@@ -92,7 +92,7 @@ impl Tree {
         n >> 1
     }
     pub fn get_value(&self, level: usize, idx: u32) -> LeafType {
-        self.data[level].get(&idx).unwrap_or(&self.default_nodes[level]).clone()
+        *self.data[level].get(&idx).unwrap_or(&self.default_nodes[level])
     }
     pub fn get_leaf(&self, idx: u32) -> LeafType {
         self.get_value(0, idx)
@@ -145,7 +145,7 @@ impl Tree {
         // apply the precalculated
         let mut cache_miss = false;
         cur_idx = idx;
-        cur_value = value;
+        //cur_value = value;
         self.data[0].insert(idx, value);
         for i in 0..self.height {
             let pair = if cur_idx % 2 == 0 {
@@ -176,8 +176,8 @@ impl Tree {
             panic!("invalid leaves size {}", leaves.len());
         }
         // TODO: optimize here
-        for i in 0..leaves.len() {
-            self.set_value(i as u32, leaves[i]);
+        for (i, item) in leaves.iter().enumerate() {
+            self.set_value(i as u32, *item);
         }
     }
     pub fn fill_with_leaves_map(&mut self, leaves: std::collections::HashMap<LeafIndex, LeafType>) {
@@ -186,7 +186,7 @@ impl Tree {
         }
     }
     pub fn get_root(&self) -> LeafType {
-        return self.get_value(self.data.len() - 1, 0);
+        self.get_value(self.data.len() - 1, 0)
     }
     pub fn get_proof(&self, index: u32) -> MerkleProof {
         let mut index = index;

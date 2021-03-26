@@ -3,7 +3,7 @@ use super::types::*;
 use crate::state::merkle_tree::Tree;
 use serde_json::json;
 
-use franklin_crypto::bellman::bn256::{Bn256, Fr};
+use franklin_crypto::bellman::bn256::Fr;
 use franklin_crypto::bellman::{Field, PrimeField};
 
 pub fn test_check_leaf_update() -> CircuitTestCase {
@@ -28,7 +28,7 @@ pub fn test_check_leaf_update() -> CircuitTestCase {
         "path_elements": proof1.path_elements.iter().map(|x| field_slice_to_string(x)).collect::<Vec<_>>(),
         "path_index": [0, 1],
     });
-    return CircuitTestCase {
+    CircuitTestCase {
         source: CircuitSource {
             src: "src/lib/binary_merkle_tree.circom".to_owned(),
             main: "CheckLeafUpdate(2)".to_owned(),
@@ -38,5 +38,5 @@ pub fn test_check_leaf_update() -> CircuitTestCase {
             input,
             output: json!({}),
         },
-    };
+    }
 }
