@@ -5,6 +5,7 @@ use franklin_crypto::bellman::bn256::{Bn256, Fr};
 use franklin_crypto::rescue::bn256::Bn256RescueParams;
 use franklin_crypto::rescue::rescue_hash;
 use lazy_static::lazy_static;
+use rayon::prelude::*;
 use std::iter;
 
 type LeafIndex = u32;
@@ -25,6 +26,12 @@ pub struct MerkleProofN<const LENGTH: usize> {
     pub path_elements: Vec<[LeafType; LENGTH]>,
 }
 type MerkleProof = MerkleProofN<1>;
+#[derive(Debug)]
+struct HashCacheItemN<const LENGTH: usize> {
+    inputs: [LeafType; LENGTH],
+    result: LeafType,
+}
+type HashCacheItem = HashCacheItemN<2>;
 
 // TODO: use leaf_index/leaf_type as generics
 pub struct Tree {
@@ -119,12 +126,24 @@ impl Tree {
     }
     // of course there is no such thing 'parallel' in Js
     // self function is only used as pseudo code for future Rust rewrite
-    pub fn set_value_parallel(&mut self, idx: u32, value: LeafType) {
-        #[derive(Default)]
-        struct HashCacheItem {
-            inputs: Vec<LeafType>,
-            result: LeafType,
+    // TODO: change updates into something like Into<ParIter> ...
+    pub fn set_value_parallel(&mut self, updates: &[(u32, LeafType)], parallel: usize) {
+        let mut parallel = parallel;
+        if parallel == 0 {
+            parallel = 8; // TODO: a better default
         }
+        for chunk in updates.chunks(parallel) {
+            let diffs: Vec<Vec<HashCacheItem>> = chunk
+                .par_iter() // iterating over i32
+                .map(|(idx, value)| self.set_value_prepare_diff(*idx, *value))
+                .collect();
+            let chunk_vec: Vec<(u32, LeafType)> = chunk.to_vec();
+            for ((idx, value), cache) in chunk_vec.into_iter().zip(diffs.into_iter()) {
+                self.set_value_apply_diff(idx, value, cache)
+            }
+        }
+    }
+    fn set_value_prepare_diff(&self, idx: u32, value: LeafType) -> Vec<HashCacheItem> {
         // the precalculating can be done parallelly
         let mut precalculated = Vec::<HashCacheItem>::default();
         let mut cur_idx = idx;
@@ -137,16 +156,22 @@ impl Tree {
             };
             cur_value = hash(&pair);
             cur_idx = self.parent_idx(cur_idx);
-            precalculated.push(HashCacheItem {
-                inputs: pair.to_vec(),
+            let cache_item = HashCacheItem {
+                inputs: pair,
                 result: cur_value,
-            });
+            };
+            precalculated.push(cache_item);
         }
+        precalculated
+    }
+    fn set_value_apply_diff(&mut self, idx: u32, value: LeafType, precalculated: Vec<HashCacheItem>) {
         // apply the precalculated
         let mut cache_miss = false;
-        cur_idx = idx;
+        let mut cur_idx = idx;
         //cur_value = value;
         self.data[0].insert(idx, value);
+        //let cache_size = precalculated.len();
+        //let mut cache_hit_count = 0;
         for i in 0..self.height {
             let pair = if cur_idx % 2 == 0 {
                 [self.get_value(i, cur_idx), self.get_value(i, cur_idx + 1)]
@@ -157,19 +182,21 @@ impl Tree {
             if !cache_miss {
                 // TODO: is the `cache_miss` shortcut really needed? comparing bigint is quite cheap compared to hash
                 // `cache_miss` makes codes more difficult to read
-                if !(precalculated[i].inputs[0] == pair[0] || precalculated[i].inputs[1] == pair[1]) {
+                if precalculated[i].inputs[0] != pair[0] || precalculated[i].inputs[1] != pair[1] {
                     // Due to self is a merkle tree, future caches will all be missed.
                     // precalculated becomes totally useless now
                     cache_miss = true;
-                    precalculated.clear();
+                    //precalculated.clear();
                 }
             }
             if cache_miss {
                 self.data[i + 1].insert(cur_idx, hash(&pair));
             } else {
                 self.data[i + 1].insert(cur_idx, precalculated[i].result);
+                //cache_hit_count += 1;
             }
         }
+        //println!("cache hit {}/{}", cache_hit_count, cache_size);
     }
     pub fn fill_with_leaves_vec(&mut self, leaves: &[LeafType]) {
         if leaves.len() != self.max_leaf_num() as usize {
@@ -208,6 +235,7 @@ impl Tree {
 mod tests {
     use super::*;
     use franklin_crypto::bellman::{Field, PrimeField};
+    use rand::Rng;
     use std::time::Instant;
     //use test::Bencher;
     #[test]
@@ -226,6 +254,47 @@ mod tests {
             }
             // 2021.03.15(Apple M1): typescript: 100 ops takes 4934ms
             // 2021.03.26(Apple M1): rust:       100 ops takes 1160ms
+            println!("{} ops takes {}ms", inner_count, start.elapsed().as_millis());
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_tree_parallel() {
+        let h = 20;
+        // RAYON_NUM_THREADS can change threads num used
+        let mut tree = Tree::new(h, Fr::zero());
+
+        for i in 0..100 {
+            let start = Instant::now();
+            let inner_count = 100;
+            let mut same_updates = Vec::new();
+            let rand_elem = || {
+                let mut rng = rand::thread_rng();
+                Fr::from_str(&format!("{}", rng.gen_range(0..123456789))).unwrap()
+            };
+            let rand_idx = || {
+                let mut rng = rand::thread_rng();
+                rng.gen_range(0..2u32.pow(20u32))
+            };
+            for j in 0..inner_count {
+                same_updates.push((i, rand_elem()));
+            }
+            let mut dense_updates = Vec::new();
+            for j in 0..inner_count {
+                dense_updates.push((j, rand_elem()));
+            }
+            let mut sparse_updates = Vec::new();
+            for j in 0..inner_count {
+                sparse_updates.push((rand_idx(), rand_elem()));
+            }
+            tree.set_value_parallel(&sparse_updates, 6);
+            // 2021.03.15(Apple M1): typescript:            100 ops takes 4934ms
+            // 2021.03.26(Apple M1): rust:                  100 ops takes 1160ms
+            // sparse update: 80-90% cache hit
+            // 2021.03.26(Apple M1): rust parallel 1:       100 ops takes 1140ms
+            // 2021.03.26(Apple M1): rust parallel 2:       100 ops takes 656ms
+            // 2021.03.26(Apple M1): rust parallel 4:       100 ops takes 422ms
             println!("{} ops takes {}ms", inner_count, start.elapsed().as_millis());
         }
     }
