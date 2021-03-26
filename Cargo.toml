@@ -8,11 +8,21 @@ edition = "2018"
 config_rs = { package = "config", version = "0.10.1" }
 dotenv = "0.15.0"
 env_logger = "0.5"
+lazy_static = "1.4.0"
 log = "0.4"
 serde = { version = "1.0.124", features = ["derive"] }
 serde_derive = "1.0.90"
 serde_json = "1.0.64"
+franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch ="beta"}
+fnv = "1.0.7"
+regex = "1"
+anyhow = "1.0.39"
+num-bigint = "0.4.0"
 
 [[bin]]
 name = "state_keeper"
 path = "src/bin/main.rs"
+
+[[bin]]
+name = "export_circuit_test"
+path = "src/bin/export_circuit_test.rs"
