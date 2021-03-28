@@ -1,6 +1,6 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
 
-use super::common::{AccountState, DepositToOldTx, L2Block, Order, PlaceOrderTx, RawTx, SpotTradeTx, tx_detail_idx, TX_LENGTH, TxType};
+use super::common::{tx_detail_idx, AccountState, DepositToOldTx, L2Block, Order, PlaceOrderTx, RawTx, SpotTradeTx, TxType, TX_LENGTH};
 use super::merkle_tree::{empty_tree_root, Tree};
 use super::types::{u32_to_fr, Fr};
 use ff::Field;
@@ -54,8 +54,8 @@ impl GlobalState {
             // default_account_leaf depends on default_order_root and default_balance_root
             default_account_leaf,
             account_tree: Tree::new(account_levels, default_account_leaf), // Tree<account_hash>
-            balance_trees: FnvHashMap::default(),                       // FnvHashMap[account_id]balance_tree
-            order_trees: FnvHashMap::default(),                         // FnvHashMap[account_id]order_tree
+            balance_trees: FnvHashMap::default(),                          // FnvHashMap[account_id]balance_tree
+            order_trees: FnvHashMap::default(),                            // FnvHashMap[account_id]order_tree
             order_map: FnvHashMap::default(),
             accounts: FnvHashMap::default(), // FnvHashMap[account_id]acount_state
             buffered_txs: Vec::new(),
@@ -69,7 +69,8 @@ impl GlobalState {
         self.account_tree.get_root()
     }
     fn recalculate_from_account_state(&mut self, account_id: u32) {
-        self.account_tree.set_value(account_id, self.accounts.get(&account_id).unwrap().hash());
+        self.account_tree
+            .set_value(account_id, self.accounts.get(&account_id).unwrap().hash());
     }
     fn recalculate_from_balance_tree(&mut self, account_id: u32) {
         self.accounts.get_mut(&account_id).unwrap().balance_root = self.balance_trees.get(&account_id).unwrap().get_root();
@@ -239,7 +240,10 @@ impl GlobalState {
             let txs = &self.buffered_txs[(self.buffered_txs.len() - self.n_tx)..];
             let block = self.forge_with_txs(txs);
             self.buffered_blocks.push(block);
-            assert!(self.buffered_blocks.len() * self.n_tx == self.buffered_txs.len(), "invalid block num");
+            assert!(
+                self.buffered_blocks.len() * self.n_tx == self.buffered_txs.len(),
+                "invalid block num"
+            );
             if self.verbose {
                 println!("forge block {} done", self.buffered_blocks.len() - 1);
             }

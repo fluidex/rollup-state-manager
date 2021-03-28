@@ -2,7 +2,7 @@
 
 use super::merkle_tree::MerklePath;
 use super::types::{hash, shl, Fr};
-use ff::{Field};
+use ff::Field;
 
 #[derive(Clone, Copy)]
 pub struct Order {
@@ -46,7 +46,6 @@ pub struct AccountState {
     pub order_root: Fr,
 }
 
-
 impl AccountState {
     pub fn empty(balance_root: Fr, order_root: Fr) -> Self {
         Self {
@@ -79,7 +78,7 @@ impl AccountState {
         let inputs = &[data, self.balance_root, self.ay, self.eth_addr, self.order_root];
         hash(inputs)
     }
-    
+
     /*
     pub fn updateAccountKey(account) {
       const sign = BigInt(account.sign);
