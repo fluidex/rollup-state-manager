@@ -17,7 +17,8 @@ pub struct MerkleProofN<const LENGTH: usize> {
     pub leaf: LeafType,
     pub path_elements: Vec<[LeafType; LENGTH]>,
 }
-type MerkleProof = MerkleProofN<1>;
+pub type MerkleProof = MerkleProofN<1>;
+pub type MerklePath = Vec<[LeafType; 1]>;
 #[derive(Debug)]
 struct HashCacheItemN<const LENGTH: usize> {
     inputs: [LeafType; LENGTH],
@@ -223,6 +224,10 @@ impl Tree {
     }
 }
 
+pub fn empty_tree_root(level: usize, leaf: LeafType) -> LeafType {
+    Tree::new(level, leaf).get_root()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -278,13 +283,13 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    //#[ignore]
     fn bench_tree_parallel() {
         let h = 20;
         // RAYON_NUM_THREADS can change threads num used
         let mut tree = Tree::new(h, Fr::zero());
 
-        for i in 0..100 {
+        for i in 0..10 {
             let start = Instant::now();
             let inner_count = 100;
             let mut same_updates = Vec::new();
@@ -307,7 +312,7 @@ mod tests {
             for _ in 0..inner_count {
                 sparse_updates.push((rand_idx(), rand_elem()));
             }
-            tree.set_value_parallel(&sparse_updates, 4);
+            tree.set_value_parallel(&sparse_updates, 2);
             // Rescue
             // 2021.03.15(Apple M1): typescript:            100 ops takes 4934ms
             // 2021.03.26(Apple M1): rust:                  100 ops takes 1160ms
@@ -316,6 +321,8 @@ mod tests {
             // 2021.03.26(Apple M1): rust parallel 2:       100 ops takes 656ms
             // 2021.03.26(Apple M1): rust parallel 4:       100 ops takes 422ms
             // Poseidon
+            // 2021.03.28(Apple M1): rust parallel 1:       100 ops takes 57ms
+            // 2021.03.28(Apple M1): rust parallel 2:       100 ops takes 37ms
             // 2021.03.28(Apple M1): rust parallel 4:       100 ops takes 25ms
             println!("{} ops takes {}ms", inner_count, start.elapsed().as_millis());
         }

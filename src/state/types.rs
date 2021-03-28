@@ -1,3 +1,4 @@
+use ff::{PrimeField, PrimeFieldRepr};
 use lazy_static::lazy_static;
 
 /*
@@ -23,4 +24,14 @@ lazy_static! {
 }
 pub fn hash(inputs: &[Fr]) -> Fr {
     (&POSEIDON_HASHER).hash(inputs.to_vec()).unwrap()
+}
+
+pub fn shl(a: &Fr, x: u32) -> Fr {
+    let mut repr = a.into_repr();
+    repr.shl(x);
+    Fr::from_repr(repr).unwrap()
+}
+
+pub fn u32_to_fr(x: u32) -> Fr {
+    Fr::from_str(&format!("{}", x)).unwrap()
 }
