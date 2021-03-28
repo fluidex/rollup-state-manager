@@ -1,6 +1,6 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
 
-use super::common::{AccountState, DepositToOldTx, L2Block, Order, PlaceOrderTx, RawTx, SpotTradeTx, TxDetailIdx, TxLength, TxType};
+use super::common::{AccountState, DepositToOldTx, L2Block, Order, PlaceOrderTx, RawTx, SpotTradeTx, tx_detail_idx, TX_LENGTH, TxType};
 use super::merkle_tree::{empty_tree_root, Tree};
 use super::types::{u32_to_fr, Fr};
 use ff::Field;
@@ -9,690 +9,690 @@ use fnv::FnvHashMap;
 struct StateProof {
     leaf: Fr,
     root: Fr,
-    balanceRoot: Fr,
-    orderRoot: Fr,
-    balancePath: Vec<[Fr; 1]>,
-    accountPath: Vec<[Fr; 1]>,
+    balance_root: Fr,
+    order_root: Fr,
+    balance_path: Vec<[Fr; 1]>,
+    account_path: Vec<[Fr; 1]>,
 }
 
 // TODO: change to snake_case
 // TODO: too many unwrap here
 struct GlobalState {
-    nTx: usize,
-    balanceLevels: usize,
-    orderLevels: usize,
-    accountLevels: usize,
-    accountTree: Tree,
+    n_tx: usize,
+    balance_levels: usize,
+    order_levels: usize,
+    account_levels: usize,
+    account_tree: Tree,
     // idx to balanceTree
-    balanceTrees: FnvHashMap<u32, Tree>,
-    orderTrees: FnvHashMap<u32, Tree>,
-    orderMap: FnvHashMap<u32, FnvHashMap<u32, Order>>,
+    balance_trees: FnvHashMap<u32, Tree>,
+    order_trees: FnvHashMap<u32, Tree>,
+    order_map: FnvHashMap<u32, FnvHashMap<u32, Order>>,
     accounts: FnvHashMap<u32, AccountState>,
-    bufferedTxs: Vec<RawTx>,
-    bufferedBlocks: Vec<L2Block>,
-    defaultBalanceRoot: Fr,
-    defaultOrderLeaf: Fr,
-    defaultOrderRoot: Fr,
-    defaultAccountLeaf: Fr,
-    nextOrderIds: FnvHashMap<u32, u32>,
+    buffered_txs: Vec<RawTx>,
+    buffered_blocks: Vec<L2Block>,
+    default_balance_root: Fr,
+    default_order_leaf: Fr,
+    default_order_root: Fr,
+    default_account_leaf: Fr,
+    next_order_ids: FnvHashMap<u32, u32>,
     verbose: bool,
 }
 
 impl GlobalState {
-    pub fn new(balanceLevels: usize, orderLevels: usize, accountLevels: usize, nTx: usize, verbose: bool) -> Self {
-        let defaultBalanceRoot = empty_tree_root(balanceLevels, Fr::zero());
-        let defaultOrderLeaf = Order::empty().hash();
-        let defaultOrderRoot = empty_tree_root(orderLevels, defaultOrderLeaf);
-        let defaultAccountLeaf = AccountState::empty(defaultBalanceRoot, defaultOrderRoot).hash();
+    pub fn new(balance_levels: usize, order_levels: usize, account_levels: usize, n_tx: usize, verbose: bool) -> Self {
+        let default_balance_root = empty_tree_root(balance_levels, Fr::zero());
+        let default_order_leaf = Order::empty().hash();
+        let default_order_root = empty_tree_root(order_levels, default_order_leaf);
+        let default_account_leaf = AccountState::empty(default_balance_root, default_order_root).hash();
         Self {
-            balanceLevels,
-            orderLevels,
-            accountLevels,
-            defaultBalanceRoot,
-            defaultOrderLeaf,
-            defaultOrderRoot,
-            // defaultAccountLeaf depends on defaultOrderRoot and defaultBalanceRoot
-            defaultAccountLeaf,
-            accountTree: Tree::new(accountLevels, defaultAccountLeaf), // Tree<account_hash>
-            balanceTrees: FnvHashMap::default(),                       // FnvHashMap[account_id]balance_tree
-            orderTrees: FnvHashMap::default(),                         // FnvHashMap[account_id]order_tree
-            orderMap: FnvHashMap::default(),
+            balance_levels,
+            order_levels,
+            account_levels,
+            default_balance_root,
+            default_order_leaf,
+            default_order_root,
+            // default_account_leaf depends on default_order_root and default_balance_root
+            default_account_leaf,
+            account_tree: Tree::new(account_levels, default_account_leaf), // Tree<account_hash>
+            balance_trees: FnvHashMap::default(),                       // FnvHashMap[account_id]balance_tree
+            order_trees: FnvHashMap::default(),                         // FnvHashMap[account_id]order_tree
+            order_map: FnvHashMap::default(),
             accounts: FnvHashMap::default(), // FnvHashMap[account_id]acount_state
-            bufferedTxs: Vec::new(),
-            bufferedBlocks: Vec::new(),
-            nextOrderIds: FnvHashMap::default(),
-            nTx,
+            buffered_txs: Vec::new(),
+            buffered_blocks: Vec::new(),
+            next_order_ids: FnvHashMap::default(),
+            n_tx,
             verbose,
         }
     }
     pub fn root(&self) -> Fr {
-        return self.accountTree.get_root();
+        self.account_tree.get_root()
     }
-    fn recalculateFromAccountState(&mut self, accountID: u32) {
-        self.accountTree.set_value(accountID, self.accounts.get(&accountID).unwrap().hash());
+    fn recalculate_from_account_state(&mut self, account_id: u32) {
+        self.account_tree.set_value(account_id, self.accounts.get(&account_id).unwrap().hash());
     }
-    fn recalculateFromBalanceTree(&mut self, accountID: u32) {
-        self.accounts.get_mut(&accountID).unwrap().balanceRoot = self.balanceTrees.get(&accountID).unwrap().get_root();
-        self.recalculateFromAccountState(accountID);
+    fn recalculate_from_balance_tree(&mut self, account_id: u32) {
+        self.accounts.get_mut(&account_id).unwrap().balance_root = self.balance_trees.get(&account_id).unwrap().get_root();
+        self.recalculate_from_account_state(account_id);
     }
-    fn recalculateFromOrderTree(&mut self, accountID: u32) {
-        self.accounts.get_mut(&accountID).unwrap().orderRoot = self.orderTrees.get(&accountID).unwrap().get_root();
-        self.recalculateFromAccountState(accountID);
+    fn recalculate_from_order_tree(&mut self, account_id: u32) {
+        self.accounts.get_mut(&account_id).unwrap().order_root = self.order_trees.get(&account_id).unwrap().get_root();
+        self.recalculate_from_account_state(account_id);
     }
     /*
-    pub fn setAccountKey(&mut self, accountID: Fr, account: Account) {
-      //println!("setAccountKey", accountID);
-      self.accounts.get(accountID).updateAccountKey(account);
-      self.recalculateFromAccountState(accountID);
+    pub fn setAccountKey(&mut self, account_id: Fr, account: Account) {
+      //println!("setAccountKey", account_id);
+      self.accounts.get(account_id).updateAccountKey(account);
+      self.recalculate_from_account_state(account_id);
     }
-    pub fn setAccountL2Addr(&mut self, accountID: Fr, sign, ay, ethAddr) {
-      self.accounts.get(accountID).updateL2Addr(sign, ay, ethAddr);
-      self.recalculateFromAccountState(accountID);
+    pub fn setAccountL2Addr(&mut self, account_id: Fr, sign, ay, eth_addr) {
+      self.accounts.get(account_id).update_l2_addr(sign, ay, eth_addr);
+      self.recalculate_from_account_state(account_id);
     }
     */
-    // TODO: we should change accountID to u32 later?
-    pub fn setAccountNonce(&mut self, accountID: u32, nonce: Fr) {
-        self.accounts.get_mut(&accountID).unwrap().updateNonce(nonce);
-        self.recalculateFromAccountState(accountID);
+    // TODO: we should change account_id to u32 later?
+    pub fn set_account_nonce(&mut self, account_id: u32, nonce: Fr) {
+        self.accounts.get_mut(&account_id).unwrap().update_nonce(nonce);
+        self.recalculate_from_account_state(account_id);
     }
     // self function should only be used in tests for convenience
-    pub fn setAccountOrderRoot(&mut self, accountID: u32, orderRoot: Fr) {
-        self.accounts.get_mut(&accountID).unwrap().updateOrderRoot(orderRoot);
-        self.recalculateFromAccountState(accountID);
+    pub fn set_account_order_root(&mut self, account_id: u32, order_root: Fr) {
+        self.accounts.get_mut(&account_id).unwrap().update_order_root(order_root);
+        self.recalculate_from_account_state(account_id);
     }
-    fn increaseNonce(&mut self, accountID: u32) {
-        let mut nonce = self.accounts.get(&accountID).unwrap().nonce;
+    fn increase_nonce(&mut self, account_id: u32) {
+        let mut nonce = self.accounts.get(&account_id).unwrap().nonce;
         nonce.add_assign(&Fr::one());
         //println!("oldNonce", oldNonce);
-        self.setAccountNonce(accountID, nonce);
+        self.set_account_nonce(account_id, nonce);
     }
-    pub fn getAccount(&self, account_id: u32) -> AccountState {
+    pub fn get_account(&self, account_id: u32) -> AccountState {
         *self.accounts.get(&account_id).unwrap()
     }
-    fn getNextOrderIdForUser(&self, accountID: u32) -> u32 {
-        *self.nextOrderIds.get(&accountID).unwrap()
+    fn get_next_order_id_for_user(&self, account_id: u32) -> u32 {
+        *self.next_order_ids.get(&account_id).unwrap()
     }
-    pub fn createNewAccount(&mut self, next_order_id: u32) -> u32 {
-        let accountID = self.balanceTrees.len() as u32;
-        if accountID >= 2u32.pow(self.accountLevels as u32) {
-            panic!("account_id {} overflows for accountLevels {}", accountID, self.accountLevels);
+    pub fn create_new_account(&mut self, next_order_id: u32) -> u32 {
+        let account_id = self.balance_trees.len() as u32;
+        if account_id >= 2u32.pow(self.account_levels as u32) {
+            panic!("account_id {} overflows for account_levels {}", account_id, self.account_levels);
         }
 
-        let accountState = AccountState::empty(self.defaultBalanceRoot, self.defaultOrderRoot);
-        self.accounts.insert(accountID, accountState);
-        self.balanceTrees.insert(accountID, Tree::new(self.balanceLevels, Fr::zero()));
-        self.orderTrees
-            .insert(accountID, Tree::new(self.orderLevels, self.defaultOrderLeaf));
-        self.orderMap.insert(accountID, FnvHashMap::<u32, Order>::default());
-        self.accountTree.set_value(accountID, self.defaultAccountLeaf);
-        self.nextOrderIds.insert(accountID, next_order_id);
-        //println!("add account", accountID);
-        return accountID;
+        let account_state = AccountState::empty(self.default_balance_root, self.default_order_root);
+        self.accounts.insert(account_id, account_state);
+        self.balance_trees.insert(account_id, Tree::new(self.balance_levels, Fr::zero()));
+        self.order_trees
+            .insert(account_id, Tree::new(self.order_levels, self.default_order_leaf));
+        self.order_map.insert(account_id, FnvHashMap::<u32, Order>::default());
+        self.account_tree.set_value(account_id, self.default_account_leaf);
+        self.next_order_ids.insert(account_id, next_order_id);
+        //println!("add account", account_id);
+        account_id
     }
 
-    pub fn setAccountOrder(&mut self, accountID: u32, orderID: u32, order: Order) {
-        assert!(self.orderTrees.contains_key(&accountID), "setAccountOrder");
-        if orderID >= 2u32.pow(self.orderLevels as u32) {
-            panic!("order_id {} overflows for orderLevels {}", orderID, self.orderLevels);
+    pub fn set_account_order(&mut self, account_id: u32, order_id: u32, order: Order) {
+        assert!(self.order_trees.contains_key(&account_id), "set_account_order");
+        if order_id >= 2u32.pow(self.order_levels as u32) {
+            panic!("order_id {} overflows for order_levels {}", order_id, self.order_levels);
         }
-        self.orderTrees.get_mut(&accountID).unwrap().set_value(orderID, order.hash());
-        self.orderMap.get_mut(&accountID).unwrap().insert(orderID, order);
-        self.recalculateFromOrderTree(accountID);
+        self.order_trees.get_mut(&account_id).unwrap().set_value(order_id, order.hash());
+        self.order_map.get_mut(&account_id).unwrap().insert(order_id, order);
+        self.recalculate_from_order_tree(account_id);
     }
-    pub fn createNewOrder(&mut self, tx: &PlaceOrderTx) -> u32 {
-        let mut orderID = self.getNextOrderIdForUser(tx.accountID);
-        if orderID >= 2u32.pow(self.orderLevels as u32) {
-            panic!("order_id {} overflows for orderLevels {}", orderID, self.orderLevels);
+    pub fn create_new_order(&mut self, tx: &PlaceOrderTx) -> u32 {
+        let order_id = self.get_next_order_id_for_user(tx.account_id);
+        if order_id >= 2u32.pow(self.order_levels as u32) {
+            panic!("order_id {} overflows for order_levels {}", order_id, self.order_levels);
         }
 
         let order = Order {
             status: Fr::zero(), //open
-            tokenbuy: u32_to_fr(tx.tokenID_buy),
-            tokensell: u32_to_fr(tx.tokenID_sell),
+            tokenbuy: u32_to_fr(tx.token_id_buy),
+            tokensell: u32_to_fr(tx.token_id_sell),
             filled_sell: Fr::zero(),
             filled_buy: Fr::zero(),
             total_sell: tx.amount_sell,
             total_buy: tx.amount_buy,
         };
-        self.setAccountOrder(tx.accountID, orderID, order);
-        self.nextOrderIds.insert(tx.accountID, orderID + 1);
-        orderID
+        self.set_account_order(tx.account_id, order_id, order);
+        self.next_order_ids.insert(tx.account_id, order_id + 1);
+        order_id
     }
 
-    pub fn getTokenBalance(&self, accountID: u32, tokenID: u32) -> Fr {
-        self.balanceTrees.get(&accountID).unwrap().get_leaf(tokenID)
+    pub fn get_token_balance(&self, account_id: u32, token_id: u32) -> Fr {
+        self.balance_trees.get(&account_id).unwrap().get_leaf(token_id)
     }
-    pub fn setTokenBalance(&mut self, accountID: u32, tokenID: u32, balance: Fr) {
-        assert!(self.balanceTrees.contains_key(&accountID), "setTokenBalance");
-        self.balanceTrees.get_mut(&accountID).unwrap().set_value(tokenID, balance);
-        self.recalculateFromBalanceTree(accountID);
+    pub fn set_token_balance(&mut self, account_id: u32, token_id: u32, balance: Fr) {
+        assert!(self.balance_trees.contains_key(&account_id), "set_token_balance");
+        self.balance_trees.get_mut(&account_id).unwrap().set_value(token_id, balance);
+        self.recalculate_from_balance_tree(account_id);
     }
-    pub fn getAccountOrder(&self, accountID: u32, orderID: u32) -> Order {
-        *self.orderMap.get(&accountID).unwrap().get(&orderID).unwrap()
-    }
-
-    pub fn trivialOrderPathElements(&self) -> Vec<[Fr; 1]> {
-        Tree::new(self.orderLevels, Fr::zero()).get_proof(0).path_elements
+    pub fn get_account_order(&self, account_id: u32, order_id: u32) -> Order {
+        *self.order_map.get(&account_id).unwrap().get(&order_id).unwrap()
     }
 
-    pub fn stateProof(&self, accountID: u32, tokenID: u32) -> StateProof {
-        let balanceProof = self.balanceTrees.get(&accountID).unwrap().get_proof(tokenID);
-        let orderRoot = self.orderTrees.get(&accountID).unwrap().get_root();
-        let accountProof = self.accountTree.get_proof(accountID);
-        //assert!(accountLeaf == balanceRoot, "stateProof");
+    pub fn trivial_order_path_elements(&self) -> Vec<[Fr; 1]> {
+        Tree::new(self.order_levels, Fr::zero()).get_proof(0).path_elements
+    }
+
+    pub fn state_proof(&self, account_id: u32, token_id: u32) -> StateProof {
+        let balance_proof = self.balance_trees.get(&account_id).unwrap().get_proof(token_id);
+        let order_root = self.order_trees.get(&account_id).unwrap().get_root();
+        let account_proof = self.account_tree.get_proof(account_id);
+        //assert!(accountLeaf == balance_root, "state_proof");
         StateProof {
-            leaf: balanceProof.leaf,
-            root: accountProof.root,
-            balanceRoot: balanceProof.root,
-            orderRoot,
-            balancePath: balanceProof.path_elements,
-            accountPath: accountProof.path_elements,
+            leaf: balance_proof.leaf,
+            root: account_proof.root,
+            balance_root: balance_proof.root,
+            order_root,
+            balance_path: balance_proof.path_elements,
+            account_path: account_proof.path_elements,
         }
     }
-    pub fn getL1Addr(&self, accountID: u32) -> Fr {
-        return self.accounts.get(&accountID).unwrap().ethAddr;
+    pub fn get_l1_addr(&self, account_id: u32) -> Fr {
+        return self.accounts.get(&account_id).unwrap().eth_addr;
     }
-    pub fn forgeWithTxs(&self, bufferedTxs: &[RawTx]) -> L2Block {
-        assert!(bufferedTxs.len() == self.nTx, "invalid txs len");
-        let txsType = bufferedTxs.iter().map(|tx| tx.txType).collect();
-        let encodedTxs = bufferedTxs.iter().map(|tx| tx.payload.clone()).collect();
-        let balance_path_elements = bufferedTxs
+    pub fn forge_with_txs(&self, buffered_txs: &[RawTx]) -> L2Block {
+        assert!(buffered_txs.len() == self.n_tx, "invalid txs len");
+        let txs_type = buffered_txs.iter().map(|tx| tx.tx_type).collect();
+        let encoded_txs = buffered_txs.iter().map(|tx| tx.payload.clone()).collect();
+        let balance_path_elements = buffered_txs
             .iter()
             .map(|tx| {
                 [
-                    tx.balancePath0.clone(),
-                    tx.balancePath1.clone(),
-                    tx.balancePath2.clone(),
-                    tx.balancePath3.clone(),
+                    tx.balance_path0.clone(),
+                    tx.balance_path1.clone(),
+                    tx.balance_path2.clone(),
+                    tx.balance_path3.clone(),
                 ]
             })
             .collect();
-        let order_path_elements = bufferedTxs
+        let order_path_elements = buffered_txs
             .iter()
-            .map(|tx| [tx.orderPath0.clone(), tx.orderPath1.clone()])
+            .map(|tx| [tx.order_path0.clone(), tx.order_path1.clone()])
             .collect();
-        let orderRoots = bufferedTxs.iter().map(|tx| [tx.orderRoot0, tx.orderRoot1]).collect();
-        let account_path_elements = bufferedTxs
+        let order_roots = buffered_txs.iter().map(|tx| [tx.order_root0, tx.order_root1]).collect();
+        let account_path_elements = buffered_txs
             .iter()
-            .map(|tx| [tx.accountPath0.clone(), tx.accountPath1.clone()])
+            .map(|tx| [tx.account_path0.clone(), tx.account_path1.clone()])
             .collect();
-        let oldAccountRoots = bufferedTxs.iter().map(|tx| tx.rootBefore).collect();
-        let newAccountRoots = bufferedTxs.iter().map(|tx| tx.rootAfter).collect();
+        let old_account_roots = buffered_txs.iter().map(|tx| tx.root_before).collect();
+        let new_account_roots = buffered_txs.iter().map(|tx| tx.root_after).collect();
         L2Block {
-            txsType,
-            encodedTxs,
+            txs_type,
+            encoded_txs,
             balance_path_elements,
             order_path_elements,
             account_path_elements,
-            orderRoots,
-            oldAccountRoots,
-            newAccountRoots,
+            order_roots,
+            old_account_roots,
+            new_account_roots,
         }
     }
     pub fn forge(&self) -> L2Block {
-        return self.forgeWithTxs(&self.bufferedTxs);
+        self.forge_with_txs(&self.buffered_txs)
     }
-    pub fn addRawTx(&mut self, rawTx: RawTx) {
-        self.bufferedTxs.push(rawTx);
-        if self.bufferedTxs.len() % self.nTx == 0 {
-            // forge next block, using last nTx txs
-            let txs = &self.bufferedTxs[(self.bufferedTxs.len() - self.nTx)..];
-            let block = self.forgeWithTxs(txs);
-            self.bufferedBlocks.push(block);
-            assert!(self.bufferedBlocks.len() * self.nTx == self.bufferedTxs.len(), "invalid block num");
+    pub fn add_raw_tx(&mut self, raw_tx: RawTx) {
+        self.buffered_txs.push(raw_tx);
+        if self.buffered_txs.len() % self.n_tx == 0 {
+            // forge next block, using last n_tx txs
+            let txs = &self.buffered_txs[(self.buffered_txs.len() - self.n_tx)..];
+            let block = self.forge_with_txs(txs);
+            self.buffered_blocks.push(block);
+            assert!(self.buffered_blocks.len() * self.n_tx == self.buffered_txs.len(), "invalid block num");
             if self.verbose {
-                println!("forge block {} done", self.bufferedBlocks.len() - 1);
+                println!("forge block {} done", self.buffered_blocks.len() - 1);
             }
         }
     }
     /*
     DepositToNew(tx: DepositToNewTx) {
-      assert!(self.accounts.get(tx.accountID).ethAddr == 0n, "DepositToNew");
-      let proof = self.stateProof(tx.accountID, tx.tokenID);
+      assert!(self.accounts.get(tx.account_id).eth_addr == 0n, "DepositToNew");
+      let proof = self.state_proof(tx.account_id, tx.token_id);
       // first, generate the tx
-      let encodedTx: Array<Fr> = new Array(Txlen());
-      encodedTx.fill(0n, 0, Txlen());
-      encodedTx[TxDetailIdx::TokenID] = Scalar.e(tx.tokenID);
-      encodedTx[TxDetailIdx::Amount] = tx.amount;
-      encodedTx[TxDetailIdx::AccountID2] = Scalar.e(tx.accountID);
-      encodedTx[TxDetailIdx::EthAddr2] = tx.ethAddr;
-      encodedTx[TxDetailIdx::Sign2] = Scalar.e(tx.sign);
-      encodedTx[TxDetailIdx::Ay2] = tx.ay;
-      let rawTx: RawTx = {
-        txType: TxType.DepositToNew,
-        payload: encodedTx,
-        balancePath0: proof.balancePath,
-        balancePath1: proof.balancePath,
-        balancePath2: proof.balancePath,
-        balancePath3: proof.balancePath,
-        orderPath0: self.trivialOrderPathElements(),
-        orderPath1: self.trivialOrderPathElements(),
-        orderRoot0: self.defaultOrderRoot,
-        orderRoot1: self.defaultOrderRoot,
-        accountPath0: proof.accountPath,
-        accountPath1: proof.accountPath,
-        rootBefore: proof.root,
-        rootAfter: 0n,
+      let encoded_tx: Array<Fr> = new Array(Txlen());
+      encoded_tx.fill(0n, 0, Txlen());
+      encoded_tx[tx_detail_idx::TOKEN_ID] = Scalar.e(tx.token_id);
+      encoded_tx[tx_detail_idx::AMOUNT] = tx.amount;
+      encoded_tx[tx_detail_idx::ACCOUNT_ID2] = Scalar.e(tx.account_id);
+      encoded_tx[tx_detail_idx::ETH_ADDR2] = tx.eth_addr;
+      encoded_tx[tx_detail_idx::SIGN2] = Scalar.e(tx.sign);
+      encoded_tx[tx_detail_idx::AY2] = tx.ay;
+      let raw_tx: RawTx = {
+        tx_type: TxType.DepositToNew,
+        payload: encoded_tx,
+        balance_path0: proof.balance_path,
+        balance_path1: proof.balance_path,
+        balance_path2: proof.balance_path,
+        balance_path3: proof.balance_path,
+        order_path0: self.trivial_order_path_elements(),
+        order_path1: self.trivial_order_path_elements(),
+        order_root0: self.default_order_root,
+        order_root1: self.default_order_root,
+        account_path0: proof.account_path,
+        account_path1: proof.account_path,
+        root_before: proof.root,
+        root_after: 0n,
       };
 
       // then update global state
-      self.setTokenBalance(tx.accountID, tx.tokenID, tx.amount);
-      self.setAccountL2Addr(tx.accountID, tx.sign, tx.ay, tx.ethAddr);
-      rawTx.rootAfter = self.root();
-      self.addRawTx(rawTx);
+      self.set_token_balance(tx.account_id, tx.token_id, tx.amount);
+      self.setAccountL2Addr(tx.account_id, tx.sign, tx.ay, tx.eth_addr);
+      raw_tx.root_after = self.root();
+      self.add_raw_tx(raw_tx);
     }
     */
-    pub fn DepositToOld(&mut self, tx: DepositToOldTx) {
-        //assert!(self.accounts.get(tx.accountID).ethAddr != 0n, "DepositToOld");
-        let proof = self.stateProof(tx.accountID, tx.tokenID);
+    pub fn deposit_to_old(&mut self, tx: DepositToOldTx) {
+        //assert!(self.accounts.get(tx.account_id).eth_addr != 0n, "deposit_to_old");
+        let proof = self.state_proof(tx.account_id, tx.token_id);
         // first, generate the tx
 
-        let mut encodedTx = [Fr::zero(); TxLength];
-        encodedTx[TxDetailIdx::TokenID] = u32_to_fr(tx.tokenID);
-        encodedTx[TxDetailIdx::Amount] = tx.amount;
-        encodedTx[TxDetailIdx::AccountID2] = u32_to_fr(tx.accountID);
-        let oldBalance = self.getTokenBalance(tx.accountID, tx.tokenID);
-        encodedTx[TxDetailIdx::Balance2] = oldBalance;
-        encodedTx[TxDetailIdx::Nonce2] = self.accounts.get(&tx.accountID).unwrap().nonce;
-        let acc = self.accounts.get(&tx.accountID).unwrap();
-        encodedTx[TxDetailIdx::EthAddr2] = acc.ethAddr;
-        encodedTx[TxDetailIdx::Sign2] = acc.sign;
-        encodedTx[TxDetailIdx::Ay2] = acc.ay;
+        let mut encoded_tx = [Fr::zero(); TX_LENGTH];
+        encoded_tx[tx_detail_idx::TOKEN_ID] = u32_to_fr(tx.token_id);
+        encoded_tx[tx_detail_idx::AMOUNT] = tx.amount;
+        encoded_tx[tx_detail_idx::ACCOUNT_ID2] = u32_to_fr(tx.account_id);
+        let old_balance = self.get_token_balance(tx.account_id, tx.token_id);
+        encoded_tx[tx_detail_idx::BALANCE2] = old_balance;
+        encoded_tx[tx_detail_idx::NONCE2] = self.accounts.get(&tx.account_id).unwrap().nonce;
+        let acc = self.accounts.get(&tx.account_id).unwrap();
+        encoded_tx[tx_detail_idx::ETH_ADDR2] = acc.eth_addr;
+        encoded_tx[tx_detail_idx::SIGN2] = acc.sign;
+        encoded_tx[tx_detail_idx::AY2] = acc.ay;
 
-        let mut rawTx = RawTx {
-            txType: TxType::DepositToOld,
-            payload: encodedTx.to_vec(),
-            balancePath0: proof.balancePath.clone(),
-            balancePath1: proof.balancePath.clone(),
-            balancePath2: proof.balancePath.clone(),
-            balancePath3: proof.balancePath,
-            orderPath0: self.trivialOrderPathElements(),
-            orderPath1: self.trivialOrderPathElements(),
-            orderRoot0: acc.orderRoot,
-            orderRoot1: acc.orderRoot,
-            accountPath0: proof.accountPath.clone(),
-            accountPath1: proof.accountPath,
-            rootBefore: proof.root,
-            rootAfter: Fr::zero(),
+        let mut raw_tx = RawTx {
+            tx_type: TxType::DepositToOld,
+            payload: encoded_tx.to_vec(),
+            balance_path0: proof.balance_path.clone(),
+            balance_path1: proof.balance_path.clone(),
+            balance_path2: proof.balance_path.clone(),
+            balance_path3: proof.balance_path,
+            order_path0: self.trivial_order_path_elements(),
+            order_path1: self.trivial_order_path_elements(),
+            order_root0: acc.order_root,
+            order_root1: acc.order_root,
+            account_path0: proof.account_path.clone(),
+            account_path1: proof.account_path,
+            root_before: proof.root,
+            root_after: Fr::zero(),
         };
 
-        let mut balance = oldBalance;
+        let mut balance = old_balance;
         balance.add_assign(&tx.amount);
-        self.setTokenBalance(tx.accountID, tx.tokenID, balance);
+        self.set_token_balance(tx.account_id, tx.token_id, balance);
 
-        rawTx.rootAfter = self.root();
-        self.addRawTx(rawTx);
+        raw_tx.root_after = self.root();
+        self.add_raw_tx(raw_tx);
     }
     /*
     fillTransferTx(tx: TranferTx) {
       let fullTx = {
         from: tx.from,
         to: tx.to,
-        tokenID: tx.tokenID,
+        token_id: tx.token_id,
         amount: tx.amount,
         fromNonce: self.accounts.get(tx.from).nonce,
         toNonce: self.accounts.get(tx.to).nonce,
-        oldBalanceFrom: self.getTokenBalance(tx.from, tx.tokenID),
-        oldBalanceTo: self.getTokenBalance(tx.to, tx.tokenID),
+        old_balanceFrom: self.get_token_balance(tx.from, tx.token_id),
+        old_balanceTo: self.get_token_balance(tx.to, tx.token_id),
       };
       return fullTx;
     }
-    fillWithdrawTx(tx: WithdrawTx) {
+    fillWithdraw_tx(tx: Withdraw_tx) {
       let fullTx = {
-        accountID: tx.accountID,
-        tokenID: tx.tokenID,
+        account_id: tx.account_id,
+        token_id: tx.token_id,
         amount: tx.amount,
-        nonce: self.accounts.get(tx.accountID).nonce,
-        oldBalance: self.getTokenBalance(tx.accountID, tx.tokenID),
+        nonce: self.accounts.get(tx.account_id).nonce,
+        old_balance: self.get_token_balance(tx.account_id, tx.token_id),
       };
       return fullTx;
     }
     Transfer(tx: TranferTx) {
-      assert!(self.accounts.get(tx.from).ethAddr != 0n, "TransferTx: empty fromAccount");
-      assert!(self.accounts.get(tx.to).ethAddr != 0n, "Transfer: empty toAccount");
-      let proofFrom = self.stateProof(tx.from, tx.tokenID);
+      assert!(self.accounts.get(tx.from).eth_addr != 0n, "TransferTx: empty fromAccount");
+      assert!(self.accounts.get(tx.to).eth_addr != 0n, "Transfer: empty toAccount");
+      let proofFrom = self.state_proof(tx.from, tx.token_id);
       let fromAccount = self.accounts.get(tx.from);
       let toAccount = self.accounts.get(tx.to);
 
       // first, generate the tx
-      let encodedTx: Array<Fr> = new Array(Txlen());
-      encodedTx.fill(0n, 0, Txlen());
+      let encoded_tx: Array<Fr> = new Array(Txlen());
+      encoded_tx.fill(0n, 0, Txlen());
 
-      let fromOldBalance = self.getTokenBalance(tx.from, tx.tokenID);
-      let toOldBalance = self.getTokenBalance(tx.to, tx.tokenID);
+      let fromOldBalance = self.get_token_balance(tx.from, tx.token_id);
+      let toOldBalance = self.get_token_balance(tx.to, tx.token_id);
       assert!(fromOldBalance > tx.amount, "Transfer balance not enough");
-      encodedTx[TxDetailIdx::AccountID1] = tx.from;
-      encodedTx[TxDetailIdx::AccountID2] = tx.to;
-      encodedTx[TxDetailIdx::TokenID] = tx.tokenID;
-      encodedTx[TxDetailIdx::Amount] = tx.amount;
-      encodedTx[TxDetailIdx::Nonce1] = fromAccount.nonce;
-      encodedTx[TxDetailIdx::Nonce2] = toAccount.nonce;
-      encodedTx[TxDetailIdx::Sign1] = fromAccount.sign;
-      encodedTx[TxDetailIdx::Sign2] = toAccount.sign;
-      encodedTx[TxDetailIdx::Ay1] = fromAccount.ay;
-      encodedTx[TxDetailIdx::Ay2] = toAccount.ay;
-      encodedTx[TxDetailIdx::EthAddr1] = fromAccount.ethAddr;
-      encodedTx[TxDetailIdx::EthAddr2] = toAccount.ethAddr;
-      encodedTx[TxDetailIdx::Balance1] = fromOldBalance;
-      encodedTx[TxDetailIdx::Balance2] = toOldBalance;
-      encodedTx[TxDetailIdx::SigL2Hash] = tx.signature.hash;
-      encodedTx[TxDetailIdx::S] = tx.signature.S;
-      encodedTx[TxDetailIdx::R8x] = tx.signature.R8x;
-      encodedTx[TxDetailIdx::R8y] = tx.signature.R8y;
+      encoded_tx[tx_detail_idx::ACCOUNT_ID1] = tx.from;
+      encoded_tx[tx_detail_idx::ACCOUNT_ID2] = tx.to;
+      encoded_tx[tx_detail_idx::TOKEN_ID] = tx.token_id;
+      encoded_tx[tx_detail_idx::AMOUNT] = tx.amount;
+      encoded_tx[tx_detail_idx::NONCE1] = fromAccount.nonce;
+      encoded_tx[tx_detail_idx::NONCE2] = toAccount.nonce;
+      encoded_tx[tx_detail_idx::SIGN1] = fromAccount.sign;
+      encoded_tx[tx_detail_idx::SIGN2] = toAccount.sign;
+      encoded_tx[tx_detail_idx::AY1] = fromAccount.ay;
+      encoded_tx[tx_detail_idx::AY2] = toAccount.ay;
+      encoded_tx[tx_detail_idx::ETH_ADDR1] = fromAccount.eth_addr;
+      encoded_tx[tx_detail_idx::ETH_ADDR2] = toAccount.eth_addr;
+      encoded_tx[tx_detail_idx::BALANCE1] = fromOldBalance;
+      encoded_tx[tx_detail_idx::BALANCE2] = toOldBalance;
+      encoded_tx[tx_detail_idx::SIG_L2_HASH] = tx.signature.hash;
+      encoded_tx[tx_detail_idx::S] = tx.signature.S;
+      encoded_tx[tx_detail_idx::R8X] = tx.signature.R8x;
+      encoded_tx[tx_detail_idx::R8Y] = tx.signature.R8y;
 
-      let rawTx: RawTx = {
-        txType: TxType.Transfer,
-        payload: encodedTx,
-        balancePath0: proofFrom.balancePath,
-        balancePath1: null,
-        balancePath2: proofFrom.balancePath,
-        balancePath3: null,
-        orderPath0: self.trivialOrderPathElements(),
-        orderPath1: self.trivialOrderPathElements(),
-        orderRoot0: fromAccount.orderRoot,
-        orderRoot1: toAccount.orderRoot,
-        accountPath0: proofFrom.accountPath,
-        accountPath1: null,
-        rootBefore: proofFrom.root,
-        rootAfter: 0n,
+      let raw_tx: RawTx = {
+        tx_type: TxType.Transfer,
+        payload: encoded_tx,
+        balance_path0: proofFrom.balance_path,
+        balance_path1: null,
+        balance_path2: proofFrom.balance_path,
+        balance_path3: null,
+        order_path0: self.trivial_order_path_elements(),
+        order_path1: self.trivial_order_path_elements(),
+        order_root0: fromAccount.order_root,
+        order_root1: toAccount.order_root,
+        account_path0: proofFrom.account_path,
+        account_path1: null,
+        root_before: proofFrom.root,
+        root_after: 0n,
       };
 
-      self.setTokenBalance(tx.from, tx.tokenID, fromOldBalance - tx.amount);
-      self.increaseNonce(tx.from);
+      self.set_token_balance(tx.from, tx.token_id, fromOldBalance - tx.amount);
+      self.increase_nonce(tx.from);
 
-      let proofTo = self.stateProof(tx.to, tx.tokenID);
-      rawTx.balancePath1 = proofTo.balancePath;
-      rawTx.balancePath3 = proofTo.balancePath;
-      rawTx.accountPath1 = proofTo.accountPath;
-      self.setTokenBalance(tx.to, tx.tokenID, toOldBalance + tx.amount);
+      let proofTo = self.state_proof(tx.to, tx.token_id);
+      raw_tx.balance_path1 = proofTo.balance_path;
+      raw_tx.balance_path3 = proofTo.balance_path;
+      raw_tx.account_path1 = proofTo.account_path;
+      self.set_token_balance(tx.to, tx.token_id, toOldBalance + tx.amount);
 
-      rawTx.rootAfter = self.root();
-      self.addRawTx(rawTx);
+      raw_tx.root_after = self.root();
+      self.add_raw_tx(raw_tx);
     }
-    Withdraw(tx: WithdrawTx) {
-      assert!(self.accounts.get(tx.accountID).ethAddr != 0n, "Withdraw");
-      let proof = self.stateProof(tx.accountID, tx.tokenID);
+    Withdraw(tx: Withdraw_tx) {
+      assert!(self.accounts.get(tx.account_id).eth_addr != 0n, "Withdraw");
+      let proof = self.state_proof(tx.account_id, tx.token_id);
       // first, generate the tx
-      let encodedTx: Array<Fr> = new Array(Txlen());
-      encodedTx.fill(0n, 0, Txlen());
+      let encoded_tx: Array<Fr> = new Array(Txlen());
+      encoded_tx.fill(0n, 0, Txlen());
 
-      let acc = self.accounts.get(tx.accountID);
-      let balanceBefore = self.getTokenBalance(tx.accountID, tx.tokenID);
+      let acc = self.accounts.get(tx.account_id);
+      let balanceBefore = self.get_token_balance(tx.account_id, tx.token_id);
       assert!(balanceBefore > tx.amount, "Withdraw balance");
-      encodedTx[TxDetailIdx::AccountID1] = tx.accountID;
-      encodedTx[TxDetailIdx::TokenID] = tx.tokenID;
-      encodedTx[TxDetailIdx::Amount] = tx.amount;
-      encodedTx[TxDetailIdx::Nonce1] = acc.nonce;
-      encodedTx[TxDetailIdx::Sign1] = acc.sign;
-      encodedTx[TxDetailIdx::Ay1] = acc.ay;
-      encodedTx[TxDetailIdx::EthAddr1] = acc.ethAddr;
-      encodedTx[TxDetailIdx::Balance1] = balanceBefore;
+      encoded_tx[tx_detail_idx::ACCOUNT_ID1] = tx.account_id;
+      encoded_tx[tx_detail_idx::TOKEN_ID] = tx.token_id;
+      encoded_tx[tx_detail_idx::AMOUNT] = tx.amount;
+      encoded_tx[tx_detail_idx::NONCE1] = acc.nonce;
+      encoded_tx[tx_detail_idx::SIGN1] = acc.sign;
+      encoded_tx[tx_detail_idx::AY1] = acc.ay;
+      encoded_tx[tx_detail_idx::ETH_ADDR1] = acc.eth_addr;
+      encoded_tx[tx_detail_idx::BALANCE1] = balanceBefore;
 
-      encodedTx[TxDetailIdx::SigL2Hash] = tx.signature.hash;
-      encodedTx[TxDetailIdx::S] = tx.signature.S;
-      encodedTx[TxDetailIdx::R8x] = tx.signature.R8x;
-      encodedTx[TxDetailIdx::R8y] = tx.signature.R8y;
+      encoded_tx[tx_detail_idx::SIG_L2_HASH] = tx.signature.hash;
+      encoded_tx[tx_detail_idx::S] = tx.signature.S;
+      encoded_tx[tx_detail_idx::R8X] = tx.signature.R8x;
+      encoded_tx[tx_detail_idx::R8Y] = tx.signature.R8y;
 
-      let rawTx: RawTx = {
-        txType: TxType.Withdraw,
-        payload: encodedTx,
-        balancePath0: proof.balancePath,
-        balancePath1: proof.balancePath,
-        balancePath2: proof.balancePath,
-        balancePath3: proof.balancePath,
-        orderPath0: self.trivialOrderPathElements(),
-        orderPath1: self.trivialOrderPathElements(),
-        orderRoot0: acc.orderRoot,
-        orderRoot1: acc.orderRoot,
-        accountPath0: proof.accountPath,
-        accountPath1: proof.accountPath,
-        rootBefore: proof.root,
-        rootAfter: 0n,
+      let raw_tx: RawTx = {
+        tx_type: TxType.Withdraw,
+        payload: encoded_tx,
+        balance_path0: proof.balance_path,
+        balance_path1: proof.balance_path,
+        balance_path2: proof.balance_path,
+        balance_path3: proof.balance_path,
+        order_path0: self.trivial_order_path_elements(),
+        order_path1: self.trivial_order_path_elements(),
+        order_root0: acc.order_root,
+        order_root1: acc.order_root,
+        account_path0: proof.account_path,
+        account_path1: proof.account_path,
+        root_before: proof.root,
+        root_after: 0n,
       };
 
-      self.setTokenBalance(tx.accountID, tx.tokenID, balanceBefore - tx.amount);
-      self.increaseNonce(tx.accountID);
+      self.set_token_balance(tx.account_id, tx.token_id, balanceBefore - tx.amount);
+      self.increase_nonce(tx.account_id);
 
-      rawTx.rootAfter = self.root();
-      self.addRawTx(rawTx);
+      raw_tx.root_after = self.root();
+      self.add_raw_tx(raw_tx);
     }
     */
-    pub fn PlaceOrder(&mut self, tx: PlaceOrderTx) -> u32 {
+    pub fn place_order(&mut self, tx: PlaceOrderTx) -> u32 {
         if self.verbose {
-            //println!("PlaceOrder", tx, "operation id", self.bufferedTxs.len());
+            //println!("PlaceOrder", tx, "operation id", self.buffered_txs.len());
         }
         // TODO: check order signature
-        //assert!(self.accounts.get(tx.accountID).ethAddr != 0n, "PlaceOrder account: accountID" + tx.accountID);
+        //assert!(self.accounts.get(tx.account_id).eth_addr != 0n, "PlaceOrder account: account_id" + tx.account_id);
 
-        let account = *self.accounts.get(&tx.accountID).unwrap();
-        let proof = self.stateProof(tx.accountID, tx.tokenID_sell);
+        let account = *self.accounts.get(&tx.account_id).unwrap();
+        let proof = self.state_proof(tx.account_id, tx.token_id_sell);
 
-        let mut rawTx = RawTx {
-            txType: TxType::PlaceOrder,
+        let mut raw_tx = RawTx {
+            tx_type: TxType::PlaceOrder,
             payload: Default::default(),
-            balancePath0: proof.balancePath.clone(),
-            balancePath1: proof.balancePath.clone(),
-            balancePath2: proof.balancePath.clone(),
-            balancePath3: proof.balancePath,
-            orderPath0: Default::default(),
-            orderPath1: self.trivialOrderPathElements(),
-            orderRoot0: account.orderRoot,
-            orderRoot1: Default::default(),
-            accountPath0: proof.accountPath.clone(),
-            accountPath1: proof.accountPath,
-            rootBefore: self.root(),
-            rootAfter: Default::default(),
+            balance_path0: proof.balance_path.clone(),
+            balance_path1: proof.balance_path.clone(),
+            balance_path2: proof.balance_path.clone(),
+            balance_path3: proof.balance_path,
+            order_path0: Default::default(),
+            order_path1: self.trivial_order_path_elements(),
+            order_root0: account.order_root,
+            order_root1: Default::default(),
+            account_path0: proof.account_path.clone(),
+            account_path1: proof.account_path,
+            root_before: self.root(),
+            root_after: Default::default(),
         };
-        //println!("orderRoo0", rawTx.orderRoot0);
+        //println!("orderRoo0", raw_tx.order_root0);
 
-        let order_id = self.createNewOrder(&tx);
+        let order_id = self.create_new_order(&tx);
 
         // fill in the tx
 
-        let mut encodedTx = [Fr::zero(); TxLength];
-        encodedTx[TxDetailIdx::Order1ID] = u32_to_fr(order_id);
-        encodedTx[TxDetailIdx::TokenID] = u32_to_fr(tx.previous_tokenID_sell);
-        encodedTx[TxDetailIdx::TokenID2] = u32_to_fr(tx.previous_tokenID_buy);
-        encodedTx[TxDetailIdx::TokenID3] = u32_to_fr(tx.tokenID_sell);
-        encodedTx[TxDetailIdx::TokenID4] = u32_to_fr(tx.tokenID_buy);
-        encodedTx[TxDetailIdx::AccountID1] = u32_to_fr(tx.accountID.clone());
-        encodedTx[TxDetailIdx::EthAddr1] = account.ethAddr;
-        encodedTx[TxDetailIdx::Sign1] = account.sign;
-        encodedTx[TxDetailIdx::Ay1] = account.ay;
-        encodedTx[TxDetailIdx::Nonce1] = account.nonce;
-        encodedTx[TxDetailIdx::Balance1] = proof.leaf;
-        encodedTx[TxDetailIdx::Order1AmountSell] = tx.previous_amount_sell;
-        encodedTx[TxDetailIdx::Order1AmountBuy] = tx.previous_amount_buy;
-        encodedTx[TxDetailIdx::Order1FilledSell] = tx.previous_filled_sell;
-        encodedTx[TxDetailIdx::Order1FilledBuy] = tx.previous_filled_buy;
-        encodedTx[TxDetailIdx::Order2AmountSell] = tx.amount_sell;
-        encodedTx[TxDetailIdx::Order2AmountBuy] = tx.amount_buy;
-        rawTx.payload = encodedTx.to_vec();
-        rawTx.orderPath0 = self.orderTrees.get(&tx.accountID).unwrap().get_proof(order_id).path_elements;
-        //println!("rawTx.orderPath0", rawTx.orderPath0)
-        rawTx.orderRoot1 = self.orderTrees.get(&tx.accountID).unwrap().get_proof(order_id).root;
+        let mut encoded_tx = [Fr::zero(); TX_LENGTH];
+        encoded_tx[tx_detail_idx::ORDER1_ID] = u32_to_fr(order_id);
+        encoded_tx[tx_detail_idx::TOKEN_ID] = u32_to_fr(tx.previous_token_id_sell);
+        encoded_tx[tx_detail_idx::TOKEN_ID2] = u32_to_fr(tx.previous_token_id_buy);
+        encoded_tx[tx_detail_idx::TOKEN_ID3] = u32_to_fr(tx.token_id_sell);
+        encoded_tx[tx_detail_idx::TOKEN_ID4] = u32_to_fr(tx.token_id_buy);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = u32_to_fr(tx.account_id);
+        encoded_tx[tx_detail_idx::ETH_ADDR1] = account.eth_addr;
+        encoded_tx[tx_detail_idx::SIGN1] = account.sign;
+        encoded_tx[tx_detail_idx::AY1] = account.ay;
+        encoded_tx[tx_detail_idx::NONCE1] = account.nonce;
+        encoded_tx[tx_detail_idx::BALANCE1] = proof.leaf;
+        encoded_tx[tx_detail_idx::ORDER1_AMOUNT_SELL] = tx.previous_amount_sell;
+        encoded_tx[tx_detail_idx::ORDER1_AMOUNT_BUY] = tx.previous_amount_buy;
+        encoded_tx[tx_detail_idx::ORDER1_FILLED_SELL] = tx.previous_filled_sell;
+        encoded_tx[tx_detail_idx::ORDER1_FILLED_BUY] = tx.previous_filled_buy;
+        encoded_tx[tx_detail_idx::ORDER2_AMOUNT_SELL] = tx.amount_sell;
+        encoded_tx[tx_detail_idx::ORDER2_AMOUNT_BUY] = tx.amount_buy;
+        raw_tx.payload = encoded_tx.to_vec();
+        raw_tx.order_path0 = self.order_trees.get(&tx.account_id).unwrap().get_proof(order_id).path_elements;
+        //println!("raw_tx.order_path0", raw_tx.order_path0)
+        raw_tx.order_root1 = self.order_trees.get(&tx.account_id).unwrap().get_proof(order_id).root;
 
-        rawTx.rootAfter = self.root();
-        self.addRawTx(rawTx);
+        raw_tx.root_after = self.root();
+        self.add_raw_tx(raw_tx);
         if self.verbose {
             //println!("create order ", order_id, tx);
         }
-        return order_id;
+        order_id
     }
-    pub fn SpotTrade(&mut self, tx: SpotTradeTx) {
-        //assert!(self.accounts.get(tx.order1_accountID).ethAddr != 0n, "SpotTrade account1");
-        //assert!(self.accounts.get(tx.order2_accountID).ethAddr != 0n, "SpotTrade account2");
+    pub fn spot_trade(&mut self, tx: SpotTradeTx) {
+        //assert!(self.accounts.get(tx.order1_account_id).eth_addr != 0n, "SpotTrade account1");
+        //assert!(self.accounts.get(tx.order2_account_id).eth_addr != 0n, "SpotTrade account2");
 
-        assert!(tx.order1_id < 2u32.pow(self.orderLevels as u32), "order1 id overflows");
-        assert!(tx.order2_id < 2u32.pow(self.orderLevels as u32), "order2 id overflows");
+        assert!(tx.order1_id < 2u32.pow(self.order_levels as u32), "order1 id overflows");
+        assert!(tx.order2_id < 2u32.pow(self.order_levels as u32), "order2 id overflows");
 
-        let account1 = self.accounts.get(&tx.order1_accountID).unwrap();
-        let account2 = self.accounts.get(&tx.order2_accountID).unwrap();
-        let proof_order1_seller = self.stateProof(tx.order1_accountID, tx.tokenID_1to2);
-        let proof_order2_seller = self.stateProof(tx.order2_accountID, tx.tokenID_2to1);
+        let account1 = self.accounts.get(&tx.order1_account_id).unwrap();
+        let account2 = self.accounts.get(&tx.order2_account_id).unwrap();
+        let proof_order1_seller = self.state_proof(tx.order1_account_id, tx.token_id_1to2);
+        let proof_order2_seller = self.state_proof(tx.order2_account_id, tx.token_id_2to1);
 
-        let order1 = *self.orderMap.get(&tx.order1_accountID).unwrap().get(&tx.order1_id).unwrap();
-        let order2 = *self.orderMap.get(&tx.order2_accountID).unwrap().get(&tx.order2_id).unwrap();
+        let order1 = *self.order_map.get(&tx.order1_account_id).unwrap().get(&tx.order1_id).unwrap();
+        let order2 = *self.order_map.get(&tx.order2_account_id).unwrap().get(&tx.order2_id).unwrap();
 
         // first, generate the tx
 
-        let mut encodedTx = [Fr::zero(); TxLength];
-        encodedTx[TxDetailIdx::AccountID1] = u32_to_fr(tx.order1_accountID);
-        encodedTx[TxDetailIdx::AccountID2] = u32_to_fr(tx.order2_accountID);
-        encodedTx[TxDetailIdx::EthAddr1] = account1.ethAddr;
-        encodedTx[TxDetailIdx::EthAddr2] = account2.ethAddr;
-        encodedTx[TxDetailIdx::Sign1] = account1.sign;
-        encodedTx[TxDetailIdx::Sign2] = account2.sign;
-        encodedTx[TxDetailIdx::Ay1] = account1.ay;
-        encodedTx[TxDetailIdx::Ay2] = account2.ay;
-        encodedTx[TxDetailIdx::Nonce1] = account1.nonce;
-        encodedTx[TxDetailIdx::Nonce2] = account2.nonce;
-        let account1_balance_sell = self.getTokenBalance(tx.order1_accountID, tx.tokenID_1to2);
-        let account2_balance_buy = self.getTokenBalance(tx.order2_accountID, tx.tokenID_1to2);
-        let account2_balance_sell = self.getTokenBalance(tx.order2_accountID, tx.tokenID_2to1);
-        let account1_balance_buy = self.getTokenBalance(tx.order1_accountID, tx.tokenID_2to1);
+        let mut encoded_tx = [Fr::zero(); TX_LENGTH];
+        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = u32_to_fr(tx.order1_account_id);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID2] = u32_to_fr(tx.order2_account_id);
+        encoded_tx[tx_detail_idx::ETH_ADDR1] = account1.eth_addr;
+        encoded_tx[tx_detail_idx::ETH_ADDR2] = account2.eth_addr;
+        encoded_tx[tx_detail_idx::SIGN1] = account1.sign;
+        encoded_tx[tx_detail_idx::SIGN2] = account2.sign;
+        encoded_tx[tx_detail_idx::AY1] = account1.ay;
+        encoded_tx[tx_detail_idx::AY2] = account2.ay;
+        encoded_tx[tx_detail_idx::NONCE1] = account1.nonce;
+        encoded_tx[tx_detail_idx::NONCE2] = account2.nonce;
+        let account1_balance_sell = self.get_token_balance(tx.order1_account_id, tx.token_id_1to2);
+        let account2_balance_buy = self.get_token_balance(tx.order2_account_id, tx.token_id_1to2);
+        let account2_balance_sell = self.get_token_balance(tx.order2_account_id, tx.token_id_2to1);
+        let account1_balance_buy = self.get_token_balance(tx.order1_account_id, tx.token_id_2to1);
         assert!(account1_balance_sell > tx.amount_1to2, "balance_1to2");
         assert!(account2_balance_sell > tx.amount_2to1, "balance_2to1");
-        encodedTx[TxDetailIdx::TokenID] = u32_to_fr(tx.tokenID_1to2);
-        encodedTx[TxDetailIdx::Amount] = tx.amount_1to2;
-        encodedTx[TxDetailIdx::Balance1] = account1_balance_sell;
-        encodedTx[TxDetailIdx::Balance2] = account2_balance_buy;
-        encodedTx[TxDetailIdx::Balance3] = account2_balance_sell;
-        encodedTx[TxDetailIdx::Balance4] = account1_balance_buy;
-        encodedTx[TxDetailIdx::TokenID2] = u32_to_fr(tx.tokenID_2to1);
-        encodedTx[TxDetailIdx::Amount2] = tx.amount_2to1;
-        encodedTx[TxDetailIdx::Order1ID] = u32_to_fr(tx.order1_id);
-        encodedTx[TxDetailIdx::Order1AmountSell] = order1.total_sell;
-        encodedTx[TxDetailIdx::Order1AmountBuy] = order1.total_buy;
-        encodedTx[TxDetailIdx::Order1FilledSell] = order1.filled_sell;
-        encodedTx[TxDetailIdx::Order1FilledBuy] = order1.filled_buy;
-        encodedTx[TxDetailIdx::Order2ID] = u32_to_fr(tx.order2_id);
-        encodedTx[TxDetailIdx::Order2AmountSell] = order2.total_sell;
-        encodedTx[TxDetailIdx::Order2AmountBuy] = order2.total_buy;
-        encodedTx[TxDetailIdx::Order2FilledSell] = order2.filled_sell;
-        encodedTx[TxDetailIdx::Order2FilledBuy] = order2.filled_buy;
+        encoded_tx[tx_detail_idx::TOKEN_ID] = u32_to_fr(tx.token_id_1to2);
+        encoded_tx[tx_detail_idx::AMOUNT] = tx.amount_1to2;
+        encoded_tx[tx_detail_idx::BALANCE1] = account1_balance_sell;
+        encoded_tx[tx_detail_idx::BALANCE2] = account2_balance_buy;
+        encoded_tx[tx_detail_idx::BALANCE3] = account2_balance_sell;
+        encoded_tx[tx_detail_idx::BALANCE4] = account1_balance_buy;
+        encoded_tx[tx_detail_idx::TOKEN_ID2] = u32_to_fr(tx.token_id_2to1);
+        encoded_tx[tx_detail_idx::AMOUNT2] = tx.amount_2to1;
+        encoded_tx[tx_detail_idx::ORDER1_ID] = u32_to_fr(tx.order1_id);
+        encoded_tx[tx_detail_idx::ORDER1_AMOUNT_SELL] = order1.total_sell;
+        encoded_tx[tx_detail_idx::ORDER1_AMOUNT_BUY] = order1.total_buy;
+        encoded_tx[tx_detail_idx::ORDER1_FILLED_SELL] = order1.filled_sell;
+        encoded_tx[tx_detail_idx::ORDER1_FILLED_BUY] = order1.filled_buy;
+        encoded_tx[tx_detail_idx::ORDER2_ID] = u32_to_fr(tx.order2_id);
+        encoded_tx[tx_detail_idx::ORDER2_AMOUNT_SELL] = order2.total_sell;
+        encoded_tx[tx_detail_idx::ORDER2_AMOUNT_BUY] = order2.total_buy;
+        encoded_tx[tx_detail_idx::ORDER2_FILLED_SELL] = order2.filled_sell;
+        encoded_tx[tx_detail_idx::ORDER2_FILLED_BUY] = order2.filled_buy;
 
-        let mut rawTx = RawTx {
-            txType: TxType::SpotTrade,
-            payload: encodedTx.to_vec(),
-            balancePath0: proof_order1_seller.balancePath,
-            balancePath1: Default::default(),
-            balancePath2: proof_order2_seller.balancePath,
-            balancePath3: Default::default(),
-            orderPath0: self
-                .orderTrees
-                .get(&tx.order1_accountID)
+        let mut raw_tx = RawTx {
+            tx_type: TxType::SpotTrade,
+            payload: encoded_tx.to_vec(),
+            balance_path0: proof_order1_seller.balance_path,
+            balance_path1: Default::default(),
+            balance_path2: proof_order2_seller.balance_path,
+            balance_path3: Default::default(),
+            order_path0: self
+                .order_trees
+                .get(&tx.order1_account_id)
                 .unwrap()
                 .get_proof(tx.order1_id)
                 .path_elements,
-            orderPath1: self
-                .orderTrees
-                .get(&tx.order2_accountID)
+            order_path1: self
+                .order_trees
+                .get(&tx.order2_account_id)
                 .unwrap()
                 .get_proof(tx.order2_id)
                 .path_elements,
-            orderRoot0: account1.orderRoot, // not really used in the circuit
-            orderRoot1: account2.orderRoot, // not really used in the circuit
-            accountPath0: proof_order1_seller.accountPath,
-            accountPath1: Default::default(),
-            rootBefore: self.root(),
-            rootAfter: Default::default(),
+            order_root0: account1.order_root, // not really used in the circuit
+            order_root1: account2.order_root, // not really used in the circuit
+            account_path0: proof_order1_seller.account_path,
+            account_path1: Default::default(),
+            root_before: self.root(),
+            root_after: Default::default(),
         };
 
         // do not update state root
         // account1 after sending, before receiving
         let mut balance1 = account1_balance_sell;
         balance1.sub_assign(&tx.amount_1to2);
-        self.balanceTrees
-            .get_mut(&tx.order1_accountID)
+        self.balance_trees
+            .get_mut(&tx.order1_account_id)
             .unwrap()
-            .set_value(tx.tokenID_1to2, balance1);
-        rawTx.balancePath3 = self
-            .balanceTrees
-            .get(&tx.order1_accountID)
+            .set_value(tx.token_id_1to2, balance1);
+        raw_tx.balance_path3 = self
+            .balance_trees
+            .get(&tx.order1_account_id)
             .unwrap()
-            .get_proof(tx.tokenID_2to1)
+            .get_proof(tx.token_id_2to1)
             .path_elements;
         // account2 after sending, before receiving
         let mut balance2 = account2_balance_sell;
         balance2.sub_assign(&tx.amount_2to1);
-        self.balanceTrees
-            .get_mut(&tx.order2_accountID)
+        self.balance_trees
+            .get_mut(&tx.order2_account_id)
             .unwrap()
-            .set_value(tx.tokenID_2to1, balance2);
-        rawTx.balancePath1 = self
-            .balanceTrees
-            .get(&tx.order2_accountID)
+            .set_value(tx.token_id_2to1, balance2);
+        raw_tx.balance_path1 = self
+            .balance_trees
+            .get(&tx.order2_account_id)
             .unwrap()
-            .get_proof(tx.tokenID_1to2)
+            .get_proof(tx.token_id_1to2)
             .path_elements;
 
         let mut order1_filled_sell = order1.filled_sell;
         order1_filled_sell.add_assign(&tx.amount_1to2);
         let mut order1_filled_buy = order1.filled_buy;
         order1_filled_buy.add_assign(&tx.amount_2to1);
-        let newOrder1 = Order {
+        let new_order1 = Order {
             status: Fr::zero(), // open
-            tokenbuy: u32_to_fr(tx.tokenID_2to1),
-            tokensell: u32_to_fr(tx.tokenID_1to2),
+            tokenbuy: u32_to_fr(tx.token_id_2to1),
+            tokensell: u32_to_fr(tx.token_id_1to2),
             filled_sell: order1_filled_sell,
             filled_buy: order1_filled_buy,
             total_sell: order1.total_sell,
             total_buy: order1.total_buy,
         };
-        self.setAccountOrder(tx.order1_accountID, tx.order1_id, newOrder1);
+        self.set_account_order(tx.order1_account_id, tx.order1_id, new_order1);
         let mut account1_balance_buy = account1_balance_buy;
         account1_balance_buy.add_assign(&tx.amount_2to1);
-        self.setTokenBalance(tx.order1_accountID, tx.tokenID_2to1, account1_balance_buy);
-        rawTx.accountPath1 = self.accountTree.get_proof(tx.order2_accountID).path_elements;
+        self.set_token_balance(tx.order1_account_id, tx.token_id_2to1, account1_balance_buy);
+        raw_tx.account_path1 = self.account_tree.get_proof(tx.order2_account_id).path_elements;
 
         let mut order2_filled_sell = order2.filled_sell;
         order2_filled_sell.add_assign(&tx.amount_2to1);
         let mut order2_filled_buy = order2.filled_buy;
         order2_filled_buy.add_assign(&tx.amount_1to2);
-        let newOrder2 = Order {
+        let new_order2 = Order {
             status: Fr::zero(), // open
-            tokenbuy: u32_to_fr(tx.tokenID_1to2),
-            tokensell: u32_to_fr(tx.tokenID_2to1),
+            tokenbuy: u32_to_fr(tx.token_id_1to2),
+            tokensell: u32_to_fr(tx.token_id_2to1),
             filled_sell: order2_filled_sell,
             filled_buy: order2_filled_buy,
             total_sell: order2.total_sell,
             total_buy: order2.total_buy,
         };
-        self.setAccountOrder(tx.order2_accountID, tx.order2_id, newOrder2);
+        self.set_account_order(tx.order2_account_id, tx.order2_id, new_order2);
         let mut account2_balance_buy = account2_balance_buy;
         account2_balance_buy.add_assign(&tx.amount_1to2);
-        self.setTokenBalance(tx.order2_accountID, tx.tokenID_1to2, account2_balance_buy);
+        self.set_token_balance(tx.order2_account_id, tx.token_id_1to2, account2_balance_buy);
 
-        rawTx.rootAfter = self.root();
-        self.addRawTx(rawTx);
+        raw_tx.root_after = self.root();
+        self.add_raw_tx(raw_tx);
     }
-    pub fn Nop(&mut self) {
+    pub fn nop(&mut self) {
         // assume we already have initialized the account tree and the balance tree
-        let trivialProof = self.stateProof(0, 0);
-        let mut encodedTx = [Fr::zero(); TxLength];
-        let rawTx = RawTx {
-            txType: TxType::Nop,
-            payload: encodedTx.to_vec(),
-            balancePath0: trivialProof.balancePath.clone(),
-            balancePath1: trivialProof.balancePath.clone(),
-            balancePath2: trivialProof.balancePath.clone(),
-            balancePath3: trivialProof.balancePath,
-            orderPath0: self.trivialOrderPathElements(),
-            orderPath1: self.trivialOrderPathElements(),
-            orderRoot0: trivialProof.orderRoot,
-            orderRoot1: trivialProof.orderRoot,
-            accountPath0: trivialProof.accountPath.clone(),
-            accountPath1: trivialProof.accountPath,
-            rootBefore: self.root(),
-            rootAfter: self.root(),
+        let trivial_proof = self.state_proof(0, 0);
+        let encoded_tx = [Fr::zero(); TX_LENGTH];
+        let raw_tx = RawTx {
+            tx_type: TxType::Nop,
+            payload: encoded_tx.to_vec(),
+            balance_path0: trivial_proof.balance_path.clone(),
+            balance_path1: trivial_proof.balance_path.clone(),
+            balance_path2: trivial_proof.balance_path.clone(),
+            balance_path3: trivial_proof.balance_path,
+            order_path0: self.trivial_order_path_elements(),
+            order_path1: self.trivial_order_path_elements(),
+            order_root0: trivial_proof.order_root,
+            order_root1: trivial_proof.order_root,
+            account_path0: trivial_proof.account_path.clone(),
+            account_path1: trivial_proof.account_path,
+            root_before: self.root(),
+            root_after: self.root(),
         };
-        self.addRawTx(rawTx);
+        self.add_raw_tx(raw_tx);
     }
 
-    pub fn flushWithNop(&mut self) {
-        while self.bufferedTxs.len() % self.nTx != 0 {
-            self.Nop();
+    pub fn flush_with_nop(&mut self) {
+        while self.buffered_txs.len() % self.n_tx != 0 {
+            self.nop();
         }
     }
 }
