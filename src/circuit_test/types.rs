@@ -1,8 +1,8 @@
 //use serde_json::Value;
 use regex::Regex;
 
-use franklin_crypto::bellman::bn256::Fr;
-use franklin_crypto::bellman::to_hex;
+use crate::state::types::Fr;
+use ff::to_hex;
 use num_bigint::BigInt;
 
 #[derive(Default, Clone)]

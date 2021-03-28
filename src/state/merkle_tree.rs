@@ -1,24 +1,16 @@
 // https://github1s.com/Fluidex/circuits/blob/HEAD/helper.ts/binary_merkle_tree.ts
 
 use fnv::FnvHashMap;
-use franklin_crypto::bellman::bn256::{Bn256, Fr};
-use franklin_crypto::rescue::bn256::Bn256RescueParams;
-use franklin_crypto::rescue::rescue_hash;
-use lazy_static::lazy_static;
 use rayon::prelude::*;
 use std::iter;
+
+pub use ff::{Field, PrimeField};
+
+use super::types::{hash, Fr};
 
 type LeafIndex = u32;
 type LeafType = Fr;
 type ValueMap = FnvHashMap<LeafIndex, LeafType>;
-
-lazy_static! {
-    pub static ref RESCUE_PARAMS: Bn256RescueParams = Bn256RescueParams::new_checked_2_into_1();
-}
-
-fn hash(inputs: &[Fr]) -> Fr {
-    rescue_hash::<Bn256>(&RESCUE_PARAMS, &inputs)[0]
-}
 
 pub struct MerkleProofN<const LENGTH: usize> {
     pub root: LeafType,
@@ -234,7 +226,6 @@ impl Tree {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use franklin_crypto::bellman::{Field, PrimeField};
     use rand::Rng;
     use std::time::Instant;
     //use test::Bencher;
@@ -259,6 +250,34 @@ mod tests {
     }
 
     #[test]
+    fn test_parallel_update() {
+        let h = 20;
+        // RAYON_NUM_THREADS can change threads num used
+        let mut tree1 = Tree::new(h, Fr::zero());
+
+        let mut tree2 = Tree::new(h, Fr::zero());
+        let count = 100;
+        let mut updates = Vec::new();
+        let rand_elem = || {
+            let mut rng = rand::thread_rng();
+            Fr::from_str(&format!("{}", rng.gen_range(0..123456789))).unwrap()
+        };
+        let rand_idx = || {
+            let mut rng = rand::thread_rng();
+            rng.gen_range(0..2u32.pow(20u32))
+        };
+        for _ in 0..count {
+            updates.push((rand_idx(), rand_elem()));
+        }
+        for (idx, value) in updates.iter() {
+            tree1.set_value(*idx, *value);
+        }
+
+        tree2.set_value_parallel(&updates, 4);
+        assert_eq!(tree1.get_root(), tree2.get_root());
+    }
+
+    #[test]
     #[ignore]
     fn bench_tree_parallel() {
         let h = 20;
@@ -277,7 +296,7 @@ mod tests {
                 let mut rng = rand::thread_rng();
                 rng.gen_range(0..2u32.pow(20u32))
             };
-            for j in 0..inner_count {
+            for _ in 0..inner_count {
                 same_updates.push((i, rand_elem()));
             }
             let mut dense_updates = Vec::new();
@@ -285,16 +304,19 @@ mod tests {
                 dense_updates.push((j, rand_elem()));
             }
             let mut sparse_updates = Vec::new();
-            for j in 0..inner_count {
+            for _ in 0..inner_count {
                 sparse_updates.push((rand_idx(), rand_elem()));
             }
-            tree.set_value_parallel(&sparse_updates, 6);
+            tree.set_value_parallel(&sparse_updates, 4);
+            // Rescue
             // 2021.03.15(Apple M1): typescript:            100 ops takes 4934ms
             // 2021.03.26(Apple M1): rust:                  100 ops takes 1160ms
             // sparse update: 80-90% cache hit
             // 2021.03.26(Apple M1): rust parallel 1:       100 ops takes 1140ms
             // 2021.03.26(Apple M1): rust parallel 2:       100 ops takes 656ms
             // 2021.03.26(Apple M1): rust parallel 4:       100 ops takes 422ms
+            // Poseidon
+            // 2021.03.28(Apple M1): rust parallel 4:       100 ops takes 25ms
             println!("{} ops takes {}ms", inner_count, start.elapsed().as_millis());
         }
     }
