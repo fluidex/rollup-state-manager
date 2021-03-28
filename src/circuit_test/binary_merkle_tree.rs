@@ -3,8 +3,8 @@ use super::types::*;
 use crate::state::merkle_tree::Tree;
 use serde_json::json;
 
-use franklin_crypto::bellman::bn256::Fr;
-use franklin_crypto::bellman::{Field, PrimeField};
+use crate::state::types::Fr;
+pub use ff::{Field, PrimeField};
 
 pub fn test_check_leaf_update() -> CircuitTestCase {
     let leaves: Vec<Fr> = vec![10, 11, 12, 13]

@@ -326,14 +326,40 @@ checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
 
 [[package]]
 name = "ff_ce"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d3a682c12d0cc98a32ab7540401a5ea1ed21d11571eea11d5829cd721f85ff0"
+dependencies = [
+ "byteorder",
+ "ff_derive_ce 0.8.0",
+ "hex",
+ "rand 0.4.6",
+]
+
+[[package]]
+name = "ff_ce"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38107cbd8bac0d907d7e7513c9f68c95adbda9e6f6f6bdf3f5111c6ecac4fe47"
 dependencies = [
  "byteorder",
- "ff_derive_ce",
+ "ff_derive_ce 0.9.0",
  "hex",
  "rand 0.4.6",
+]
+
+[[package]]
+name = "ff_derive_ce"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50c052fa6d4c2f12305ec364bfb8ef884836f3f61ea015b202372ff996d1ac4b"
+dependencies = [
+ "num-bigint 0.2.6",
+ "num-integer",
+ "num-traits 0.2.14",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -774,7 +800,7 @@ checksum = "1e753515675eaaa98071d814bea0148ae8c9d7995fa0531bf222e7857e3f1759"
 dependencies = [
  "byteorder",
  "cfg-if",
- "ff_ce",
+ "ff_ce 0.12.0",
  "rand 0.4.6",
 ]
 
@@ -789,6 +815,17 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
+name = "poseidon-rs"
+version = "0.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c76e4996e3d9572d8b5cd56f495dda3fb748fd4cd6bdca754270b8b66a9a2dd3"
+dependencies = [
+ "ff_ce 0.11.0",
+ "rand 0.4.6",
+ "serde_json",
+]
 
 [[package]]
 name = "poseidon_hash"
@@ -1108,12 +1145,14 @@ dependencies = [
  "config",
  "dotenv",
  "env_logger",
+ "ff_ce 0.11.0",
  "fnv",
  "franklin-crypto",
  "itertools 0.10.0",
  "lazy_static",
  "log",
  "num-bigint 0.4.0",
+ "poseidon-rs",
  "rand 0.8.3",
  "rayon",
  "regex",
