@@ -289,7 +289,7 @@ mod tests {
         // RAYON_NUM_THREADS can change threads num used
         let mut tree = Tree::new(h, Fr::zero());
 
-        for i in 0..100 {
+        for i in 0..10 {
             let start = Instant::now();
             let inner_count = 100;
             let mut same_updates = Vec::new();
