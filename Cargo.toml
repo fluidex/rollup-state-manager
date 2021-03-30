@@ -17,12 +17,17 @@ franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matte
 fnv = "1.0.7"
 regex = "1"
 anyhow = "1.0.39"
-num-bigint = "0.4.0"
+num-bigint = {version = "0.2.2", features = ["rand"]}
+#num-bigint = "0.4.0"
 rayon = "1.5.0"
 itertools = "0.10.0"
 rand = "0.8.3"
-poseidon-rs = "0.0.8"
+poseidon-rs = { version = "0.0.8"}
 ff = {package="ff_ce" , version="0.11", features = ["derive"]}
+#babyjubjub-rs = { version = "0.0.8", features = ["aarch64"] , default-features = false}
+babyjubjub-rs = { version = "0.0.8"}
+hex = "0.4.3"
+arrayref = "0.3.6"
 
 [[bin]]
 name = "state_keeper"
@@ -31,3 +36,6 @@ path = "src/bin/main.rs"
 [[bin]]
 name = "export_circuit_test"
 path = "src/bin/export_circuit_test.rs"
+
+[features]
+default = []

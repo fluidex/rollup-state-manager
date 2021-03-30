@@ -1,5 +1,8 @@
+use ff::to_hex;
 use ff::{PrimeField, PrimeFieldRepr};
 use lazy_static::lazy_static;
+
+use num_bigint::BigInt;
 
 /*
 // if use rescue
@@ -34,4 +37,10 @@ pub fn shl(a: &Fr, x: u32) -> Fr {
 
 pub fn u32_to_fr(x: u32) -> Fr {
     Fr::from_str(&format!("{}", x)).unwrap()
+}
+pub fn field_to_bigint(elem: &Fr) -> BigInt {
+    BigInt::parse_bytes(to_hex(elem).as_bytes(), 16).unwrap()
+}
+pub fn field_to_string(elem: &Fr) -> String {
+    field_to_bigint(&elem).to_str_radix(10)
 }
