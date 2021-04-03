@@ -6,7 +6,7 @@ use super::types::{u32_to_fr, Fr};
 use ff::Field;
 use fnv::FnvHashMap;
 
-struct StateProof {
+pub struct StateProof {
     leaf: Fr,
     root: Fr,
     balance_root: Fr,
@@ -17,7 +17,7 @@ struct StateProof {
 
 // TODO: change to snake_case
 // TODO: too many unwrap here
-struct GlobalState {
+pub struct GlobalState {
     n_tx: usize,
     balance_levels: usize,
     order_levels: usize,
