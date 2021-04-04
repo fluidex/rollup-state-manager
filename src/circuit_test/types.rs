@@ -1,9 +1,12 @@
 //use serde_json::Value;
 use regex::Regex;
 
-use crate::state::types::Fr;
+use crate::state::types;
+pub use types::Fr;
 use ff::to_hex;
 use num_bigint::BigInt;
+use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::Decimal;
 
 #[derive(Default, Clone)]
 pub struct CircuitTestData {
@@ -30,4 +33,24 @@ pub fn format_circuit_name(s: &str) -> String {
 }
 pub fn field_to_string(elem: &Fr) -> String {
     BigInt::parse_bytes(to_hex(elem).as_bytes(), 16).unwrap().to_str_radix(10)
+}
+
+pub fn number_to_integer(num: &Decimal, prec: u32) -> Fr {
+    let prec_mul = Decimal::new(10, 0).powi(prec as u64);
+    let adjusted = num * prec_mul;
+    types::u64_to_fr(adjusted.floor().to_u64().unwrap())
+}
+
+pub use types::u32_to_fr;
+pub use types::u64_to_fr;
+
+
+#[cfg(test)]
+#[test]
+fn test_number_to_integer() {
+
+    let pi = Decimal::new(3141, 3);
+    let out = number_to_integer(&pi, 3);
+    assert_eq!("Fr(0x0000000000000000000000000000000000000000000000000000000000000c45)", out.to_string());
+
 }

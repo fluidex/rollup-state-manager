@@ -1,26 +1,25 @@
 use serde::{Deserialize, Serialize};
-use rust_decimal::prelude::Zero;
 use rust_decimal::Decimal;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum MarketRole {
     MAKER = 1,
     TAKER = 2,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum OrderSide {
     ASK,
     BID,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum OrderType {
     LIMIT,
     MARKET,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum OrderEventType {
     PUT = 1,
     UPDATE = 2,
@@ -60,10 +59,10 @@ pub struct OrderMessage {
 
 #[derive(Serialize, Deserialize)]
 pub struct VerboseOrderState {
-    price: Decimal,
-    amount: Decimal,
-    finished_base: Decimal,
-    finished_quote: Decimal,
+    pub price: Decimal,
+    pub amount: Decimal,
+    pub finished_base: Decimal,
+    pub finished_quote: Decimal,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -106,7 +105,7 @@ pub struct TradeMessage {
     pub state_after: VerboseTradeState,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct BalanceMessage {
     pub timestamp: f64,
     pub user_id: u32,
