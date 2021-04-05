@@ -14,6 +14,7 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Lines, Write};
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 enum WrappedMessage {
     BALANCE(messages::BalanceMessage),
@@ -555,8 +556,13 @@ fn export_circuit_and_testdata(
 fn test_all() -> Result<()> {
     let circuit_repo = fs::canonicalize(PathBuf::from("../circuits")).expect("invalid circuits repo path");
 
+    let timing = Instant::now();
     let (blocks, components) = replay_msgs(&circuit_repo)?;
-    println!("genesis {} blocks", blocks.len());
+    println!(
+        "genesis {} blocks (TPS: {})",
+        blocks.len(),
+        (test_const::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
+    );
 
     let circuit_dir = export_circuit_and_testdata(&circuit_repo, blocks, components)?;
 
