@@ -1,15 +1,14 @@
 //use serde_json::Value;
-#![feature(array_map)]
 use regex::Regex;
 
-use crate::state::{types, common};
-pub use types::Fr;
+use crate::state::{common, types};
 use ff::to_hex;
 use num_bigint::BigInt;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
-use serde::Serialize;
 use serde::ser::SerializeSeq;
+use serde::Serialize;
+pub use types::Fr;
 
 use std::convert::TryFrom;
 
@@ -49,18 +48,18 @@ pub fn number_to_integer(num: &Decimal, prec: u32) -> Fr {
 pub use types::u32_to_fr;
 pub use types::u64_to_fr;
 
-
 #[cfg(test)]
 #[test]
 fn test_number_to_integer() {
-
     let pi = Decimal::new(3141, 3);
     let out = number_to_integer(&pi, 3);
-    assert_eq!("Fr(0x0000000000000000000000000000000000000000000000000000000000000c45)", out.to_string());
-
+    assert_eq!(
+        "Fr(0x0000000000000000000000000000000000000000000000000000000000000c45)",
+        out.to_string()
+    );
 }
 
-pub struct FrStr (Fr);
+pub struct FrStr(Fr);
 
 impl Serialize for FrStr {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -69,12 +68,12 @@ impl Serialize for FrStr {
 }
 
 impl From<Fr> for FrStr {
-    fn from(origin : Fr) -> Self {
+    fn from(origin: Fr) -> Self {
         FrStr(origin)
     }
 }
 
-pub struct MerkleLeafStr (FrStr);
+pub struct MerkleLeafStr(FrStr);
 
 impl Serialize for MerkleLeafStr {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -84,27 +83,24 @@ impl Serialize for MerkleLeafStr {
     }
 }
 
-//convert MerkleLeafType embedded in MerklePath 
-impl From<&[Fr;1]> for MerkleLeafStr {
-    fn from(origin : &[Fr;1]) -> Self {
-        MerkleLeafStr(FrStr(origin[0].clone()))
+//convert MerkleLeafType embedded in MerklePath
+impl From<&[Fr; 1]> for MerkleLeafStr {
+    fn from(origin: &[Fr; 1]) -> Self {
+        MerkleLeafStr(FrStr(origin[0]))
     }
 }
 
-
 impl Serialize for common::TxType {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_i32(
-            match self {
-                common::TxType::DepositToNew => 1,
-                common::TxType::DepositToOld => 2,
-                common::TxType::Transfer => 3,
-                common::TxType::Withdraw => 4,
-                common::TxType::PlaceOrder => 5,
-                common::TxType::SpotTrade => 6,
-                common::TxType::Nop => 7,
-            }
-        )
+        serializer.serialize_i32(match self {
+            common::TxType::DepositToNew => 1,
+            common::TxType::DepositToOld => 2,
+            common::TxType::Transfer => 3,
+            common::TxType::Withdraw => 4,
+            common::TxType::PlaceOrder => 5,
+            common::TxType::SpotTrade => 6,
+            common::TxType::Nop => 7,
+        })
     }
 }
 
@@ -121,40 +117,41 @@ pub struct L2BlockSerde {
     account_path_elements: Vec<[MerklePathStr; 2]>,
     order_roots: Vec<[FrStr; 2]>,
     old_account_roots: Vec<FrStr>,
-    new_account_roots: Vec<FrStr>,    
+    new_account_roots: Vec<FrStr>,
 }
 
 //array::map is not stable
-fn array_map<U, T : Clone + Into<U>, const N: usize>(origin : [T; N]) -> [U; N] {
-    let mut collector : Vec<U> = Vec::new();
+fn array_map<U, T: Clone + Into<U>, const N: usize>(origin: [T; N]) -> [U; N] {
+    let mut collector: Vec<U> = Vec::new();
     for i in &origin {
         collector.push(i.clone().into());
     }
     TryFrom::try_from(collector).ok().unwrap()
 }
 
-fn from_merkle<const N: usize>(origin : [common::MerklePath; N]) -> [MerklePathStr; N] {
-    let mut collector : Vec<MerklePathStr> = Vec::new();
+fn from_merkle<const N: usize>(origin: [common::MerklePath; N]) -> [MerklePathStr; N] {
+    let mut collector: Vec<MerklePathStr> = Vec::new();
     for i in &origin {
         collector.push(i.iter().map(From::from).collect());
     }
     TryFrom::try_from(collector).ok().unwrap()
 }
 
-
 impl From<common::L2Block> for L2BlockSerde {
-    fn from(origin : common::L2Block) -> Self {
+    fn from(origin: common::L2Block) -> Self {
         L2BlockSerde {
             txs_type: origin.txs_type,
-            encoded_txs: origin.encoded_txs.into_iter().map(
-                |i|i.into_iter().map(From::from).collect()
-            ).collect(),
+            encoded_txs: origin
+                .encoded_txs
+                .into_iter()
+                .map(|i| i.into_iter().map(From::from).collect())
+                .collect(),
             balance_path_elements: origin.balance_path_elements.into_iter().map(from_merkle).collect(),
             order_path_elements: origin.order_path_elements.into_iter().map(from_merkle).collect(),
             account_path_elements: origin.account_path_elements.into_iter().map(from_merkle).collect(),
             order_roots: origin.order_roots.into_iter().map(array_map).collect(),
             old_account_roots: origin.old_account_roots.into_iter().map(From::from).collect(),
             new_account_roots: origin.new_account_roots.into_iter().map(From::from).collect(),
-        }        
+        }
     }
 }

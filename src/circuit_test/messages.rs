@@ -1,5 +1,6 @@
-use serde::{Deserialize, Serialize};
+#![allow(clippy::upper_case_acronyms)]
 use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum MarketRole {
@@ -55,7 +56,6 @@ pub struct OrderMessage {
     pub base: String,
     pub quote: String,
 }
-
 
 #[derive(Serialize, Deserialize)]
 pub struct VerboseOrderState {
