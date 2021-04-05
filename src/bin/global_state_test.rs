@@ -71,7 +71,7 @@ mod test_const {
     pub const MAXORDERNUM : usize  = 2usize.pow(ORDERLEVELS as u32);
     pub const MAXACCOUNTNUM : usize = 2usize.pow(ACCOUNTLEVELS as u32);
     pub const MAXTOKENNUM : usize = 2usize.pow(BALANCELEVELS as u32);
-    pub const VERBOSE : bool = true;
+    pub const VERBOSE : bool = false;
 
     pub fn token_id(token_name: &str) -> u32 {
         match token_name {
@@ -429,8 +429,9 @@ fn handle_deposit(state : &mut global_state::GlobalState, deposit : messages::Ba
 }
 
 
-fn replay_msgs(test_dir : &PathBuf) -> Result<()>{
+fn replay_msgs(circuit_repo : &PathBuf) -> Result<(Vec<common::L2Block>, types::CircuitSource)>{
 
+    let test_dir = circuit_repo.join("test").join("testdata");
     let file = File::open(test_dir.join("msgs_float.jsonl"))?;
 
     let lns : Lines<BufReader<File>> = BufReader::new(file).lines();
@@ -455,11 +456,9 @@ fn replay_msgs(test_dir : &PathBuf) -> Result<()>{
         let msg = line.map(parse_msg)??;
         match msg {
             WrappedMessage::BALANCE(balance) => {
-                println!("balance {}", balance.change);
                 handle_deposit(&mut state, balance);
             },
             WrappedMessage::TRADE(trade) => {
-                println!("trade {}", trade.amount);
                 place_order.handle_trade(&mut state, trade);
                 
             },
@@ -471,30 +470,77 @@ fn replay_msgs(test_dir : &PathBuf) -> Result<()>{
 
     state.flush_with_nop();
 
-    Ok(())
+    let component = types::CircuitSource {
+        src: String::from("src/block.circom"),
+        main: format!("Block({}, {}, {}, {})", test_const::NTXS, test_const::BALANCELEVELS, 
+            test_const::ORDERLEVELS, test_const::ACCOUNTLEVELS),
+    };
+
+    Ok((state.take_blocks(), component))
 
 }
 
-fn export_circuit_and_testdata() {
+//just grap from export_circuit_test.rs ...
+fn write_circuit(circuit_repo: &Path, test_dir: &Path, source: &circuit_test::types::CircuitSource) -> Result<PathBuf> {
+    let circuit_name = circuit_test::types::format_circuit_name(source.main.as_str());
+    let circuit_dir = test_dir.join(circuit_name);
 
+    fs::create_dir_all(circuit_dir.clone())?;
+
+    let circuit_file = circuit_dir.join("circuit.circom");
+
+    //in os beyond UNIX the slash in source wolud not be considerred as separator
+    //so we need to convert them explicity
+    let src_path: PathBuf = source.src.split('/').collect();
+
+    let file_content = format!(
+        "include \"{}\";\ncomponent main = {}",
+        circuit_repo.join(src_path).to_str().unwrap(),
+        source.main
+    );
+    let mut f = File::create(circuit_file)?;
+    f.write_all(&file_content.as_bytes())?;
+    Ok(circuit_dir)
+}
+
+fn write_input(input_dir: &Path, block: common::L2Block) -> Result<()>{
+
+    fs::create_dir_all(input_dir.clone())?;
+    let input_f = File::create(input_dir.join("input.json"))?;
+    serde_json::to_writer_pretty(input_f, &types::L2BlockSerde::from(block))?;
+    let output_f = File::create(input_dir.join("output.json"))?;
+    //TODO: no output?
+    serde_json::to_writer_pretty(output_f, &serde_json::Value::Object(Default::default()))?;
+
+    Ok(())
+}
+
+fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<common::L2Block>, 
+    source : circuit_test::types::CircuitSource) -> Result<PathBuf>{
+
+    let test_dir = circuit_repo.join("testdata");
+    let circuitDir = write_circuit(circuit_repo, &test_dir, &source)?;
+
+    let mut blki = 0;
+    for blk in blocks {
+        let input_dir = test_dir.join(format!("{:04}", blki));
+        write_input(&input_dir, blk)?;
+        blki += 1;
+        //println!("{}", serde_json::to_string_pretty(&types::L2BlockSerde::from(blk)).unwrap());
+    }
+
+    Ok(circuitDir)
 }
 
 fn test_all() -> Result<()> {
     let circuit_repo = fs::canonicalize(PathBuf::from("../circuits")).expect("invalid circuits repo path");
-    let test_dir = circuit_repo.join("test").join("testdata");
 
-    replay_msgs(&test_dir)?;
-//    println!("genesis {} blocks")
+    let (blocks, components) = replay_msgs(&circuit_repo)?;
+    println!("genesis {} blocks", blocks.len());
 
-    export_circuit_and_testdata();
-/*
-  const { blocks, component } = replayMsgs();
-  console.log(`generate ${blocks.length} blocks`);
+    let circuit_dir = export_circuit_and_testdata(&circuit_repo, blocks, components)?;
 
-  // check all the blocks forged are valid for the block circuit
-  // So we can ensure logics of matchengine VS GlobalState VS circuit are same!
-  const circuitDir = await exportCircuitAndTestData(blocks, component);
-*/
+    println!("TODO: test circuit dir {}", circuit_dir.to_str().unwrap());
 
     Ok(())
 }

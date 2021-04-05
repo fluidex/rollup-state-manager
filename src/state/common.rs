@@ -1,6 +1,6 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/common.ts
 
-use super::merkle_tree::MerklePath;
+pub use super::merkle_tree::MerklePath;
 use super::types::{hash, shl, Fr};
 use ff::Field;
 
