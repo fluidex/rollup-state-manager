@@ -23,9 +23,9 @@ rayon = "1.5.0"
 itertools = "0.10.0"
 rand = "0.8.3"
 poseidon-rs = { version = "0.0.8"}
-ff = {package="ff_ce" , version="0.11", features = ["derive"]}
-#babyjubjub-rs = { version = "0.0.8", features = ["aarch64"] , default-features = false}
-babyjubjub-rs = { version = "0.0.8"}
+ff = {package="ff_ce", version="0.11", features = ["derive"]}
+babyjubjub-rs = { version = "0.0.8", features = ["aarch64"], default-features = false}
+#babyjubjub-rs = { version = "0.0.8"}
 hex = "0.4.3"
 arrayref = "0.3.6"
 rust_decimal = { version = "1.10.3", features = ["serde_json"] }

@@ -42,6 +42,10 @@ pub fn u64_to_fr(x: u64) -> Fr {
     Fr::from_repr(poseidon_rs::FrRepr::from(x)).unwrap()
 }
 
+pub fn field_to_u32(x: &Fr) -> u32 {
+    field_to_string(x).parse::<u32>().unwrap()
+}
+
 pub fn field_to_bigint(elem: &Fr) -> BigInt {
     BigInt::parse_bytes(to_hex(elem).as_bytes(), 16).unwrap()
 }

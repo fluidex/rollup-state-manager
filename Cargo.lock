@@ -86,7 +86,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40f28acbc3ff08a764fd852d110eebd4c56d5e938cc337113665a2c62f10d621"
 dependencies = [
  "arrayref",
- "blake-hash",
+ "blake",
  "ff_ce 0.11.0",
  "generic-array 0.13.3",
  "lazy_static",
@@ -129,14 +129,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
-name = "blake-hash"
-version = "0.4.0"
+name = "blake"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "312d8725bb323233680175a79742879b9b9671f615cf3446ce5c4109a7dfffd0"
+checksum = "f76cff23583935d01f1d259e546bf988450648a644da066de24717fdd015aa81"
 dependencies = [
- "block-buffer 0.9.0",
- "digest 0.9.0",
- "ppv-lite86",
+ "gcc",
+ "libc",
 ]
 
 [[package]]
@@ -182,15 +181,6 @@ dependencies = [
  "byte-tools",
  "byteorder",
  "generic-array 0.12.4",
-]
-
-[[package]]
-name = "block-buffer"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4152116fd6e9dadb291ae18fc1ec3575ed6d84c29642d97890f4b4a3417297e4"
-dependencies = [
- "generic-array 0.14.4",
 ]
 
 [[package]]
@@ -547,6 +537,12 @@ dependencies = [
  "pin-utils",
  "slab",
 ]
+
+[[package]]
+name = "gcc"
+version = "0.3.55"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f5f3913fa0bfe7ee1fd8248b6b9f42a5af4b9d65ec2dd2c3c26132b950ecfc2"
 
 [[package]]
 name = "generic-array"
@@ -1333,7 +1329,7 @@ version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a256f46ea78a0c0d9ff00077504903ac881a1dafdc20da66545699e7776b3e69"
 dependencies = [
- "block-buffer 0.7.3",
+ "block-buffer",
  "digest 0.8.1",
  "fake-simd",
  "opaque-debug 0.2.3",

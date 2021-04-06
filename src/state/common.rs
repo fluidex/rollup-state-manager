@@ -6,7 +6,7 @@ use ff::Field;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Order {
-    pub status: Fr,
+    pub order_id: Fr,
     pub tokenbuy: Fr,
     pub tokensell: Fr,
     pub filled_sell: Fr,
@@ -15,10 +15,10 @@ pub struct Order {
     pub total_buy: Fr,
 }
 
-impl Order {
-    pub fn empty() -> Self {
+impl Default for Order {
+    fn default() -> Self {
         Self {
-            status: Fr::one(),
+            order_id: Fr::zero(),
             tokenbuy: Fr::zero(),
             tokensell: Fr::zero(),
             filled_sell: Fr::zero(),
@@ -27,12 +27,22 @@ impl Order {
             total_buy: Fr::zero(),
         }
     }
+}
+
+impl Order {
     pub fn hash(&self) -> Fr {
         let mut data = Fr::zero();
-        data.add_assign(&self.status);
+        data.add_assign(&self.order_id);
         data.add_assign(&shl(&self.tokenbuy, 32));
         data.add_assign(&shl(&self.tokensell, 64));
         hash(&[data, self.filled_sell, self.filled_buy, self.total_sell, self.total_buy])
+    }
+    pub fn is_filled(&self) -> bool {
+        //debug_assert!(self.filled_buy <= self.total_buy, "too much filled buy");
+        //debug_assert!(self.filled_sell <= self.total_sell, "too much filled sell");
+        // TODO: one side fill is enough
+        // https://github.com/Fluidex/circuits/blob/4f952f63aa411529c466de2f6e9f8ceeac9ceb00/src/spot_trade.circom#L42
+        self.filled_buy >= self.total_buy || self.filled_sell >= self.total_sell
     }
 }
 
@@ -178,7 +188,7 @@ pub struct RawTx {
     // debug info
     // extra: any;
 }
-
+#[derive(Clone)]
 pub struct L2Block {
     pub txs_type: Vec<TxType>,
     pub encoded_txs: Vec<Vec<Fr>>,
@@ -193,13 +203,14 @@ pub struct L2Block {
 // TODO: remove previous_...
 #[derive(Debug)]
 pub struct PlaceOrderTx {
+    pub order_id: u32,
     pub account_id: u32,
-    pub previous_token_id_sell: u32,
-    pub previous_token_id_buy: u32,
-    pub previous_amount_sell: Fr,
-    pub previous_amount_buy: Fr,
-    pub previous_filled_sell: Fr,
-    pub previous_filled_buy: Fr,
+    //pub previous_token_id_sell: u32,
+    //pub previous_token_id_buy: u32,
+    //pub previous_amount_sell: Fr,
+    //pub previous_amount_buy: Fr,
+    //pub previous_filled_sell: Fr,
+    //pub previous_filled_buy: Fr,
     pub token_id_sell: u32,
     pub token_id_buy: u32,
     pub amount_sell: Fr,
