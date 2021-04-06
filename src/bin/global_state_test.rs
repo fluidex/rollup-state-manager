@@ -3,7 +3,6 @@
 #![allow(clippy::large_enum_variant)]
 
 use anyhow::{anyhow, Result};
-use ff::Field;
 use rust_decimal::Decimal;
 use serde_json::Value;
 use state_keeper::circuit_test::{self, messages, types};
@@ -47,7 +46,7 @@ fn parse_msg(line: String) -> Result<WrappedMessage> {
     }
 }
 
-type PlaceOrderType = HashMap<u64, (u32, u64)>;
+type PlaceOrderType = HashMap<u32, (u32, u64)>;
 //index type?
 #[derive(Debug)]
 struct PlaceOrder(PlaceOrderType);
@@ -107,8 +106,6 @@ struct TokenPair<'c>(&'c str, &'c str);
 
 struct OrderState<'c> {
     origin: &'c messages::VerboseOrderState,
-    //seems not used yet
-    status: u32,
     side: &'static str,
     token_sell: u32,
     token_buy: u32,
@@ -116,6 +113,10 @@ struct OrderState<'c> {
     total_buy: Decimal,
     filled_sell: Decimal,
     filled_buy: Decimal,
+
+    order_id: u32,
+    account_id: u32,
+    role: messages::MarketRole,
 }
 
 struct OrderStateTag {
@@ -140,31 +141,53 @@ impl<'c> From<TokenPair<'c>> for TokenIdPair {
 }
 
 impl<'c> OrderState<'c> {
-    fn parse(origin: &'c messages::VerboseOrderState, id_pair: TokenIdPair, _token_pair: TokenPair<'c>, side: &'static str) -> Self {
+    fn parse(
+        origin: &'c messages::VerboseOrderState,
+        id_pair: TokenIdPair,
+        _token_pair: TokenPair<'c>,
+        side: &'static str,
+        trade: &messages::TradeMessage,
+    ) -> Self {
         match side {
             "ASK" => OrderState {
                 origin,
                 side,
-                status: 0,
+                //status: 0,
                 token_sell: id_pair.0,
                 token_buy: id_pair.1,
                 total_sell: origin.amount,
                 total_buy: origin.amount * origin.price,
                 filled_sell: origin.finished_base,
                 filled_buy: origin.finished_quote,
+                order_id: trade.ask_order_id as u32,
+                account_id: trade.ask_user_id,
+                role: trade.ask_role,
             },
             "BID" => OrderState {
                 origin,
                 side,
-                status: 0,
+                //status: 0,
                 token_sell: id_pair.1,
                 token_buy: id_pair.0,
                 total_sell: origin.amount * origin.price,
                 total_buy: origin.amount,
                 filled_sell: origin.finished_quote,
                 filled_buy: origin.finished_base,
+                order_id: trade.bid_order_id as u32,
+                account_id: trade.bid_user_id,
+                role: trade.bid_role,
             },
             _ => unreachable!(),
+        }
+    }
+    fn place_order_tx(&self) -> common::PlaceOrderTx {
+        common::PlaceOrderTx {
+            order_id: self.order_id,
+            account_id: self.account_id,
+            token_id_sell: self.token_sell,
+            token_id_buy: self.token_buy,
+            amount_sell: types::number_to_integer(&self.total_sell, test_const::prec(self.token_sell)),
+            amount_buy: types::number_to_integer(&self.total_buy, test_const::prec(self.token_buy)),
         }
     }
 }
@@ -172,7 +195,8 @@ impl<'c> OrderState<'c> {
 impl<'c> From<OrderState<'c>> for common::Order {
     fn from(origin: OrderState<'c>) -> Self {
         common::Order {
-            status: types::u32_to_fr(origin.status),
+            order_id: types::u32_to_fr(origin.order_id),
+            //status: types::u32_to_fr(origin.status),
             tokenbuy: types::u32_to_fr(origin.token_buy),
             tokensell: types::u32_to_fr(origin.token_sell),
             filled_sell: types::number_to_integer(&origin.filled_sell, test_const::prec(origin.token_sell)),
@@ -182,85 +206,23 @@ impl<'c> From<OrderState<'c>> for common::Order {
         }
     }
 }
-
-impl OrderState<'_> {
-    fn tag(self, trade: &messages::TradeMessage) -> (Self, OrderStateTag) {
-        match self.side {
-            "ASK" => (
-                self,
-                OrderStateTag {
-                    id: trade.ask_order_id,
-                    account_id: trade.ask_user_id,
-                    role: trade.ask_role,
-                },
-            ),
-            "BID" => (
-                self,
-                OrderStateTag {
-                    id: trade.bid_order_id,
-                    account_id: trade.bid_user_id,
-                    role: trade.bid_role,
-                },
-            ),
-            _ => unreachable!(),
-        }
-    }
-}
-
-struct OrderStateWithTag<'c>(OrderState<'c>, OrderStateTag);
-
-impl<'c> From<(OrderState<'c>, OrderStateTag)> for OrderStateWithTag<'c> {
-    fn from(origin: (OrderState<'c>, OrderStateTag)) -> Self {
-        Self(origin.0, origin.1)
-    }
-}
-
-impl<'c> std::cmp::PartialOrd for OrderStateWithTag<'c> {
+impl<'c> std::cmp::PartialOrd for OrderState<'c> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<'c> std::cmp::PartialEq for OrderStateWithTag<'c> {
+impl<'c> std::cmp::PartialEq for OrderState<'c> {
     fn eq(&self, other: &Self) -> bool {
-        self.tag_id() == other.tag_id()
+        self.order_id == other.order_id
     }
 }
 
-impl<'c> std::cmp::Eq for OrderStateWithTag<'c> {}
+impl<'c> std::cmp::Eq for OrderState<'c> {}
 
-impl<'c> std::cmp::Ord for OrderStateWithTag<'c> {
+impl<'c> std::cmp::Ord for OrderState<'c> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.tag_id().cmp(&other.tag_id())
-    }
-}
-
-impl OrderStateWithTag<'_> {
-    fn tag_id(&self) -> u64 {
-        self.1.id
-    }
-
-    fn account_id(&self) -> u32 {
-        self.1.account_id
-    }
-
-    fn place_order_tx(&self) -> common::PlaceOrderTx {
-        let order = &self.0;
-        let tag = &self.1;
-
-        common::PlaceOrderTx {
-            account_id: tag.account_id,
-            previous_token_id_sell: 0,
-            previous_token_id_buy: 0,
-            previous_amount_sell: types::Fr::zero(),
-            previous_amount_buy: types::Fr::zero(),
-            previous_filled_sell: types::Fr::zero(),
-            previous_filled_buy: types::Fr::zero(),
-            token_id_sell: order.token_sell,
-            token_id_buy: order.token_buy,
-            amount_sell: types::number_to_integer(&order.total_sell, test_const::prec(order.token_sell)),
-            amount_buy: types::number_to_integer(&order.total_buy, test_const::prec(order.token_buy)),
-        }
+        self.order_id.cmp(&other.order_id)
     }
 }
 
@@ -311,23 +273,16 @@ fn assert_balance_state(
 }
 
 impl PlaceOrder {
-    fn assert_order_state<'c>(
-        &self,
-        state: &global_state::GlobalState,
-        ask_order_state: OrderStateWithTag<'c>,
-        bid_order_state: OrderStateWithTag<'c>,
-    ) {
-        let ask_order_local = state.get_account_order(
-            ask_order_state.account_id(),
-            self.as_ref().get(&ask_order_state.tag_id()).unwrap().1 as u32,
-        );
-        assert_eq!(ask_order_local, common::Order::from(ask_order_state.0));
+    fn assert_order_state<'c>(&self, state: &global_state::GlobalState, ask_order_state: OrderState<'c>, bid_order_state: OrderState<'c>) {
+        let ask_order_local = state
+            .get_account_order_by_id(ask_order_state.account_id, ask_order_state.order_id)
+            .unwrap();
+        assert_eq!(ask_order_local, common::Order::from(ask_order_state));
 
-        let bid_order_local = state.get_account_order(
-            bid_order_state.account_id(),
-            self.as_ref().get(&bid_order_state.tag_id()).unwrap().1 as u32,
-        );
-        assert_eq!(bid_order_local, common::Order::from(bid_order_state.0));
+        let bid_order_local = state
+            .get_account_order_by_id(bid_order_state.account_id, bid_order_state.order_id)
+            .unwrap();
+        assert_eq!(bid_order_local, common::Order::from(bid_order_state));
     }
 
     fn trade_into_spot_tx(&self, trade: &messages::TradeMessage) -> common::SpotTradeTx {
@@ -342,8 +297,8 @@ impl PlaceOrder {
                 token_id_2to1: id_pair.1,
                 amount_1to2: types::number_to_integer(&trade.amount, test_const::prec(id_pair.0)),
                 amount_2to1: types::number_to_integer(&trade.quote_amount, test_const::prec(id_pair.1)),
-                order1_id: self.as_ref().get(&trade.ask_order_id).unwrap().1 as u32,
-                order2_id: self.as_ref().get(&trade.bid_order_id).unwrap().1 as u32,
+                order1_id: trade.ask_order_id as u32,
+                order2_id: trade.bid_order_id as u32,
             },
             messages::MarketRole::TAKER => common::SpotTradeTx {
                 order1_account_id: trade.bid_user_id,
@@ -352,8 +307,8 @@ impl PlaceOrder {
                 token_id_2to1: id_pair.0,
                 amount_1to2: types::number_to_integer(&trade.quote_amount, test_const::prec(id_pair.1)),
                 amount_2to1: types::number_to_integer(&trade.amount, test_const::prec(id_pair.0)),
-                order1_id: self.as_ref().get(&trade.bid_order_id).unwrap().1 as u32,
-                order2_id: self.as_ref().get(&trade.ask_order_id).unwrap().1 as u32,
+                order1_id: trade.bid_order_id as u32,
+                order2_id: trade.ask_order_id as u32,
             },
         }
     }
@@ -362,22 +317,14 @@ impl PlaceOrder {
         let token_pair = TokenPair::from(trade.market.as_str());
         let id_pair = TokenIdPair::from(token_pair);
 
-        let ask_order_state_before: OrderStateWithTag = OrderState::parse(&trade.state_before.ask_order_state, id_pair, token_pair, "ASK")
-            .tag(&trade)
-            .into();
+        let ask_order_state_before: OrderState = OrderState::parse(&trade.state_before.ask_order_state, id_pair, token_pair, "ASK", &trade);
 
-        let bid_order_state_before: OrderStateWithTag = OrderState::parse(&trade.state_before.bid_order_state, id_pair, token_pair, "BID")
-            .tag(&trade)
-            .into();
+        let bid_order_state_before: OrderState = OrderState::parse(&trade.state_before.bid_order_state, id_pair, token_pair, "BID", &trade);
 
         //this field is not used yet ...
-        let ask_order_state_after: OrderStateWithTag = OrderState::parse(&trade.state_after.ask_order_state, id_pair, token_pair, "ASK")
-            .tag(&trade)
-            .into();
+        let ask_order_state_after: OrderState = OrderState::parse(&trade.state_after.ask_order_state, id_pair, token_pair, "ASK", &trade);
 
-        let bid_order_state_after: OrderStateWithTag = OrderState::parse(&trade.state_after.bid_order_state, id_pair, token_pair, "BID")
-            .tag(&trade)
-            .into();
+        let bid_order_state_after: OrderState = OrderState::parse(&trade.state_after.bid_order_state, id_pair, token_pair, "BID", &trade);
 
         //seems we do not need to use map/zip liket the ts code because the suitable order_id has been embedded
         //into the tag.id field
@@ -385,29 +332,29 @@ impl PlaceOrder {
         put_states.sort();
 
         for order_state in put_states.into_iter() {
-            if !self.as_ref().contains_key(&order_state.tag_id()) {
+            if !self.as_ref().contains_key(&order_state.order_id) {
                 //why the returning order id is u32?
-                let new_order_id = state.place_order(order_state.place_order_tx());
+                // in fact the GlobalState should not expose "inner idx/pos" to caller
+                // we'd better handle this inside GlobalState later
+                let new_order_pos = state.place_order(order_state.place_order_tx());
                 self.as_mut()
-                    .insert(order_state.tag_id(), (order_state.account_id(), new_order_id as u64));
+                    .insert(order_state.order_id, (order_state.account_id, new_order_pos as u64));
                 if test_const::VERBOSE {
                     println!(
                         "global order id {} to user order id ({},{})",
-                        order_state.tag_id(),
-                        order_state.account_id(),
-                        new_order_id
+                        order_state.order_id, order_state.account_id, new_order_pos
                     );
                 }
             } else if test_const::VERBOSE {
-                println!("skip put order {}", order_state.tag_id());
+                println!("skip put order {}", order_state.order_id);
             }
         }
 
         assert_balance_state(
             &trade.state_before.balance,
             state,
-            bid_order_state_before.account_id(),
-            ask_order_state_before.account_id(),
+            bid_order_state_before.account_id,
+            ask_order_state_before.account_id,
             id_pair,
         );
         self.assert_order_state(state, ask_order_state_before, bid_order_state_before);
@@ -417,8 +364,8 @@ impl PlaceOrder {
         assert_balance_state(
             &trade.state_after.balance,
             state,
-            bid_order_state_after.account_id(),
-            ask_order_state_after.account_id(),
+            bid_order_state_after.account_id,
+            ask_order_state_after.account_id,
             id_pair,
         );
         self.assert_order_state(state, ask_order_state_after, bid_order_state_after);
@@ -545,7 +492,7 @@ fn export_circuit_and_testdata(
     let circuit_dir = write_circuit(circuit_repo, &test_dir, &source)?;
 
     for (blki, blk) in blocks.into_iter().enumerate() {
-        let input_dir = test_dir.join(format!("{:04}", blki));
+        let input_dir = circuit_dir.join(format!("{:04}", blki));
         write_input(&input_dir, blk)?;
         //println!("{}", serde_json::to_string_pretty(&types::L2BlockSerde::from(blk)).unwrap());
     }

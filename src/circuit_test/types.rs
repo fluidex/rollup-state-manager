@@ -93,13 +93,13 @@ impl From<&[Fr; 1]> for MerkleLeafStr {
 impl Serialize for common::TxType {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_i32(match self {
-            common::TxType::DepositToNew => 1,
-            common::TxType::DepositToOld => 2,
-            common::TxType::Transfer => 3,
-            common::TxType::Withdraw => 4,
-            common::TxType::PlaceOrder => 5,
-            common::TxType::SpotTrade => 6,
-            common::TxType::Nop => 7,
+            common::TxType::DepositToNew => 0,
+            common::TxType::DepositToOld => 1,
+            common::TxType::Transfer => 2,
+            common::TxType::Withdraw => 3,
+            common::TxType::PlaceOrder => 4,
+            common::TxType::SpotTrade => 5,
+            common::TxType::Nop => 6,
         })
     }
 }
@@ -110,13 +110,18 @@ type MerklePathStr = Vec<MerkleLeafStr>;
 //TODO: carmel style except for three "elements" field
 #[derive(Serialize)]
 pub struct L2BlockSerde {
+    #[serde(rename(serialize = "txsType"))]
     txs_type: Vec<common::TxType>,
+    #[serde(rename(serialize = "encodedTxs"))]
     encoded_txs: Vec<Vec<FrStr>>,
     balance_path_elements: Vec<[MerklePathStr; 4]>,
     order_path_elements: Vec<[MerklePathStr; 2]>,
     account_path_elements: Vec<[MerklePathStr; 2]>,
+    #[serde(rename(serialize = "orderRoots"))]
     order_roots: Vec<[FrStr; 2]>,
+    #[serde(rename(serialize = "oldAccountRoots"))]
     old_account_roots: Vec<FrStr>,
+    #[serde(rename(serialize = "newAccountRoots"))]
     new_account_roots: Vec<FrStr>,
 }
 
