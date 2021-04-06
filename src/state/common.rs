@@ -1,10 +1,10 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/common.ts
 
-use super::merkle_tree::MerklePath;
+pub use super::merkle_tree::MerklePath;
 use super::types::{hash, shl, Fr};
 use ff::Field;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Order {
     pub status: Fr,
     pub tokenbuy: Fr,
@@ -191,6 +191,7 @@ pub struct L2Block {
 }
 
 // TODO: remove previous_...
+#[derive(Debug)]
 pub struct PlaceOrderTx {
     pub account_id: u32,
     pub previous_token_id_sell: u32,
@@ -205,12 +206,14 @@ pub struct PlaceOrderTx {
     pub amount_buy: Fr,
 }
 
+#[derive(Debug)]
 pub struct DepositToOldTx {
     pub account_id: u32,
     pub token_id: u32,
     pub amount: Fr,
 }
 
+#[derive(Debug)]
 pub struct SpotTradeTx {
     pub order1_account_id: u32,
     pub order2_account_id: u32,

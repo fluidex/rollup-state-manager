@@ -6,7 +6,7 @@ use super::types::{u32_to_fr, Fr};
 use ff::Field;
 use fnv::FnvHashMap;
 
-struct StateProof {
+pub struct StateProof {
     leaf: Fr,
     root: Fr,
     balance_root: Fr,
@@ -17,7 +17,7 @@ struct StateProof {
 
 // TODO: change to snake_case
 // TODO: too many unwrap here
-struct GlobalState {
+pub struct GlobalState {
     n_tx: usize,
     balance_levels: usize,
     order_levels: usize,
@@ -249,6 +249,13 @@ impl GlobalState {
             }
         }
     }
+    pub fn get_buffered_blocks(&self) -> &[L2Block] {
+        self.buffered_blocks.as_slice()
+    }
+    pub fn take_blocks(self) -> Vec<L2Block> {
+        self.buffered_blocks
+    }
+
     /*
     DepositToNew(tx: DepositToNewTx) {
       assert!(self.accounts.get(tx.account_id).eth_addr == 0n, "DepositToNew");
@@ -463,7 +470,7 @@ impl GlobalState {
     */
     pub fn place_order(&mut self, tx: PlaceOrderTx) -> u32 {
         if self.verbose {
-            //println!("PlaceOrder", tx, "operation id", self.buffered_txs.len());
+            println!("PlaceOrder {:#?} operation id {}", tx, self.buffered_txs.len());
         }
         // TODO: check order signature
         //assert!(self.accounts.get(tx.account_id).eth_addr != 0n, "PlaceOrder account: account_id" + tx.account_id);

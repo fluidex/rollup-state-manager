@@ -38,6 +38,10 @@ pub fn shl(a: &Fr, x: u32) -> Fr {
 pub fn u32_to_fr(x: u32) -> Fr {
     Fr::from_str(&format!("{}", x)).unwrap()
 }
+pub fn u64_to_fr(x: u64) -> Fr {
+    Fr::from_repr(poseidon_rs::FrRepr::from(x)).unwrap()
+}
+
 pub fn field_to_bigint(elem: &Fr) -> BigInt {
     BigInt::parse_bytes(to_hex(elem).as_bytes(), 16).unwrap()
 }
