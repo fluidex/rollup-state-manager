@@ -1,13 +1,4 @@
-use crate::state::{common, types};
-use ff::to_hex;
-use num_bigint::BigInt;
 use regex::Regex;
-use rust_decimal::prelude::ToPrimitive;
-use rust_decimal::Decimal;
-use serde::ser::SerializeSeq;
-use serde::Serialize;
-use std::convert::TryFrom;
-pub use types::Fr;
 
 #[derive(Default, Clone)]
 pub struct CircuitTestData {
