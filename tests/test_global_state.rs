@@ -8,7 +8,6 @@ use crate::test_utils::L2BlockSerde;
 use anyhow::{anyhow, Result};
 use rust_decimal::Decimal;
 use serde_json::Value;
-use state_keeper::circuit_test::messages;
 use state_keeper::state::{common, global_state};
 use state_keeper::test_utils;
 use state_keeper::types;
@@ -50,9 +49,9 @@ pub mod test_params {
 }
 
 enum WrappedMessage {
-    BALANCE(messages::BalanceMessage),
-    TRADE(messages::TradeMessage),
-    ORDER(messages::OrderMessage),
+    BALANCE(types::messages::BalanceMessage),
+    TRADE(types::messages::TradeMessage),
+    ORDER(types::messages::OrderMessage),
 }
 
 fn parse_msg(line: String) -> Result<WrappedMessage> {
@@ -112,7 +111,7 @@ impl TokenIdPair {
 struct TokenPair<'c>(&'c str, &'c str);
 
 struct OrderState<'c> {
-    origin: &'c messages::VerboseOrderState,
+    origin: &'c types::messages::VerboseOrderState,
     side: &'static str,
     token_sell: u32,
     token_buy: u32,
@@ -123,13 +122,13 @@ struct OrderState<'c> {
 
     order_id: u32,
     account_id: u32,
-    role: messages::MarketRole,
+    role: types::messages::MarketRole,
 }
 
 struct OrderStateTag {
     id: u64,
     account_id: u32,
-    role: messages::MarketRole,
+    role: types::messages::MarketRole,
 }
 
 impl<'c> From<&'c str> for TokenPair<'c> {
@@ -149,11 +148,11 @@ impl<'c> From<TokenPair<'c>> for TokenIdPair {
 
 impl<'c> OrderState<'c> {
     fn parse(
-        origin: &'c messages::VerboseOrderState,
+        origin: &'c types::messages::VerboseOrderState,
         id_pair: TokenIdPair,
         _token_pair: TokenPair<'c>,
         side: &'static str,
-        trade: &messages::TradeMessage,
+        trade: &types::messages::TradeMessage,
     ) -> Self {
         match side {
             "ASK" => OrderState {
@@ -243,7 +242,7 @@ struct CommonBalanceState {
 }
 
 impl CommonBalanceState {
-    fn parse(origin: &messages::VerboseBalanceState, id_pair: TokenIdPair) -> Self {
+    fn parse(origin: &types::messages::VerboseBalanceState, id_pair: TokenIdPair) -> Self {
         let base_id = id_pair.0;
         let quote_id = id_pair.1;
 
@@ -269,7 +268,7 @@ impl CommonBalanceState {
 }
 
 fn assert_balance_state(
-    balance_state: &messages::VerboseBalanceState,
+    balance_state: &types::messages::VerboseBalanceState,
     state: &global_state::GlobalState,
     bid_id: u32,
     ask_id: u32,
@@ -293,12 +292,12 @@ impl PlaceOrder {
         assert_eq!(bid_order_local, common::Order::from(bid_order_state));
     }
 
-    fn trade_into_spot_tx(&self, trade: &messages::TradeMessage) -> common::SpotTradeTx {
+    fn trade_into_spot_tx(&self, trade: &types::messages::TradeMessage) -> common::SpotTradeTx {
         //allow information can be obtained from trade
         let id_pair = TokenIdPair::from(TokenPair::from(trade.market.as_str()));
 
         match trade.ask_role {
-            messages::MarketRole::MAKER => common::SpotTradeTx {
+            types::messages::MarketRole::MAKER => common::SpotTradeTx {
                 order1_account_id: trade.ask_user_id,
                 order2_account_id: trade.bid_user_id,
                 token_id_1to2: id_pair.0,
@@ -308,7 +307,7 @@ impl PlaceOrder {
                 order1_id: trade.ask_order_id as u32,
                 order2_id: trade.bid_order_id as u32,
             },
-            messages::MarketRole::TAKER => common::SpotTradeTx {
+            types::messages::MarketRole::TAKER => common::SpotTradeTx {
                 order1_account_id: trade.bid_user_id,
                 order2_account_id: trade.ask_user_id,
                 token_id_1to2: id_pair.1,
@@ -321,7 +320,7 @@ impl PlaceOrder {
         }
     }
 
-    fn handle_trade(&mut self, state: &mut global_state::GlobalState, trade: messages::TradeMessage) {
+    fn handle_trade(&mut self, state: &mut global_state::GlobalState, trade: types::messages::TradeMessage) {
         let token_pair = TokenPair::from(trade.market.as_str());
         let id_pair = TokenIdPair::from(token_pair);
 
@@ -382,7 +381,7 @@ impl PlaceOrder {
     }
 }
 
-fn handle_deposit(state: &mut global_state::GlobalState, deposit: messages::BalanceMessage) {
+fn handle_deposit(state: &mut global_state::GlobalState, deposit: types::messages::BalanceMessage) {
     //integrate the sanity check here ...
     assert!(!deposit.change.is_sign_negative(), "only support deposit now");
 
