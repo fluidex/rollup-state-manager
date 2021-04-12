@@ -11,10 +11,9 @@ use std::path::{Path, PathBuf};
 
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/binary_merkle_tree.ts
 mod test_case {
-    use ff::Field;
+    use ff::{Field, PrimeField};
     use serde_json::json;
     use state_keeper::state::merkle_tree::Tree;
-    use state_keeper::test_utils::*;
     use state_keeper::test_utils::{field_to_string, Fr};
     use state_keeper::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
 

@@ -5,7 +5,6 @@ pub use circuit::{format_circuit_name, CircuitSource, CircuitTestCase, CircuitTe
 use crate::state::{common, types};
 use ff::to_hex;
 use num_bigint::BigInt;
-use regex::Regex;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde::ser::SerializeSeq;
