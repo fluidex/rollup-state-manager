@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 mod test_case {
     use ff::{Field, PrimeField};
     use serde_json::json;
-    use state_keeper::state::merkle_tree::Tree;
+    use state_keeper::types::merkle_tree::Tree;
     use state_keeper::test_utils::{field_to_string, Fr};
     use state_keeper::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
 

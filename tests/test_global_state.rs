@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 use rust_decimal::Decimal;
 use serde_json::Value;
 use state_keeper::circuit_test::messages;
-use state_keeper::state::{common, global_state, types};
+use state_keeper::state::{common, global_state};
 use state_keeper::test_utils;
 use std::collections::HashMap;
 use std::fs::{self, File};

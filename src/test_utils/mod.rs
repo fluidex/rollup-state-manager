@@ -3,8 +3,6 @@ pub mod circuit;
 use crate::state::common;
 pub use crate::types::primitives::{field_to_string, u64_to_fr, Fr};
 pub use circuit::{format_circuit_name, CircuitSource, CircuitTestCase, CircuitTestData};
-use ff::to_hex;
-use num_bigint::BigInt;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde::ser::SerializeSeq;
