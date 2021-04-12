@@ -210,6 +210,7 @@ impl<'c> From<OrderState<'c>> for common::Order {
         }
     }
 }
+
 impl<'c> std::cmp::PartialOrd for OrderState<'c> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
