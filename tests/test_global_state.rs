@@ -514,7 +514,7 @@ fn run() -> Result<()> {
 
     let circuit_dir = export_circuit_and_testdata(&circuit_repo, blocks, components)?;
 
-    println!("TODO: test circuit dir {}", circuit_dir.to_str().unwrap());
+    println!("test circuit dir {}", circuit_dir.to_str().unwrap());
 
     Ok(())
 }
