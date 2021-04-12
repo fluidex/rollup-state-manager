@@ -463,7 +463,7 @@ fn write_circuit(circuit_repo: &Path, test_dir: &Path, source: &test_utils::Circ
 
     let circuit_file = circuit_dir.join("circuit.circom");
 
-    //in os beyond UNIX the slash in source wolud not be considerred as separator
+    // on other OS than UNIX the slash in source wolud not be considerred as separator
     //so we need to convert them explicity
     let src_path: PathBuf = source.src.split('/').collect();
 
