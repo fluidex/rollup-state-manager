@@ -1,5 +1,5 @@
 // use state_keeper::circuit_test;
-use state_keeper::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
+use state_keeper::test_utils::CircuitTestCase;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
