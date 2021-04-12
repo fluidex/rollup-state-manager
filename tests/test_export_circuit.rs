@@ -3,6 +3,7 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+// use anyhow::anyhow;
 
 /*
  * cargo run --bin export_circuit_test
@@ -31,18 +32,16 @@ fn write_test_case(circuit_repo: &Path, test_dir: &Path, t: circuit_test::types:
     serde_json::to_writer_pretty(output_f, &t.data.output)?;
     Ok(())
 }
-fn test_all() -> anyhow::Result<()> {
+
+fn run() -> anyhow::Result<()> {
     let circuit_repo = fs::canonicalize(PathBuf::from("../circuits")).expect("invalid circuits repo path");
     let test_dir = circuit_repo.join("testdata");
-    write_test_case(&circuit_repo, &test_dir, circuit_test::binary_merkle_tree::test_check_leaf_update())?;
-    Ok(())
+    write_test_case(&circuit_repo, &test_dir, circuit_test::binary_merkle_tree::test_check_leaf_update())
 }
+
 fn main() {
-    match test_all() {
-        Ok(_) => {}
-        Err(e) => {
-            eprintln!("{:#?}", e);
-            std::process::exit(1);
-        }
+    match run() {
+        Ok(_) => println!("test_export_circuit pass"),
+        Err(e) => panic!("{:#?}", e),
     }
 }
