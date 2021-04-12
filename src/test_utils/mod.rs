@@ -1,4 +1,5 @@
 pub mod circuit;
+pub mod messages;
 
 use crate::state::common;
 pub use crate::types::primitives::{field_to_string, u64_to_fr, Fr};

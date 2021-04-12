@@ -2,10 +2,10 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::large_enum_variant)]
 
+use crate::test_utils::messages::{parse_msg, WrappedMessage};
 use crate::test_utils::L2BlockSerde;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use rust_decimal::Decimal;
-use serde_json::Value;
 use state_keeper::state::{common, global_state};
 use state_keeper::test_utils;
 use state_keeper::types;
@@ -38,37 +38,6 @@ pub mod test_params {
             0 | 1 => 6,
             _ => unreachable!(),
         }
-    }
-}
-
-enum WrappedMessage {
-    BALANCE(types::messages::BalanceMessage),
-    TRADE(types::messages::TradeMessage),
-    ORDER(types::messages::OrderMessage),
-}
-
-fn parse_msg(line: String) -> Result<WrappedMessage> {
-    let v: Value = serde_json::from_str(&line)?;
-    if let Value::String(typestr) = &v["type"] {
-        let val = v["value"].clone();
-
-        match typestr.as_str() {
-            "BalanceMessage" => {
-                let data = serde_json::from_value(val).map_err(|e| anyhow!("wrong balance: {}", e))?;
-                Ok(WrappedMessage::BALANCE(data))
-            }
-            "OrderMessage" => {
-                let data = serde_json::from_value(val).map_err(|e| anyhow!("wrong balance: {}", e))?;
-                Ok(WrappedMessage::ORDER(data))
-            }
-            "TradeMessage" => {
-                let data = serde_json::from_value(val).map_err(|e| anyhow!("wrong balance: {}", e))?;
-                Ok(WrappedMessage::TRADE(data))
-            }
-            other => Err(anyhow!("unrecognized type field {}", other)),
-        }
-    } else {
-        Err(anyhow!("missed or unexpected type field: {}", line))
     }
 }
 
@@ -489,8 +458,8 @@ fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<common::L2Block>
     let circuit_dir = write_circuit(circuit_repo, &test_dir, &source)?;
 
     for (blki, blk) in blocks.into_iter().enumerate() {
-        let input_dir = circuit_dir.join(format!("{:04}", blki));
-        write_input(&input_dir, blk)?;
+        let dir = circuit_dir.join(format!("{:04}", blki));
+        write_input_output(&dir, blk)?;
         //println!("{}", serde_json::to_string_pretty(&types::L2BlockSerde::from(blk)).unwrap());
     }
 

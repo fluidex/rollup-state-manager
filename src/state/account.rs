@@ -55,8 +55,8 @@ impl L2Account {
 
 #[cfg(test)]
 mod tests {
-    use crate::types::primitives::field_to_string;
     use super::*;
+    use crate::types::primitives::field_to_string;
     use ff::PrimeField;
 
     #[test]
