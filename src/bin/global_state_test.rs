@@ -63,7 +63,7 @@ impl AsMut<PlaceOrderType> for PlaceOrder {
     }
 }
 
-mod test_const {
+mod test_params {
 
     pub const NTXS: usize = 2;
     pub const BALANCELEVELS: usize = 2;
@@ -136,7 +136,7 @@ impl<'c> From<&'c str> for TokenPair<'c> {
 
 impl<'c> From<TokenPair<'c>> for TokenIdPair {
     fn from(origin: TokenPair<'c>) -> Self {
-        TokenIdPair(test_const::token_id(origin.0), test_const::token_id(origin.1))
+        TokenIdPair(test_params::token_id(origin.0), test_params::token_id(origin.1))
     }
 }
 
@@ -186,8 +186,8 @@ impl<'c> OrderState<'c> {
             account_id: self.account_id,
             token_id_sell: self.token_sell,
             token_id_buy: self.token_buy,
-            amount_sell: types::number_to_integer(&self.total_sell, test_const::prec(self.token_sell)),
-            amount_buy: types::number_to_integer(&self.total_buy, test_const::prec(self.token_buy)),
+            amount_sell: types::number_to_integer(&self.total_sell, test_params::prec(self.token_sell)),
+            amount_buy: types::number_to_integer(&self.total_buy, test_params::prec(self.token_buy)),
         }
     }
 }
@@ -199,10 +199,10 @@ impl<'c> From<OrderState<'c>> for common::Order {
             //status: types::u32_to_fr(origin.status),
             tokenbuy: types::u32_to_fr(origin.token_buy),
             tokensell: types::u32_to_fr(origin.token_sell),
-            filled_sell: types::number_to_integer(&origin.filled_sell, test_const::prec(origin.token_sell)),
-            filled_buy: types::number_to_integer(&origin.filled_buy, test_const::prec(origin.token_buy)),
-            total_sell: types::number_to_integer(&origin.total_sell, test_const::prec(origin.token_sell)),
-            total_buy: types::number_to_integer(&origin.total_buy, test_const::prec(origin.token_buy)),
+            filled_sell: types::number_to_integer(&origin.filled_sell, test_params::prec(origin.token_sell)),
+            filled_buy: types::number_to_integer(&origin.filled_buy, test_params::prec(origin.token_buy)),
+            total_sell: types::number_to_integer(&origin.total_sell, test_params::prec(origin.token_sell)),
+            total_buy: types::number_to_integer(&origin.total_buy, test_params::prec(origin.token_buy)),
         }
     }
 }
@@ -240,10 +240,10 @@ impl CommonBalanceState {
         let quote_id = id_pair.1;
 
         CommonBalanceState {
-            bid_user_base: types::number_to_integer(&origin.bid_user_base, test_const::prec(base_id)),
-            bid_user_quote: types::number_to_integer(&origin.bid_user_quote, test_const::prec(quote_id)),
-            ask_user_base: types::number_to_integer(&origin.ask_user_base, test_const::prec(base_id)),
-            ask_user_quote: types::number_to_integer(&origin.ask_user_quote, test_const::prec(quote_id)),
+            bid_user_base: types::number_to_integer(&origin.bid_user_base, test_params::prec(base_id)),
+            bid_user_quote: types::number_to_integer(&origin.bid_user_quote, test_params::prec(quote_id)),
+            ask_user_base: types::number_to_integer(&origin.ask_user_base, test_params::prec(base_id)),
+            ask_user_quote: types::number_to_integer(&origin.ask_user_quote, test_params::prec(quote_id)),
         }
     }
 
@@ -295,8 +295,8 @@ impl PlaceOrder {
                 order2_account_id: trade.bid_user_id,
                 token_id_1to2: id_pair.0,
                 token_id_2to1: id_pair.1,
-                amount_1to2: types::number_to_integer(&trade.amount, test_const::prec(id_pair.0)),
-                amount_2to1: types::number_to_integer(&trade.quote_amount, test_const::prec(id_pair.1)),
+                amount_1to2: types::number_to_integer(&trade.amount, test_params::prec(id_pair.0)),
+                amount_2to1: types::number_to_integer(&trade.quote_amount, test_params::prec(id_pair.1)),
                 order1_id: trade.ask_order_id as u32,
                 order2_id: trade.bid_order_id as u32,
             },
@@ -305,8 +305,8 @@ impl PlaceOrder {
                 order2_account_id: trade.ask_user_id,
                 token_id_1to2: id_pair.1,
                 token_id_2to1: id_pair.0,
-                amount_1to2: types::number_to_integer(&trade.quote_amount, test_const::prec(id_pair.1)),
-                amount_2to1: types::number_to_integer(&trade.amount, test_const::prec(id_pair.0)),
+                amount_1to2: types::number_to_integer(&trade.quote_amount, test_params::prec(id_pair.1)),
+                amount_2to1: types::number_to_integer(&trade.amount, test_params::prec(id_pair.0)),
                 order1_id: trade.bid_order_id as u32,
                 order2_id: trade.ask_order_id as u32,
             },
@@ -339,13 +339,13 @@ impl PlaceOrder {
                 let new_order_pos = state.place_order(order_state.place_order_tx());
                 self.as_mut()
                     .insert(order_state.order_id, (order_state.account_id, new_order_pos as u64));
-                if test_const::VERBOSE {
+                if test_params::VERBOSE {
                     println!(
                         "global order id {} to user order id ({},{})",
                         order_state.order_id, order_state.account_id, new_order_pos
                     );
                 }
-            } else if test_const::VERBOSE {
+            } else if test_params::VERBOSE {
                 println!("skip put order {}", order_state.order_id);
             }
         }
@@ -378,7 +378,7 @@ fn handle_deposit(state: &mut global_state::GlobalState, deposit: messages::Bala
     //integrate the sanity check here ...
     assert!(!deposit.change.is_sign_negative(), "only support deposit now");
 
-    let token_id = test_const::token_id(&deposit.asset);
+    let token_id = test_params::token_id(&deposit.asset);
 
     let balance_before = deposit.balance - deposit.change;
     assert!(!balance_before.is_sign_negative(), "invalid balance {:?}", deposit);
@@ -386,13 +386,13 @@ fn handle_deposit(state: &mut global_state::GlobalState, deposit: messages::Bala
     let expected_balance_before = state.get_token_balance(deposit.user_id, token_id);
     assert_eq!(
         expected_balance_before,
-        types::number_to_integer(&balance_before, test_const::prec(token_id))
+        types::number_to_integer(&balance_before, test_params::prec(token_id))
     );
 
     state.deposit_to_old(common::DepositToOldTx {
         token_id,
         account_id: deposit.user_id,
-        amount: types::number_to_integer(&deposit.change, test_const::prec(token_id)),
+        amount: types::number_to_integer(&deposit.change, test_params::prec(token_id)),
     });
 }
 
@@ -403,18 +403,18 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<common::L2Block>, types::Circ
     let lns: Lines<BufReader<File>> = BufReader::new(file).lines();
 
     let mut state = global_state::GlobalState::new(
-        test_const::BALANCELEVELS,
-        test_const::ORDERLEVELS,
-        test_const::ACCOUNTLEVELS,
-        test_const::NTXS,
-        test_const::VERBOSE,
+        test_params::BALANCELEVELS,
+        test_params::ORDERLEVELS,
+        test_params::ACCOUNTLEVELS,
+        test_params::NTXS,
+        test_params::VERBOSE,
     );
 
     println!("genesis root {}", state.root());
 
     let mut place_order = PlaceOrder(PlaceOrderType::new());
 
-    for _ in 0..test_const::MAXACCOUNTNUM {
+    for _ in 0..test_params::MAXACCOUNTNUM {
         state.create_new_account(1);
     }
 
@@ -439,10 +439,10 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<common::L2Block>, types::Circ
         src: String::from("src/block.circom"),
         main: format!(
             "Block({}, {}, {}, {})",
-            test_const::NTXS,
-            test_const::BALANCELEVELS,
-            test_const::ORDERLEVELS,
-            test_const::ACCOUNTLEVELS
+            test_params::NTXS,
+            test_params::BALANCELEVELS,
+            test_params::ORDERLEVELS,
+            test_params::ACCOUNTLEVELS
         ),
     };
 
@@ -508,7 +508,7 @@ fn test_all() -> Result<()> {
     println!(
         "genesis {} blocks (TPS: {})",
         blocks.len(),
-        (test_const::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
+        (test_params::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
     );
 
     let circuit_dir = export_circuit_and_testdata(&circuit_repo, blocks, components)?;
