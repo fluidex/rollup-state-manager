@@ -17,7 +17,6 @@ use std::io::{BufRead, BufReader, Lines, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-// TODO: move to other? or at least re-org in tests?
 pub mod test_params {
     pub const NTXS: usize = 2;
     pub const BALANCELEVELS: usize = 2;
