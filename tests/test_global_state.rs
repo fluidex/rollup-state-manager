@@ -6,6 +6,7 @@ use anyhow::{anyhow, Result};
 use rust_decimal::Decimal;
 use serde_json::Value;
 use state_keeper::circuit_test::{self, messages, types};
+use state_keeper::test_utils;
 use state_keeper::state::{common, global_state};
 //use std::cmp;
 use serde_json::json;
@@ -455,8 +456,8 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<common::L2Block>, types::Circ
 }
 
 //just grap from export_circuit_test.rs ...
-fn write_circuit(circuit_repo: &Path, test_dir: &Path, source: &circuit_test::types::CircuitSource) -> Result<PathBuf> {
-    let circuit_name = circuit_test::types::format_circuit_name(source.main.as_str());
+fn write_circuit(circuit_repo: &Path, test_dir: &Path, source: &test_utils::CircuitSource) -> Result<PathBuf> {
+    let circuit_name = test_utils::format_circuit_name(source.main.as_str());
     let circuit_dir = test_dir.join(circuit_name);
 
     fs::create_dir_all(circuit_dir.clone())?;
@@ -491,7 +492,7 @@ fn write_input(input_dir: &Path, block: common::L2Block) -> Result<()> {
 fn export_circuit_and_testdata(
     circuit_repo: &Path,
     blocks: Vec<common::L2Block>,
-    source: circuit_test::types::CircuitSource,
+    source: test_utils::CircuitSource,
 ) -> Result<PathBuf> {
     let test_dir = circuit_repo.join("testdata");
     let circuit_dir = write_circuit(circuit_repo, &test_dir, &source)?;
