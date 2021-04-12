@@ -2,8 +2,6 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::large_enum_variant)]
 
-// use std::cmp;
-// use serde_json::json;
 use crate::test_utils::L2BlockSerde;
 use anyhow::{anyhow, Result};
 use rust_decimal::Decimal;
