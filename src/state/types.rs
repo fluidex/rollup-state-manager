@@ -1,7 +1,6 @@
 use ff::to_hex;
 use ff::{PrimeField, PrimeFieldRepr};
 use lazy_static::lazy_static;
-
 use num_bigint::BigInt;
 
 /*
