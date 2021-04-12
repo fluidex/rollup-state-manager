@@ -1,4 +1,5 @@
-use state_keeper::circuit_test;
+// use state_keeper::circuit_test;
+use crate::test_utils::circuit::CircuitTestCase;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
@@ -11,7 +12,44 @@ use std::path::{Path, PathBuf};
  * npx snarkit test ../circuits/testdata/CheckLeafUpdate_2/
  */
 
-fn write_test_case(circuit_repo: &Path, test_dir: &Path, t: circuit_test::types::CircuitTestCase) -> anyhow::Result<()> {
+mod test_case {
+    fn check_leaf_update() -> CircuitTestCase {
+        let leaves: Vec<Fr> = vec![10, 11, 12, 13]
+            .iter()
+            .map(|x| Fr::from_str(&format!("{}", x)).unwrap())
+            .collect();
+        let mut tree = Tree::new(2, Fr::zero());
+        tree.fill_with_leaves_vec(&leaves);
+        let proof1 = tree.get_proof(2);
+        tree.set_value(2, Fr::from_str("19").unwrap());
+        let proof2 = tree.get_proof(2);
+        // TODO: we need a path index function?
+        //
+        let field_slice_to_string = |arr: &[Fr]| arr.iter().map(field_to_string).collect::<Vec<String>>();
+        let input = json!({
+            "enabled": 1,
+            "oldLeaf": field_to_string(&proof1.leaf),
+            "oldRoot": field_to_string(&proof1.root),
+            "newLeaf": field_to_string(&proof2.leaf),
+            "newRoot": field_to_string(&proof2.root),
+            "path_elements": proof1.path_elements.iter().map(|x| field_slice_to_string(x)).collect::<Vec<_>>(),
+            "path_index": [0, 1],
+        });
+        CircuitTestCase {
+            source: CircuitSource {
+                src: "src/lib/binary_merkle_tree.circom".to_owned(),
+                main: "CheckLeafUpdate(2)".to_owned(),
+            },
+            data: CircuitTestData {
+                name: "test_check_leaf_update".to_owned(),
+                input,
+                output: json!({}),
+            },
+        }
+    }
+}
+
+fn write_test_case(circuit_repo: &Path, test_dir: &Path, t: CircuitTestCase) -> anyhow::Result<()> {
     //let mut t = t.clone();
     let circuit_name = circuit_test::types::format_circuit_name(&t.source.main);
     let circuit_dir = test_dir.join(circuit_name);
@@ -36,7 +74,7 @@ fn write_test_case(circuit_repo: &Path, test_dir: &Path, t: circuit_test::types:
 fn run() -> anyhow::Result<()> {
     let circuit_repo = fs::canonicalize(PathBuf::from("../circuits")).expect("invalid circuits repo path");
     let test_dir = circuit_repo.join("testdata");
-    write_test_case(&circuit_repo, &test_dir, circuit_test::binary_merkle_tree::test_check_leaf_update())
+    write_test_case(&circuit_repo, &test_dir, test_case::check_leaf_update())
 }
 
 fn main() {

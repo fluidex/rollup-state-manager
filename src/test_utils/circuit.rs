@@ -1,4 +1,3 @@
-//use serde_json::Value;
 use crate::state::{common, types};
 use ff::to_hex;
 use num_bigint::BigInt;
