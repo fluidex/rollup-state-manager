@@ -34,5 +34,13 @@ rust_decimal = { version = "1.10.3", features = ["serde_json"] }
 name = "state_keeper"
 path = "src/bin/main.rs"
 
+[[bin]]
+name = "test_export_circuit"
+path = "src/tests/bin/test_export_circuit.rs"
+
+[[bin]]
+name = "test_global_state"
+path = "src/tests/bin/test_global_state.rs"
+
 [features]
 default = []
