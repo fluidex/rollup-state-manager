@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
  * npx snarkit test ../circuits/testdata/CheckLeafUpdate_2/
  */
 
+// from https://github1s.com/Fluidex/circuits/blob/HEAD/test/binary_merkle_tree.ts
 mod test_case {
     use state_keeper::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
 
