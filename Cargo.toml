@@ -40,3 +40,4 @@ path = "src/bin/export_circuit_test.rs"
 
 [features]
 default = []
+bench_global_state = []

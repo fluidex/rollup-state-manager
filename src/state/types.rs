@@ -25,8 +25,20 @@ lazy_static! {
     //pub static ref POSEIDON_PARAMS: poseidon_rs::Constants = poseidon_rs::load_constants();
     pub static ref POSEIDON_HASHER: poseidon_rs::Poseidon = poseidon_rs::Poseidon::new();
 }
+#[cfg(not(bench_double_hash))]
 pub fn hash(inputs: &[Fr]) -> Fr {
     (&POSEIDON_HASHER).hash(inputs.to_vec()).unwrap()
+}
+
+#[cfg(bench_double_hash)]
+pub fn hash(inputs: &[Fr]) -> Fr {
+    let fr1 = (&POSEIDON_HASHER).hash(inputs.to_vec()).unwrap();
+    let fr2 = (&POSEIDON_HASHER).hash(inputs.to_vec()).unwrap();
+    if inputs.len() > 1 {
+        fr2
+    } else {
+        fr1
+    }
 }
 
 pub fn shl(a: &Fr, x: u32) -> Fr {
