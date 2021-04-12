@@ -477,11 +477,13 @@ fn write_circuit(circuit_repo: &Path, test_dir: &Path, source: &test_utils::Circ
     Ok(circuit_dir)
 }
 
-fn write_input(input_dir: &Path, block: common::L2Block) -> Result<()> {
-    fs::create_dir_all(input_dir)?;
-    let input_f = File::create(input_dir.join("input.json"))?;
+fn write_input_output(dir: &Path, block: common::L2Block) -> Result<()> {
+    fs::create_dir_all(dir)?;
+
+    let input_f = File::create(dir.join("input.json"))?;
     serde_json::to_writer_pretty(input_f, &L2BlockSerde::from(block))?;
-    let output_f = File::create(input_dir.join("output.json"))?;
+
+    let output_f = File::create(dir.join("output.json"))?;
     //TODO: no output?
     serde_json::to_writer_pretty(output_f, &serde_json::Value::Object(Default::default()))?;
 
