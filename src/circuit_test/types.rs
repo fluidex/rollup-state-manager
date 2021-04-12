@@ -1,16 +1,14 @@
 //use serde_json::Value;
-use regex::Regex;
-
+// use regex::Regex;
 use crate::state::{common, types};
-use ff::to_hex;
-use num_bigint::BigInt;
-use rust_decimal::prelude::ToPrimitive;
-use rust_decimal::Decimal;
-use serde::ser::SerializeSeq;
-use serde::Serialize;
+// use ff::to_hex;
+// use num_bigint::BigInt;
+// use rust_decimal::prelude::ToPrimitive;
+// use rust_decimal::Decimal;
+// use serde::ser::SerializeSeq;
+// use serde::Serialize;
+// use std::convert::TryFrom;
 pub use types::Fr;
-
-use std::convert::TryFrom;
 
 pub fn field_to_string(elem: &Fr) -> String {
     BigInt::parse_bytes(to_hex(elem).as_bytes(), 16).unwrap().to_str_radix(10)

@@ -8,6 +8,7 @@ use serde_json::Value;
 use state_keeper::circuit_test::{self, messages, types};
 use state_keeper::state::{common, global_state};
 //use std::cmp;
+use serde_json::json;
 use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
