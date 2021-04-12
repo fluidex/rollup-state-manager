@@ -21,10 +21,12 @@ pub fn hash(inputs: &[Fr]) -> Fr {
 
 // if use poseidon
 pub type Fr = poseidon_rs::Fr;
+
 lazy_static! {
     //pub static ref POSEIDON_PARAMS: poseidon_rs::Constants = poseidon_rs::load_constants();
     pub static ref POSEIDON_HASHER: poseidon_rs::Poseidon = poseidon_rs::Poseidon::new();
 }
+
 pub fn hash(inputs: &[Fr]) -> Fr {
     (&POSEIDON_HASHER).hash(inputs.to_vec()).unwrap()
 }
@@ -38,6 +40,7 @@ pub fn shl(a: &Fr, x: u32) -> Fr {
 pub fn u32_to_fr(x: u32) -> Fr {
     Fr::from_str(&format!("{}", x)).unwrap()
 }
+
 pub fn u64_to_fr(x: u64) -> Fr {
     Fr::from_repr(poseidon_rs::FrRepr::from(x)).unwrap()
 }
@@ -49,6 +52,7 @@ pub fn field_to_u32(x: &Fr) -> u32 {
 pub fn field_to_bigint(elem: &Fr) -> BigInt {
     BigInt::parse_bytes(to_hex(elem).as_bytes(), 16).unwrap()
 }
+
 pub fn field_to_string(elem: &Fr) -> String {
     field_to_bigint(&elem).to_str_radix(10)
 }
