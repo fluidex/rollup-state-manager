@@ -11,7 +11,6 @@ use franklin_crypto::rescue::bn256::Bn256RescueParams;
 lazy_static! {
     pub static ref RESCUE_PARAMS: Bn256RescueParams = Bn256RescueParams::new_checked_2_into_1();
 }
-
 pub type Fr = franklin_crypto::bellman::bn256::Fr;
 pub fn hash(inputs: &[Fr]) -> Fr {
     rescue_hash::<Bn256>(&RESCUE_PARAMS, &inputs)[0]
