@@ -25,8 +25,6 @@ pub mod test_params {
     pub const MAXTOKENNUM: usize = 2usize.pow(BALANCELEVELS as u32);
     pub const VERBOSE: bool = false;
 
-    // TODO: put in util
-    // TODO: enum & impl
     pub fn token_id(token_name: &str) -> u32 {
         match token_name {
             "ETH" => 0,
@@ -35,8 +33,6 @@ pub mod test_params {
         }
     }
 
-    // TODO: put in util
-    // TODO: enum & impl
     pub fn prec(token_id: u32) -> u32 {
         match token_id {
             0 | 1 => 6,
