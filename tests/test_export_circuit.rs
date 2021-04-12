@@ -1,5 +1,5 @@
 // use state_keeper::circuit_test;
-use state_keeper::test_utils::CircuitTestCase;
+use state_keeper::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
 use std::fs;
 use std::fs::File;
 use std::io::Write;
@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
  */
 
 mod test_case {
-    use state_keeper::test_utils::CircuitTestCase;
+    use state_keeper::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
 
     pub fn check_leaf_update() -> CircuitTestCase {
         let leaves: Vec<Fr> = vec![10, 11, 12, 13]

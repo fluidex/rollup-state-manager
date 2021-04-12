@@ -1,3 +1,3 @@
 pub mod circuit;
 
-pub use circuit::CircuitTestCase;
+pub use circuit::{CircuitSource, CircuitTestCase, CircuitTestData};
