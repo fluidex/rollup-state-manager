@@ -11,11 +11,11 @@ use std::path::{Path, PathBuf};
 
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/binary_merkle_tree.ts
 mod test_case {
-    use serde_json::json;
-    use state_keeper::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
-    use state_keeper::state::types::{Fr, field_to_string};
-    use state_keeper::state::merkle_tree::Tree;
     use ff::Field;
+    use serde_json::json;
+    use state_keeper::state::merkle_tree::Tree;
+    use state_keeper::state::types::{field_to_string, Fr};
+    use state_keeper::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
 
     pub fn check_leaf_update() -> CircuitTestCase {
         let leaves: Vec<Fr> = vec![10, 11, 12, 13]

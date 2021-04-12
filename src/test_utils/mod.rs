@@ -2,6 +2,7 @@ pub mod circuit;
 
 pub use circuit::{format_circuit_name, CircuitSource, CircuitTestCase, CircuitTestData};
 
+use crate::state::{common, types};
 use ff::to_hex;
 use num_bigint::BigInt;
 use rust_decimal::prelude::ToPrimitive;
@@ -9,10 +10,9 @@ use rust_decimal::Decimal;
 use serde::ser::SerializeSeq;
 use serde::Serialize;
 use std::convert::TryFrom;
-use crate::state::{common, types};
-pub use types::Fr;
 pub use types::u32_to_fr;
 pub use types::u64_to_fr;
+pub use types::Fr;
 // use regex::Regex;
 // use ff::to_hex;
 // use num_bigint::BigInt;
