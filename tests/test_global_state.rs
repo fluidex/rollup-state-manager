@@ -519,6 +519,12 @@ fn run() -> Result<()> {
     Ok(())
 }
 
+/*
+ * cargo run --bin export_circuit_test
+ * npm -g install snarkit
+ * npx snarkit test ../circuits/testdata/Block_2_2_7_2/
+ */
+
 fn main() {
     match run() {
         Ok(_) => println!("global_state tests generated"),
