@@ -9,9 +9,11 @@ use rust_decimal::Decimal;
 use serde::ser::SerializeSeq;
 use serde::Serialize;
 use std::convert::TryFrom;
-pub use types::Fr;
-// use regex::Regex;
 use crate::state::{common, types};
+pub use types::Fr;
+pub use types::u32_to_fr;
+pub use types::u64_to_fr;
+// use regex::Regex;
 // use ff::to_hex;
 // use num_bigint::BigInt;
 // use rust_decimal::prelude::ToPrimitive;
@@ -19,8 +21,6 @@ use crate::state::{common, types};
 // use serde::ser::SerializeSeq;
 // use serde::Serialize;
 // use std::convert::TryFrom;
-pub use types::u32_to_fr;
-pub use types::u64_to_fr;
 
 pub fn field_to_string(elem: &Fr) -> String {
     BigInt::parse_bytes(to_hex(elem).as_bytes(), 16).unwrap().to_str_radix(10)
