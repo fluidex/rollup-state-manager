@@ -1,4 +1,4 @@
-use state_keeper::test_utils::CircuitTestCase;
+use state_keeper::test_utils::{self, CircuitTestCase};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -52,7 +52,7 @@ mod test_case {
 
 fn write_test_case(circuit_repo: &Path, test_dir: &Path, t: CircuitTestCase) -> anyhow::Result<()> {
     //let mut t = t.clone();
-    let circuit_name = state_keeper::test_utils::format_circuit_name(&t.source.main);
+    let circuit_name = test_utils::format_circuit_name(&t.source.main);
     let circuit_dir = test_dir.join(circuit_name);
     fs::create_dir_all(circuit_dir.clone())?;
     let circuit_file = circuit_dir.join("circuit.circom");
