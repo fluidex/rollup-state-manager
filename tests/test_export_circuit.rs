@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 /*
  * cargo run --bin export_circuit_test
- * npm -g install https://github.com/Fluidex/circom-circuit-tester
+ * npm -g install snarkit
  * npx snarkit test ../circuits/testdata/CheckLeafUpdate_2/
  */
 
