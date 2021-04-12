@@ -36,11 +36,11 @@ path = "src/bin/main.rs"
 
 [[bin]]
 name = "test_export_circuit"
-path = "src/tests/bin/test_export_circuit.rs"
+path = "tests/test_export_circuit.rs"
 
 [[bin]]
 name = "test_global_state"
-path = "src/tests/bin/test_global_state.rs"
+path = "tests/test_global_state.rs"
 
 [features]
 default = []
