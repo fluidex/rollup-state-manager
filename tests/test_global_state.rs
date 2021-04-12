@@ -425,8 +425,7 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<common::L2Block>, types::Circ
     }
 
     for line in lns {
-        let msg = line.map(parse_msg)??;
-        match msg {
+        match line.map(parse_msg)?? {
             WrappedMessage::BALANCE(balance) => {
                 handle_deposit(&mut state, balance);
             }
