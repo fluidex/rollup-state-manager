@@ -1,8 +1,8 @@
 pub mod circuit;
 
+use crate::state::common;
+pub use crate::types::primitives::{field_to_string, u64_to_fr, Fr};
 pub use circuit::{format_circuit_name, CircuitSource, CircuitTestCase, CircuitTestData};
-
-use crate::state::{common, types};
 use ff::to_hex;
 use num_bigint::BigInt;
 use rust_decimal::prelude::ToPrimitive;
@@ -10,18 +10,11 @@ use rust_decimal::Decimal;
 use serde::ser::SerializeSeq;
 use serde::Serialize;
 use std::convert::TryFrom;
-pub use types::u32_to_fr;
-pub use types::u64_to_fr;
-pub use types::Fr;
-
-pub fn field_to_string(elem: &Fr) -> String {
-    BigInt::parse_bytes(to_hex(elem).as_bytes(), 16).unwrap().to_str_radix(10)
-}
 
 pub fn number_to_integer(num: &Decimal, prec: u32) -> Fr {
     let prec_mul = Decimal::new(10, 0).powi(prec as u64);
     let adjusted = num * prec_mul;
-    types::u64_to_fr(adjusted.floor().to_u64().unwrap())
+    u64_to_fr(adjusted.floor().to_u64().unwrap())
 }
 
 #[cfg(test)]
@@ -39,7 +32,7 @@ pub struct FrStr(Fr);
 
 impl Serialize for FrStr {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(types::field_to_string(&self.0).as_str())
+        serializer.serialize_str(field_to_string(&self.0).as_str())
     }
 }
 

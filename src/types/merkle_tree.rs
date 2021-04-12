@@ -1,12 +1,10 @@
 // https://github1s.com/Fluidex/circuits/blob/HEAD/helper.ts/binary_merkle_tree.ts
 
+use super::primitives::{hash, Fr};
+pub use ff::{Field, PrimeField};
 use fnv::FnvHashMap;
 use rayon::prelude::*;
 use std::iter;
-
-pub use ff::{Field, PrimeField};
-
-use super::types::{hash, Fr};
 
 type LeafIndex = u32;
 type LeafType = Fr;

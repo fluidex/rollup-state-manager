@@ -1,7 +1,6 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/common.ts
-
-pub use super::merkle_tree::MerklePath;
-use super::types::{hash, shl, Fr};
+pub use crate::types::merkle_tree::MerklePath;
+use crate::types::primitives::{hash, shl, Fr};
 use ff::Field;
 
 #[derive(Clone, Copy, PartialEq, Debug)]

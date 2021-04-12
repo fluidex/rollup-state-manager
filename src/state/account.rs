@@ -1,4 +1,4 @@
-use super::types::{field_to_bigint, Fr};
+use crate::types::primitives::{field_to_bigint, Fr};
 use anyhow::Result;
 use arrayref::array_ref;
 use babyjubjub_rs::{decompress_point, Point, PrivateKey};
