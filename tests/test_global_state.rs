@@ -505,7 +505,7 @@ fn export_circuit_and_testdata(
     Ok(circuit_dir)
 }
 
-fn test_all() -> Result<()> {
+fn run() -> Result<()> {
     let circuit_repo = fs::canonicalize(PathBuf::from("../circuits")).expect("invalid circuits repo path");
 
     let timing = Instant::now();
@@ -524,11 +524,8 @@ fn test_all() -> Result<()> {
 }
 
 fn main() {
-    match test_all() {
-        Ok(_) => {}
-        Err(e) => {
-            eprintln!("{:#?}", e);
-            std::process::exit(1);
-        }
+    match run() {
+        Ok(_) => println!("global_state tests generated"),
+        Err(e) => panic!("{:#?}", e),
     }
 }
