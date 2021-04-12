@@ -16,11 +16,13 @@ pub struct CircuitTestData {
     pub input: serde_json::Value,
     pub output: serde_json::Value,
 }
+
 #[derive(Default, Clone)]
 pub struct CircuitSource {
     pub src: String,
     pub main: String,
 }
+
 #[derive(Default, Clone)]
 pub struct CircuitTestCase {
     pub source: CircuitSource,

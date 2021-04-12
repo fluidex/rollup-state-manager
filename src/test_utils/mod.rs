@@ -1,1 +1,1 @@
-pub mod circuit_file;
+pub mod circuit;
