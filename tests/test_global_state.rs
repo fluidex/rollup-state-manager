@@ -4,12 +4,14 @@
 
 // use std::cmp;
 // use serde_json::json;
+use crate::test_utils::L2BlockSerde;
 use anyhow::{anyhow, Result};
 use rust_decimal::Decimal;
 use serde_json::Value;
 use state_keeper::circuit_test::messages;
 use state_keeper::state::{common, global_state};
 use state_keeper::test_utils;
+use state_keeper::types;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Lines, Write};
@@ -200,10 +202,10 @@ impl<'c> OrderState<'c> {
 impl<'c> From<OrderState<'c>> for common::Order {
     fn from(origin: OrderState<'c>) -> Self {
         common::Order {
-            order_id: types::u32_to_fr(origin.order_id),
-            //status: types::u32_to_fr(origin.status),
-            tokenbuy: types::u32_to_fr(origin.token_buy),
-            tokensell: types::u32_to_fr(origin.token_sell),
+            order_id: types::primitives::u32_to_fr(origin.order_id),
+            //status: types::primitives::u32_to_fr(origin.status),
+            tokenbuy: types::primitives::u32_to_fr(origin.token_buy),
+            tokensell: types::primitives::u32_to_fr(origin.token_sell),
             filled_sell: test_utils::number_to_integer(&origin.filled_sell, test_params::prec(origin.token_sell)),
             filled_buy: test_utils::number_to_integer(&origin.filled_buy, test_params::prec(origin.token_buy)),
             total_sell: test_utils::number_to_integer(&origin.total_sell, test_params::prec(origin.token_sell)),
@@ -234,10 +236,10 @@ impl<'c> std::cmp::Ord for OrderState<'c> {
 
 #[derive(PartialEq, Debug)]
 struct CommonBalanceState {
-    bid_user_base: types::Fr,
-    bid_user_quote: types::Fr,
-    ask_user_base: types::Fr,
-    ask_user_quote: types::Fr,
+    bid_user_base: types::primitives::Fr,
+    bid_user_quote: types::primitives::Fr,
+    ask_user_base: types::primitives::Fr,
+    ask_user_quote: types::primitives::Fr,
 }
 
 impl CommonBalanceState {
@@ -402,7 +404,7 @@ fn handle_deposit(state: &mut global_state::GlobalState, deposit: messages::Bala
     });
 }
 
-fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<common::L2Block>, types::CircuitSource)> {
+fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<common::L2Block>, test_utils::circuit::CircuitSource)> {
     let test_dir = circuit_repo.join("test").join("testdata");
     let file = File::open(test_dir.join("msgs_float.jsonl"))?;
 
@@ -440,7 +442,7 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<common::L2Block>, types::Circ
 
     state.flush_with_nop();
 
-    let component = types::CircuitSource {
+    let component = test_utils::circuit::CircuitSource {
         src: String::from("src/block.circom"),
         main: format!(
             "Block({}, {}, {}, {})",
@@ -480,7 +482,7 @@ fn write_circuit(circuit_repo: &Path, test_dir: &Path, source: &test_utils::Circ
 fn write_input(input_dir: &Path, block: common::L2Block) -> Result<()> {
     fs::create_dir_all(input_dir)?;
     let input_f = File::create(input_dir.join("input.json"))?;
-    serde_json::to_writer_pretty(input_f, &types::L2BlockSerde::from(block))?;
+    serde_json::to_writer_pretty(input_f, &L2BlockSerde::from(block))?;
     let output_f = File::create(input_dir.join("output.json"))?;
     //TODO: no output?
     serde_json::to_writer_pretty(output_f, &serde_json::Value::Object(Default::default()))?;
