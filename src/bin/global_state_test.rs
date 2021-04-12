@@ -64,7 +64,6 @@ impl AsMut<PlaceOrderType> for PlaceOrder {
 }
 
 mod test_params {
-
     pub const NTXS: usize = 2;
     pub const BALANCELEVELS: usize = 2;
     pub const ORDERLEVELS: usize = 7;
