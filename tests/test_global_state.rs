@@ -2,14 +2,14 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::large_enum_variant)]
 
+//use std::cmp;
+// use serde_json::json;
 use anyhow::{anyhow, Result};
 use rust_decimal::Decimal;
 use serde_json::Value;
-use state_keeper::circuit_test::{self, messages, types};
-use state_keeper::test_utils;
+use state_keeper::circuit_test::{messages, types};
 use state_keeper::state::{common, global_state};
-//use std::cmp;
-use serde_json::json;
+use state_keeper::test_utils;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Lines, Write};
@@ -191,8 +191,8 @@ impl<'c> OrderState<'c> {
             account_id: self.account_id,
             token_id_sell: self.token_sell,
             token_id_buy: self.token_buy,
-            amount_sell: types::number_to_integer(&self.total_sell, test_params::prec(self.token_sell)),
-            amount_buy: types::number_to_integer(&self.total_buy, test_params::prec(self.token_buy)),
+            amount_sell: test_utils::number_to_integer(&self.total_sell, test_params::prec(self.token_sell)),
+            amount_buy: test_utils::number_to_integer(&self.total_buy, test_params::prec(self.token_buy)),
         }
     }
 }
@@ -204,10 +204,10 @@ impl<'c> From<OrderState<'c>> for common::Order {
             //status: types::u32_to_fr(origin.status),
             tokenbuy: types::u32_to_fr(origin.token_buy),
             tokensell: types::u32_to_fr(origin.token_sell),
-            filled_sell: types::number_to_integer(&origin.filled_sell, test_params::prec(origin.token_sell)),
-            filled_buy: types::number_to_integer(&origin.filled_buy, test_params::prec(origin.token_buy)),
-            total_sell: types::number_to_integer(&origin.total_sell, test_params::prec(origin.token_sell)),
-            total_buy: types::number_to_integer(&origin.total_buy, test_params::prec(origin.token_buy)),
+            filled_sell: test_utils::number_to_integer(&origin.filled_sell, test_params::prec(origin.token_sell)),
+            filled_buy: test_utils::number_to_integer(&origin.filled_buy, test_params::prec(origin.token_buy)),
+            total_sell: test_utils::number_to_integer(&origin.total_sell, test_params::prec(origin.token_sell)),
+            total_buy: test_utils::number_to_integer(&origin.total_buy, test_params::prec(origin.token_buy)),
         }
     }
 }
@@ -246,10 +246,10 @@ impl CommonBalanceState {
         let quote_id = id_pair.1;
 
         CommonBalanceState {
-            bid_user_base: types::number_to_integer(&origin.bid_user_base, test_params::prec(base_id)),
-            bid_user_quote: types::number_to_integer(&origin.bid_user_quote, test_params::prec(quote_id)),
-            ask_user_base: types::number_to_integer(&origin.ask_user_base, test_params::prec(base_id)),
-            ask_user_quote: types::number_to_integer(&origin.ask_user_quote, test_params::prec(quote_id)),
+            bid_user_base: test_utils::number_to_integer(&origin.bid_user_base, test_params::prec(base_id)),
+            bid_user_quote: test_utils::number_to_integer(&origin.bid_user_quote, test_params::prec(quote_id)),
+            ask_user_base: test_utils::number_to_integer(&origin.ask_user_base, test_params::prec(base_id)),
+            ask_user_quote: test_utils::number_to_integer(&origin.ask_user_quote, test_params::prec(quote_id)),
         }
     }
 
@@ -301,8 +301,8 @@ impl PlaceOrder {
                 order2_account_id: trade.bid_user_id,
                 token_id_1to2: id_pair.0,
                 token_id_2to1: id_pair.1,
-                amount_1to2: types::number_to_integer(&trade.amount, test_params::prec(id_pair.0)),
-                amount_2to1: types::number_to_integer(&trade.quote_amount, test_params::prec(id_pair.1)),
+                amount_1to2: test_utils::number_to_integer(&trade.amount, test_params::prec(id_pair.0)),
+                amount_2to1: test_utils::number_to_integer(&trade.quote_amount, test_params::prec(id_pair.1)),
                 order1_id: trade.ask_order_id as u32,
                 order2_id: trade.bid_order_id as u32,
             },
@@ -311,8 +311,8 @@ impl PlaceOrder {
                 order2_account_id: trade.ask_user_id,
                 token_id_1to2: id_pair.1,
                 token_id_2to1: id_pair.0,
-                amount_1to2: types::number_to_integer(&trade.quote_amount, test_params::prec(id_pair.1)),
-                amount_2to1: types::number_to_integer(&trade.amount, test_params::prec(id_pair.0)),
+                amount_1to2: test_utils::number_to_integer(&trade.quote_amount, test_params::prec(id_pair.1)),
+                amount_2to1: test_utils::number_to_integer(&trade.amount, test_params::prec(id_pair.0)),
                 order1_id: trade.bid_order_id as u32,
                 order2_id: trade.ask_order_id as u32,
             },
@@ -392,13 +392,13 @@ fn handle_deposit(state: &mut global_state::GlobalState, deposit: messages::Bala
     let expected_balance_before = state.get_token_balance(deposit.user_id, token_id);
     assert_eq!(
         expected_balance_before,
-        types::number_to_integer(&balance_before, test_params::prec(token_id))
+        test_utils::number_to_integer(&balance_before, test_params::prec(token_id))
     );
 
     state.deposit_to_old(common::DepositToOldTx {
         token_id,
         account_id: deposit.user_id,
-        amount: types::number_to_integer(&deposit.change, test_params::prec(token_id)),
+        amount: test_utils::number_to_integer(&deposit.change, test_params::prec(token_id)),
     });
 }
 
@@ -489,11 +489,7 @@ fn write_input(input_dir: &Path, block: common::L2Block) -> Result<()> {
     Ok(())
 }
 
-fn export_circuit_and_testdata(
-    circuit_repo: &Path,
-    blocks: Vec<common::L2Block>,
-    source: test_utils::CircuitSource,
-) -> Result<PathBuf> {
+fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<common::L2Block>, source: test_utils::CircuitSource) -> Result<PathBuf> {
     let test_dir = circuit_repo.join("testdata");
     let circuit_dir = write_circuit(circuit_repo, &test_dir, &source)?;
 
