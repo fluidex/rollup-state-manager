@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/binary_merkle_tree.ts
 mod test_case {
+    use serde_json::json;
     use state_keeper::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
 
     pub fn check_leaf_update() -> CircuitTestCase {
