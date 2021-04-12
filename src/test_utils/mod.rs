@@ -1,6 +1,6 @@
 pub mod circuit;
 
-pub use circuit::{CircuitSource, CircuitTestCase, CircuitTestData};
+pub use circuit::{format_circuit_name, CircuitSource, CircuitTestCase, CircuitTestData};
 
 use ff::to_hex;
 use num_bigint::BigInt;
