@@ -15,6 +15,7 @@ mod test_case {
     use state_keeper::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
     use state_keeper::state::types::{Fr, field_to_string};
     use state_keeper::state::merkle_tree::Tree;
+    use ff::Field;
 
     pub fn check_leaf_update() -> CircuitTestCase {
         let leaves: Vec<Fr> = vec![10, 11, 12, 13]
