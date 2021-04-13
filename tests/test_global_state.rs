@@ -74,47 +74,46 @@ impl Default for PlaceOrder {
     }
 }
 
-// TODO: rename
-type PlaceAccountType = HashMap<u32, u32>;
+type AccountsType = HashMap<u32, u32>;
 //index type?
 #[derive(Debug)]
-struct PlaceAccount {
-    accountmapping: PlaceAccountType,
+struct Accounts {
+    accountmapping: AccountsType,
     balance_bench: f32,
 }
 
-impl Deref for PlaceAccount {
-    type Target = PlaceAccountType;
+impl Deref for Accounts {
+    type Target = AccountsType;
     fn deref(&self) -> &Self::Target {
         &self.accountmapping
     }
 }
 
-impl DerefMut for PlaceAccount {
+impl DerefMut for Accounts {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.accountmapping
     }
 }
 
-impl Default for PlaceAccount {
+impl Default for Accounts {
     fn default() -> Self {
-        PlaceAccount {
-            accountmapping: PlaceAccountType::new(),
+        Accounts {
+            accountmapping: AccountsType::new(),
             balance_bench: 0.0,
         }
     }
 }
 
 //make ad-hoc transform in account_id
-impl PlaceAccount {
-    fn obtain_place_id(&mut self, state: &mut GlobalState, account_id: u32) -> u32 {
+impl Accounts {
+    fn userid_to_treeindex(&mut self, state: &mut GlobalState, account_id: u32) -> u32 {
         match self.get(&account_id) {
-            Some(pl_id) => *pl_id,
+            Some(idx) => *idx,
             None => {
                 let uid = state.create_new_account(1);
                 self.insert(account_id, uid);
                 if test_params::VERBOSE {
-                    println!("global account id {} to user account id {}", uid, account_id);
+                    println!("global account index {} to user account id {}", uid, account_id);
                 }
                 uid
             }
@@ -126,15 +125,15 @@ impl PlaceAccount {
         state: &mut GlobalState,
         mut trade: types::matchengine::messages::TradeMessage,
     ) -> types::matchengine::messages::TradeMessage {
-        trade.ask_user_id = self.obtain_place_id(state, trade.ask_user_id);
-        trade.bid_user_id = self.obtain_place_id(state, trade.bid_user_id);
+        trade.ask_user_id = self.userid_to_treeindex(state, trade.ask_user_id);
+        trade.bid_user_id = self.userid_to_treeindex(state, trade.bid_user_id);
 
         trade
     }
 
     pub fn handle_deposit(&mut self, state: &mut GlobalState, mut deposit: types::matchengine::messages::BalanceMessage) {
         //integrate the sanity check here ...
-        deposit.user_id = self.obtain_place_id(state, deposit.user_id);
+        deposit.user_id = self.userid_to_treeindex(state, deposit.user_id);
 
         assert!(!deposit.change.is_sign_negative(), "only support deposit now");
 
@@ -489,15 +488,15 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<types::l2::L2Block>> {
     //amplify the records: in each iter we run records on a group of new accounts
     let mut timing = Instant::now();
     let mut place_order = PlaceOrder::default();
-    let mut place_account = PlaceAccount::default();
+    let mut accounts = Accounts::default();
     for i in 1..51 {
         for msg in messages.iter() {
             match msg {
                 WrappedMessage::BALANCE(balance) => {
-                    place_account.handle_deposit(&mut state, balance.clone());
+                    accounts.handle_deposit(&mut state, balance.clone());
                 }
                 WrappedMessage::TRADE(trade) => {
-                    let trade = place_account.transform_trade(&mut state, trade.clone());
+                    let trade = accounts.transform_trade(&mut state, trade.clone());
                     place_order.handle_trade(&mut state, trade);
                 }
                 _ => unreachable!(),
@@ -505,11 +504,11 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<types::l2::L2Block>> {
         }
 
         place_order.clear();
-        place_account.clear();
+        accounts.clear();
 
         if i % 10 == 0 {
             let total = timing.elapsed().as_secs_f32();
-            let (balance_t, _) = place_account.take_bench();
+            let (balance_t, _) = accounts.take_bench();
             let (plact_t, spot_t) = place_order.take_bench();
             println!(
                 "{}th 10 iters in {:.5}s: balance {:.3}%, place {:.3}%, spot {:.3}%",
@@ -543,7 +542,7 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<types::l2::L2Block>, test_uti
     println!("genesis root {}", state.root());
 
     let mut place_order = PlaceOrder::default();
-    let mut place_account = PlaceAccount::default();
+    let mut accounts = Accounts::default();
     /*
         for _ in 0..test_const::MAXACCOUNTNUM {
             state.create_new_account(1);
@@ -553,10 +552,10 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<types::l2::L2Block>, test_uti
     for line in lns {
         match line.map(parse_msg)?? {
             WrappedMessage::BALANCE(balance) => {
-                place_account.handle_deposit(&mut state, balance);
+                accounts.handle_deposit(&mut state, balance);
             }
             WrappedMessage::TRADE(trade) => {
-                let trade = place_account.transform_trade(&mut state, trade);
+                let trade = accounts.transform_trade(&mut state, trade);
                 let trade_id = trade.id;
                 place_order.handle_trade(&mut state, trade);
                 println!("trade {} test done", trade_id);
