@@ -1,8 +1,8 @@
 pub mod circuit;
 pub mod messages;
 
-use crate::state::common;
 pub use crate::types::l2;
+pub use crate::types::merkle_tree::MerklePath;
 pub use crate::types::primitives::{field_to_string, u64_to_fr, Fr};
 pub use circuit::{format_circuit_name, CircuitSource, CircuitTestCase, CircuitTestData};
 use rust_decimal::prelude::ToPrimitive;
@@ -103,7 +103,7 @@ fn array_map<U, T: Clone + Into<U>, const N: usize>(origin: [T; N]) -> [U; N] {
     TryFrom::try_from(collector).ok().unwrap()
 }
 
-fn from_merkle<const N: usize>(origin: [common::MerklePath; N]) -> [MerklePathStr; N] {
+fn from_merkle<const N: usize>(origin: [MerklePath; N]) -> [MerklePathStr; N] {
     let mut collector: Vec<MerklePathStr> = Vec::new();
     for i in &origin {
         collector.push(i.iter().map(From::from).collect());

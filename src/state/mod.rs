@@ -1,3 +1,6 @@
+pub mod account;
 pub mod codec;
-pub mod common;
-pub mod global_state;
+pub mod global;
+
+pub use account::AccountState;
+pub use global::GlobalState;

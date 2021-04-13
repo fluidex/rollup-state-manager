@@ -6,7 +6,7 @@ use crate::test_utils::messages::{parse_msg, WrappedMessage};
 use crate::test_utils::L2BlockSerde;
 use anyhow::Result;
 use rust_decimal::Decimal;
-use state_keeper::state::global_state;
+use state_keeper::state::GlobalState;
 use state_keeper::test_utils;
 use state_keeper::types;
 use std::collections::HashMap;
@@ -216,7 +216,7 @@ impl CommonBalanceState {
         }
     }
 
-    fn build_local(state: &global_state::GlobalState, bid_id: u32, ask_id: u32, id_pair: TokenIdPair) -> Self {
+    fn build_local(state: &GlobalState, bid_id: u32, ask_id: u32, id_pair: TokenIdPair) -> Self {
         let base_id = id_pair.0;
         let quote_id = id_pair.1;
 
@@ -231,7 +231,7 @@ impl CommonBalanceState {
 
 fn assert_balance_state(
     balance_state: &types::matchengine::messages::VerboseBalanceState,
-    state: &global_state::GlobalState,
+    state: &GlobalState,
     bid_id: u32,
     ask_id: u32,
     id_pair: TokenIdPair,
@@ -242,7 +242,7 @@ fn assert_balance_state(
 }
 
 impl PlaceOrder {
-    fn assert_order_state<'c>(&self, state: &global_state::GlobalState, ask_order_state: OrderState<'c>, bid_order_state: OrderState<'c>) {
+    fn assert_order_state<'c>(&self, state: &GlobalState, ask_order_state: OrderState<'c>, bid_order_state: OrderState<'c>) {
         let ask_order_local = state
             .get_account_order_by_id(ask_order_state.account_id, ask_order_state.order_id)
             .unwrap();
@@ -282,7 +282,7 @@ impl PlaceOrder {
         }
     }
 
-    fn handle_trade(&mut self, state: &mut global_state::GlobalState, trade: types::matchengine::messages::TradeMessage) {
+    fn handle_trade(&mut self, state: &mut GlobalState, trade: types::matchengine::messages::TradeMessage) {
         let token_pair = TokenPair::from(trade.market.as_str());
         let id_pair = TokenIdPair::from(token_pair);
 
@@ -343,7 +343,7 @@ impl PlaceOrder {
     }
 }
 
-fn handle_deposit(state: &mut global_state::GlobalState, deposit: types::matchengine::messages::BalanceMessage) {
+fn handle_deposit(state: &mut GlobalState, deposit: types::matchengine::messages::BalanceMessage) {
     //integrate the sanity check here ...
     assert!(!deposit.change.is_sign_negative(), "only support deposit now");
 
@@ -371,7 +371,7 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<types::l2::L2Block>, test_uti
 
     let lns: Lines<BufReader<File>> = BufReader::new(file).lines();
 
-    let mut state = global_state::GlobalState::new(
+    let mut state = GlobalState::new(
         test_params::BALANCELEVELS,
         test_params::ORDERLEVELS,
         test_params::ACCOUNTLEVELS,
