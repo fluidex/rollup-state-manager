@@ -3,9 +3,9 @@ use anyhow::{anyhow, Result};
 use serde_json::Value;
 
 pub enum WrappedMessage {
-    BALANCE(types::messages::BalanceMessage),
-    TRADE(types::messages::TradeMessage),
-    ORDER(types::messages::OrderMessage),
+    BALANCE(types::matchengine::messages::BalanceMessage),
+    TRADE(types::matchengine::messages::TradeMessage),
+    ORDER(types::matchengine::messages::OrderMessage),
 }
 
 pub fn parse_msg(line: String) -> Result<WrappedMessage> {
