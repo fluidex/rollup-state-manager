@@ -42,32 +42,32 @@ pub mod test_params {
     }
 }
 
-type PlaceOrderType = HashMap<u32, (u32, u64)>;
+type OrdersType = HashMap<u32, (u32, u64)>;
 //index type?
 #[derive(Debug)]
-struct PlaceOrder {
-    ordermapping: PlaceOrderType,
+struct Orders {
+    ordermapping: OrdersType,
     place_bench: f32,
     spot_bench: f32,
 }
 
-impl Deref for PlaceOrder {
-    type Target = PlaceOrderType;
+impl Deref for Orders {
+    type Target = OrdersType;
     fn deref(&self) -> &Self::Target {
         &self.ordermapping
     }
 }
 
-impl DerefMut for PlaceOrder {
+impl DerefMut for Orders {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.ordermapping
     }
 }
 
-impl Default for PlaceOrder {
+impl Default for Orders {
     fn default() -> Self {
-        PlaceOrder {
-            ordermapping: PlaceOrderType::new(),
+        Orders {
+            ordermapping: OrdersType::new(),
             place_bench: 0.0,
             spot_bench: 0.0,
         }
@@ -349,7 +349,7 @@ fn assert_balance_state(
     assert_eq!(local_balance, parsed_state);
 }
 
-impl PlaceOrder {
+impl Orders {
     fn take_bench(&mut self) -> (f32, f32) {
         let ret = (self.place_bench, self.spot_bench);
         self.place_bench = 0.0;
@@ -487,7 +487,7 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<types::l2::L2Block>> {
 
     //amplify the records: in each iter we run records on a group of new accounts
     let mut timing = Instant::now();
-    let mut place_order = PlaceOrder::default();
+    let mut orders = Orders::default();
     let mut accounts = Accounts::default();
     for i in 1..51 {
         for msg in messages.iter() {
@@ -497,19 +497,19 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<types::l2::L2Block>> {
                 }
                 WrappedMessage::TRADE(trade) => {
                     let trade = accounts.transform_trade(&mut state, trade.clone());
-                    place_order.handle_trade(&mut state, trade);
+                    orders.handle_trade(&mut state, trade);
                 }
                 _ => unreachable!(),
             }
         }
 
-        place_order.clear();
+        orders.clear();
         accounts.clear();
 
         if i % 10 == 0 {
             let total = timing.elapsed().as_secs_f32();
             let (balance_t, _) = accounts.take_bench();
-            let (plact_t, spot_t) = place_order.take_bench();
+            let (plact_t, spot_t) = orders.take_bench();
             println!(
                 "{}th 10 iters in {:.5}s: balance {:.3}%, place {:.3}%, spot {:.3}%",
                 i / 10,
@@ -541,7 +541,7 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<types::l2::L2Block>, test_uti
 
     println!("genesis root {}", state.root());
 
-    let mut place_order = PlaceOrder::default();
+    let mut orders = Orders::default();
     let mut accounts = Accounts::default();
     /*
         for _ in 0..test_const::MAXACCOUNTNUM {
@@ -557,7 +557,7 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<types::l2::L2Block>, test_uti
             WrappedMessage::TRADE(trade) => {
                 let trade = accounts.transform_trade(&mut state, trade);
                 let trade_id = trade.id;
-                place_order.handle_trade(&mut state, trade);
+                orders.handle_trade(&mut state, trade);
                 println!("trade {} test done", trade_id);
             }
             _ => {
