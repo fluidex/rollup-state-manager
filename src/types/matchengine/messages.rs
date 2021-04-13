@@ -28,7 +28,7 @@ pub enum OrderEventType {
     EXPIRED = 4,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Order {
     pub id: u64,
     pub market: String,
@@ -49,7 +49,7 @@ pub struct Order {
     pub finished_fee: Decimal,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct OrderMessage {
     pub event: OrderEventType,
     pub order: Order,
@@ -57,7 +57,7 @@ pub struct OrderMessage {
     pub quote: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct VerboseOrderState {
     pub price: Decimal,
     pub amount: Decimal,
@@ -65,7 +65,7 @@ pub struct VerboseOrderState {
     pub finished_quote: Decimal,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct VerboseBalanceState {
     pub bid_user_base: Decimal,
     pub bid_user_quote: Decimal,
@@ -73,7 +73,7 @@ pub struct VerboseBalanceState {
     pub ask_user_quote: Decimal,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct VerboseTradeState {
     // emit all the related state
     pub ask_order_state: VerboseOrderState,
@@ -81,7 +81,7 @@ pub struct VerboseTradeState {
     pub balance: VerboseBalanceState,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct TradeMessage {
     pub id: u64,
     pub timestamp: f64, // unix epoch timestamp,
@@ -105,7 +105,7 @@ pub struct TradeMessage {
     pub state_after: VerboseTradeState,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct BalanceMessage {
     pub timestamp: f64,
     pub user_id: u32,
