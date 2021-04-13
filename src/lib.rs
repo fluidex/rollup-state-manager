@@ -1,6 +1,7 @@
 #![allow(clippy::needless_range_loop)]
 #![allow(dead_code)]
+pub mod account;
 pub mod config;
 pub mod state;
-// TODO: use some cargo feature for this
-pub mod circuit_test;
+pub mod test_utils;
+pub mod types;

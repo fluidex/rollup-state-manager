@@ -2,69 +2,20 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::large_enum_variant)]
 
-use anyhow::{anyhow, Result};
+use crate::test_utils::messages::{parse_msg, WrappedMessage};
+use crate::test_utils::L2BlockSerde;
+use anyhow::Result;
 use rust_decimal::Decimal;
-use serde_json::Value;
-use state_keeper::circuit_test::{self, messages, types};
-use state_keeper::state::{common, global_state};
-//use std::cmp;
+use state_keeper::state::GlobalState;
+use state_keeper::test_utils;
+use state_keeper::types;
 use std::collections::HashMap;
-use std::fs;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Lines, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-enum WrappedMessage {
-    BALANCE(messages::BalanceMessage),
-    TRADE(messages::TradeMessage),
-    ORDER(messages::OrderMessage),
-}
-
-fn parse_msg(line: String) -> Result<WrappedMessage> {
-    let v: Value = serde_json::from_str(&line)?;
-    if let Value::String(typestr) = &v["type"] {
-        let val = v["value"].clone();
-
-        match typestr.as_str() {
-            "BalanceMessage" => {
-                let data = serde_json::from_value(val).map_err(|e| anyhow!("wrong balance: {}", e))?;
-                Ok(WrappedMessage::BALANCE(data))
-            }
-            "OrderMessage" => {
-                let data = serde_json::from_value(val).map_err(|e| anyhow!("wrong balance: {}", e))?;
-                Ok(WrappedMessage::ORDER(data))
-            }
-            "TradeMessage" => {
-                let data = serde_json::from_value(val).map_err(|e| anyhow!("wrong balance: {}", e))?;
-                Ok(WrappedMessage::TRADE(data))
-            }
-            other => Err(anyhow!("unrecognized type field {}", other)),
-        }
-    } else {
-        Err(anyhow!("missed or unexpected type field: {}", line))
-    }
-}
-
-type PlaceOrderType = HashMap<u32, (u32, u64)>;
-//index type?
-#[derive(Debug)]
-struct PlaceOrder(PlaceOrderType);
-
-impl AsRef<PlaceOrderType> for PlaceOrder {
-    fn as_ref(&self) -> &PlaceOrderType {
-        &self.0
-    }
-}
-
-impl AsMut<PlaceOrderType> for PlaceOrder {
-    fn as_mut(&mut self) -> &mut PlaceOrderType {
-        &mut self.0
-    }
-}
-
-mod test_const {
-
+pub mod test_params {
     pub const NTXS: usize = 2;
     pub const BALANCELEVELS: usize = 2;
     pub const ORDERLEVELS: usize = 7;
@@ -90,6 +41,23 @@ mod test_const {
     }
 }
 
+type PlaceOrderType = HashMap<u32, (u32, u64)>;
+//index type?
+#[derive(Debug)]
+struct PlaceOrder(PlaceOrderType);
+
+impl AsRef<PlaceOrderType> for PlaceOrder {
+    fn as_ref(&self) -> &PlaceOrderType {
+        &self.0
+    }
+}
+
+impl AsMut<PlaceOrderType> for PlaceOrder {
+    fn as_mut(&mut self) -> &mut PlaceOrderType {
+        &mut self.0
+    }
+}
+
 #[derive(Clone, Copy)]
 struct TokenIdPair(u32, u32);
 /*
@@ -105,7 +73,7 @@ impl TokenIdPair {
 struct TokenPair<'c>(&'c str, &'c str);
 
 struct OrderState<'c> {
-    origin: &'c messages::VerboseOrderState,
+    origin: &'c types::matchengine::messages::VerboseOrderState,
     side: &'static str,
     token_sell: u32,
     token_buy: u32,
@@ -116,13 +84,13 @@ struct OrderState<'c> {
 
     order_id: u32,
     account_id: u32,
-    role: messages::MarketRole,
+    role: types::matchengine::messages::MarketRole,
 }
 
 struct OrderStateTag {
     id: u64,
     account_id: u32,
-    role: messages::MarketRole,
+    role: types::matchengine::messages::MarketRole,
 }
 
 impl<'c> From<&'c str> for TokenPair<'c> {
@@ -136,17 +104,17 @@ impl<'c> From<&'c str> for TokenPair<'c> {
 
 impl<'c> From<TokenPair<'c>> for TokenIdPair {
     fn from(origin: TokenPair<'c>) -> Self {
-        TokenIdPair(test_const::token_id(origin.0), test_const::token_id(origin.1))
+        TokenIdPair(test_params::token_id(origin.0), test_params::token_id(origin.1))
     }
 }
 
 impl<'c> OrderState<'c> {
     fn parse(
-        origin: &'c messages::VerboseOrderState,
+        origin: &'c types::matchengine::messages::VerboseOrderState,
         id_pair: TokenIdPair,
         _token_pair: TokenPair<'c>,
         side: &'static str,
-        trade: &messages::TradeMessage,
+        trade: &types::matchengine::messages::TradeMessage,
     ) -> Self {
         match side {
             "ASK" => OrderState {
@@ -180,32 +148,33 @@ impl<'c> OrderState<'c> {
             _ => unreachable!(),
         }
     }
-    fn place_order_tx(&self) -> common::PlaceOrderTx {
-        common::PlaceOrderTx {
+    fn place_order_tx(&self) -> types::l2::PlaceOrderTx {
+        types::l2::PlaceOrderTx {
             order_id: self.order_id,
             account_id: self.account_id,
             token_id_sell: self.token_sell,
             token_id_buy: self.token_buy,
-            amount_sell: types::number_to_integer(&self.total_sell, test_const::prec(self.token_sell)),
-            amount_buy: types::number_to_integer(&self.total_buy, test_const::prec(self.token_buy)),
+            amount_sell: test_utils::number_to_integer(&self.total_sell, test_params::prec(self.token_sell)),
+            amount_buy: test_utils::number_to_integer(&self.total_buy, test_params::prec(self.token_buy)),
         }
     }
 }
 
-impl<'c> From<OrderState<'c>> for common::Order {
+impl<'c> From<OrderState<'c>> for types::l2::Order {
     fn from(origin: OrderState<'c>) -> Self {
-        common::Order {
-            order_id: types::u32_to_fr(origin.order_id),
-            //status: types::u32_to_fr(origin.status),
-            tokenbuy: types::u32_to_fr(origin.token_buy),
-            tokensell: types::u32_to_fr(origin.token_sell),
-            filled_sell: types::number_to_integer(&origin.filled_sell, test_const::prec(origin.token_sell)),
-            filled_buy: types::number_to_integer(&origin.filled_buy, test_const::prec(origin.token_buy)),
-            total_sell: types::number_to_integer(&origin.total_sell, test_const::prec(origin.token_sell)),
-            total_buy: types::number_to_integer(&origin.total_buy, test_const::prec(origin.token_buy)),
+        types::l2::Order {
+            order_id: types::primitives::u32_to_fr(origin.order_id),
+            //status: types::primitives::u32_to_fr(origin.status),
+            tokenbuy: types::primitives::u32_to_fr(origin.token_buy),
+            tokensell: types::primitives::u32_to_fr(origin.token_sell),
+            filled_sell: test_utils::number_to_integer(&origin.filled_sell, test_params::prec(origin.token_sell)),
+            filled_buy: test_utils::number_to_integer(&origin.filled_buy, test_params::prec(origin.token_buy)),
+            total_sell: test_utils::number_to_integer(&origin.total_sell, test_params::prec(origin.token_sell)),
+            total_buy: test_utils::number_to_integer(&origin.total_buy, test_params::prec(origin.token_buy)),
         }
     }
 }
+
 impl<'c> std::cmp::PartialOrd for OrderState<'c> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
@@ -228,26 +197,26 @@ impl<'c> std::cmp::Ord for OrderState<'c> {
 
 #[derive(PartialEq, Debug)]
 struct CommonBalanceState {
-    bid_user_base: types::Fr,
-    bid_user_quote: types::Fr,
-    ask_user_base: types::Fr,
-    ask_user_quote: types::Fr,
+    bid_user_base: types::primitives::Fr,
+    bid_user_quote: types::primitives::Fr,
+    ask_user_base: types::primitives::Fr,
+    ask_user_quote: types::primitives::Fr,
 }
 
 impl CommonBalanceState {
-    fn parse(origin: &messages::VerboseBalanceState, id_pair: TokenIdPair) -> Self {
+    fn parse(origin: &types::matchengine::messages::VerboseBalanceState, id_pair: TokenIdPair) -> Self {
         let base_id = id_pair.0;
         let quote_id = id_pair.1;
 
         CommonBalanceState {
-            bid_user_base: types::number_to_integer(&origin.bid_user_base, test_const::prec(base_id)),
-            bid_user_quote: types::number_to_integer(&origin.bid_user_quote, test_const::prec(quote_id)),
-            ask_user_base: types::number_to_integer(&origin.ask_user_base, test_const::prec(base_id)),
-            ask_user_quote: types::number_to_integer(&origin.ask_user_quote, test_const::prec(quote_id)),
+            bid_user_base: test_utils::number_to_integer(&origin.bid_user_base, test_params::prec(base_id)),
+            bid_user_quote: test_utils::number_to_integer(&origin.bid_user_quote, test_params::prec(quote_id)),
+            ask_user_base: test_utils::number_to_integer(&origin.ask_user_base, test_params::prec(base_id)),
+            ask_user_quote: test_utils::number_to_integer(&origin.ask_user_quote, test_params::prec(quote_id)),
         }
     }
 
-    fn build_local(state: &global_state::GlobalState, bid_id: u32, ask_id: u32, id_pair: TokenIdPair) -> Self {
+    fn build_local(state: &GlobalState, bid_id: u32, ask_id: u32, id_pair: TokenIdPair) -> Self {
         let base_id = id_pair.0;
         let quote_id = id_pair.1;
 
@@ -261,8 +230,8 @@ impl CommonBalanceState {
 }
 
 fn assert_balance_state(
-    balance_state: &messages::VerboseBalanceState,
-    state: &global_state::GlobalState,
+    balance_state: &types::matchengine::messages::VerboseBalanceState,
+    state: &GlobalState,
     bid_id: u32,
     ask_id: u32,
     id_pair: TokenIdPair,
@@ -273,47 +242,47 @@ fn assert_balance_state(
 }
 
 impl PlaceOrder {
-    fn assert_order_state<'c>(&self, state: &global_state::GlobalState, ask_order_state: OrderState<'c>, bid_order_state: OrderState<'c>) {
+    fn assert_order_state<'c>(&self, state: &GlobalState, ask_order_state: OrderState<'c>, bid_order_state: OrderState<'c>) {
         let ask_order_local = state
             .get_account_order_by_id(ask_order_state.account_id, ask_order_state.order_id)
             .unwrap();
-        assert_eq!(ask_order_local, common::Order::from(ask_order_state));
+        assert_eq!(ask_order_local, types::l2::Order::from(ask_order_state));
 
         let bid_order_local = state
             .get_account_order_by_id(bid_order_state.account_id, bid_order_state.order_id)
             .unwrap();
-        assert_eq!(bid_order_local, common::Order::from(bid_order_state));
+        assert_eq!(bid_order_local, types::l2::Order::from(bid_order_state));
     }
 
-    fn trade_into_spot_tx(&self, trade: &messages::TradeMessage) -> common::SpotTradeTx {
+    fn trade_into_spot_tx(&self, trade: &types::matchengine::messages::TradeMessage) -> types::l2::SpotTradeTx {
         //allow information can be obtained from trade
         let id_pair = TokenIdPair::from(TokenPair::from(trade.market.as_str()));
 
         match trade.ask_role {
-            messages::MarketRole::MAKER => common::SpotTradeTx {
+            types::matchengine::messages::MarketRole::MAKER => types::l2::SpotTradeTx {
                 order1_account_id: trade.ask_user_id,
                 order2_account_id: trade.bid_user_id,
                 token_id_1to2: id_pair.0,
                 token_id_2to1: id_pair.1,
-                amount_1to2: types::number_to_integer(&trade.amount, test_const::prec(id_pair.0)),
-                amount_2to1: types::number_to_integer(&trade.quote_amount, test_const::prec(id_pair.1)),
+                amount_1to2: test_utils::number_to_integer(&trade.amount, test_params::prec(id_pair.0)),
+                amount_2to1: test_utils::number_to_integer(&trade.quote_amount, test_params::prec(id_pair.1)),
                 order1_id: trade.ask_order_id as u32,
                 order2_id: trade.bid_order_id as u32,
             },
-            messages::MarketRole::TAKER => common::SpotTradeTx {
+            types::matchengine::messages::MarketRole::TAKER => types::l2::SpotTradeTx {
                 order1_account_id: trade.bid_user_id,
                 order2_account_id: trade.ask_user_id,
                 token_id_1to2: id_pair.1,
                 token_id_2to1: id_pair.0,
-                amount_1to2: types::number_to_integer(&trade.quote_amount, test_const::prec(id_pair.1)),
-                amount_2to1: types::number_to_integer(&trade.amount, test_const::prec(id_pair.0)),
+                amount_1to2: test_utils::number_to_integer(&trade.quote_amount, test_params::prec(id_pair.1)),
+                amount_2to1: test_utils::number_to_integer(&trade.amount, test_params::prec(id_pair.0)),
                 order1_id: trade.bid_order_id as u32,
                 order2_id: trade.ask_order_id as u32,
             },
         }
     }
 
-    fn handle_trade(&mut self, state: &mut global_state::GlobalState, trade: messages::TradeMessage) {
+    fn handle_trade(&mut self, state: &mut GlobalState, trade: types::matchengine::messages::TradeMessage) {
         let token_pair = TokenPair::from(trade.market.as_str());
         let id_pair = TokenIdPair::from(token_pair);
 
@@ -339,13 +308,13 @@ impl PlaceOrder {
                 let new_order_pos = state.place_order(order_state.place_order_tx());
                 self.as_mut()
                     .insert(order_state.order_id, (order_state.account_id, new_order_pos as u64));
-                if test_const::VERBOSE {
+                if test_params::VERBOSE {
                     println!(
                         "global order id {} to user order id ({},{})",
                         order_state.order_id, order_state.account_id, new_order_pos
                     );
                 }
-            } else if test_const::VERBOSE {
+            } else if test_params::VERBOSE {
                 println!("skip put order {}", order_state.order_id);
             }
         }
@@ -374,11 +343,11 @@ impl PlaceOrder {
     }
 }
 
-fn handle_deposit(state: &mut global_state::GlobalState, deposit: messages::BalanceMessage) {
+fn handle_deposit(state: &mut GlobalState, deposit: types::matchengine::messages::BalanceMessage) {
     //integrate the sanity check here ...
     assert!(!deposit.change.is_sign_negative(), "only support deposit now");
 
-    let token_id = test_const::token_id(&deposit.asset);
+    let token_id = test_params::token_id(&deposit.asset);
 
     let balance_before = deposit.balance - deposit.change;
     assert!(!balance_before.is_sign_negative(), "invalid balance {:?}", deposit);
@@ -386,41 +355,40 @@ fn handle_deposit(state: &mut global_state::GlobalState, deposit: messages::Bala
     let expected_balance_before = state.get_token_balance(deposit.user_id, token_id);
     assert_eq!(
         expected_balance_before,
-        types::number_to_integer(&balance_before, test_const::prec(token_id))
+        test_utils::number_to_integer(&balance_before, test_params::prec(token_id))
     );
 
-    state.deposit_to_old(common::DepositToOldTx {
+    state.deposit_to_old(types::l2::DepositToOldTx {
         token_id,
         account_id: deposit.user_id,
-        amount: types::number_to_integer(&deposit.change, test_const::prec(token_id)),
+        amount: test_utils::number_to_integer(&deposit.change, test_params::prec(token_id)),
     });
 }
 
-fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<common::L2Block>, types::CircuitSource)> {
+fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<types::l2::L2Block>, test_utils::circuit::CircuitSource)> {
     let test_dir = circuit_repo.join("test").join("testdata");
     let file = File::open(test_dir.join("msgs_float.jsonl"))?;
 
     let lns: Lines<BufReader<File>> = BufReader::new(file).lines();
 
-    let mut state = global_state::GlobalState::new(
-        test_const::BALANCELEVELS,
-        test_const::ORDERLEVELS,
-        test_const::ACCOUNTLEVELS,
-        test_const::NTXS,
-        test_const::VERBOSE,
+    let mut state = GlobalState::new(
+        test_params::BALANCELEVELS,
+        test_params::ORDERLEVELS,
+        test_params::ACCOUNTLEVELS,
+        test_params::NTXS,
+        test_params::VERBOSE,
     );
 
     println!("genesis root {}", state.root());
 
     let mut place_order = PlaceOrder(PlaceOrderType::new());
 
-    for _ in 0..test_const::MAXACCOUNTNUM {
+    for _ in 0..test_params::MAXACCOUNTNUM {
         state.create_new_account(1);
     }
 
     for line in lns {
-        let msg = line.map(parse_msg)??;
-        match msg {
+        match line.map(parse_msg)?? {
             WrappedMessage::BALANCE(balance) => {
                 handle_deposit(&mut state, balance);
             }
@@ -435,14 +403,14 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<common::L2Block>, types::Circ
 
     state.flush_with_nop();
 
-    let component = types::CircuitSource {
+    let component = test_utils::circuit::CircuitSource {
         src: String::from("src/block.circom"),
         main: format!(
             "Block({}, {}, {}, {})",
-            test_const::NTXS,
-            test_const::BALANCELEVELS,
-            test_const::ORDERLEVELS,
-            test_const::ACCOUNTLEVELS
+            test_params::NTXS,
+            test_params::BALANCELEVELS,
+            test_params::ORDERLEVELS,
+            test_params::ACCOUNTLEVELS
         ),
     };
 
@@ -450,15 +418,15 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<common::L2Block>, types::Circ
 }
 
 //just grap from export_circuit_test.rs ...
-fn write_circuit(circuit_repo: &Path, test_dir: &Path, source: &circuit_test::types::CircuitSource) -> Result<PathBuf> {
-    let circuit_name = circuit_test::types::format_circuit_name(source.main.as_str());
+fn write_circuit(circuit_repo: &Path, test_dir: &Path, source: &test_utils::CircuitSource) -> Result<PathBuf> {
+    let circuit_name = test_utils::format_circuit_name(source.main.as_str());
     let circuit_dir = test_dir.join(circuit_name);
 
     fs::create_dir_all(circuit_dir.clone())?;
 
     let circuit_file = circuit_dir.join("circuit.circom");
 
-    //in os beyond UNIX the slash in source wolud not be considerred as separator
+    // on other OS than UNIX the slash in source wolud not be considerred as separator
     //so we need to convert them explicity
     let src_path: PathBuf = source.src.split('/').collect();
 
@@ -472,35 +440,33 @@ fn write_circuit(circuit_repo: &Path, test_dir: &Path, source: &circuit_test::ty
     Ok(circuit_dir)
 }
 
-fn write_input(input_dir: &Path, block: common::L2Block) -> Result<()> {
-    fs::create_dir_all(input_dir)?;
-    let input_f = File::create(input_dir.join("input.json"))?;
-    serde_json::to_writer_pretty(input_f, &types::L2BlockSerde::from(block))?;
-    let output_f = File::create(input_dir.join("output.json"))?;
+fn write_input_output(dir: &Path, block: types::l2::L2Block) -> Result<()> {
+    fs::create_dir_all(dir)?;
+
+    let input_f = File::create(dir.join("input.json"))?;
+    serde_json::to_writer_pretty(input_f, &L2BlockSerde::from(block))?;
+
+    let output_f = File::create(dir.join("output.json"))?;
     //TODO: no output?
     serde_json::to_writer_pretty(output_f, &serde_json::Value::Object(Default::default()))?;
 
     Ok(())
 }
 
-fn export_circuit_and_testdata(
-    circuit_repo: &Path,
-    blocks: Vec<common::L2Block>,
-    source: circuit_test::types::CircuitSource,
-) -> Result<PathBuf> {
+fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<types::l2::L2Block>, source: test_utils::CircuitSource) -> Result<PathBuf> {
     let test_dir = circuit_repo.join("testdata");
     let circuit_dir = write_circuit(circuit_repo, &test_dir, &source)?;
 
     for (blki, blk) in blocks.into_iter().enumerate() {
-        let input_dir = circuit_dir.join(format!("{:04}", blki));
-        write_input(&input_dir, blk)?;
+        let dir = circuit_dir.join(format!("{:04}", blki));
+        write_input_output(&dir, blk)?;
         //println!("{}", serde_json::to_string_pretty(&types::L2BlockSerde::from(blk)).unwrap());
     }
 
     Ok(circuit_dir)
 }
 
-fn test_all() -> Result<()> {
+fn run() -> Result<()> {
     let circuit_repo = fs::canonicalize(PathBuf::from("../circuits")).expect("invalid circuits repo path");
 
     let timing = Instant::now();
@@ -508,22 +474,25 @@ fn test_all() -> Result<()> {
     println!(
         "genesis {} blocks (TPS: {})",
         blocks.len(),
-        (test_const::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
+        (test_params::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
     );
 
     let circuit_dir = export_circuit_and_testdata(&circuit_repo, blocks, components)?;
 
-    println!("TODO: test circuit dir {}", circuit_dir.to_str().unwrap());
+    println!("test circuit dir {}", circuit_dir.to_str().unwrap());
 
     Ok(())
 }
 
+/*
+ * cargo run --bin export_circuit_test
+ * npm -g install snarkit
+ * npx snarkit test ../circuits/testdata/Block_2_2_7_2/
+ */
+
 fn main() {
-    match test_all() {
-        Ok(_) => {}
-        Err(e) => {
-            eprintln!("{:#?}", e);
-            std::process::exit(1);
-        }
+    match run() {
+        Ok(_) => println!("global_state tests generated"),
+        Err(e) => panic!("{:#?}", e),
     }
 }

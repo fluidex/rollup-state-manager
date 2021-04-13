@@ -1,52 +1,21 @@
-//use serde_json::Value;
-use regex::Regex;
+pub mod circuit;
+pub mod messages;
 
-use crate::state::{common, types};
-use ff::to_hex;
-use num_bigint::BigInt;
+pub use crate::types::l2;
+pub use crate::types::merkle_tree::MerklePath;
+pub use crate::types::primitives::{field_to_string, u64_to_fr, Fr};
+pub use circuit::{format_circuit_name, CircuitSource, CircuitTestCase, CircuitTestData};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde::ser::SerializeSeq;
 use serde::Serialize;
-pub use types::Fr;
-
 use std::convert::TryFrom;
-
-#[derive(Default, Clone)]
-pub struct CircuitTestData {
-    pub name: String,
-    pub input: serde_json::Value,
-    pub output: serde_json::Value,
-}
-#[derive(Default, Clone)]
-pub struct CircuitSource {
-    pub src: String,
-    pub main: String,
-}
-#[derive(Default, Clone)]
-pub struct CircuitTestCase {
-    pub source: CircuitSource,
-    pub data: CircuitTestData,
-}
-
-pub fn format_circuit_name(s: &str) -> String {
-    // js: s.replace(/[ )]/g, '').replace(/[(,]/g, '_');
-    let remove = Regex::new(r"[ )]").unwrap();
-    let replace = Regex::new(r"[(,]").unwrap();
-    replace.replace_all(&remove.replace_all(s, ""), "_").to_owned().to_string()
-}
-pub fn field_to_string(elem: &Fr) -> String {
-    BigInt::parse_bytes(to_hex(elem).as_bytes(), 16).unwrap().to_str_radix(10)
-}
 
 pub fn number_to_integer(num: &Decimal, prec: u32) -> Fr {
     let prec_mul = Decimal::new(10, 0).powi(prec as u64);
     let adjusted = num * prec_mul;
-    types::u64_to_fr(adjusted.floor().to_u64().unwrap())
+    u64_to_fr(adjusted.floor().to_u64().unwrap())
 }
-
-pub use types::u32_to_fr;
-pub use types::u64_to_fr;
 
 #[cfg(test)]
 #[test]
@@ -63,7 +32,7 @@ pub struct FrStr(Fr);
 
 impl Serialize for FrStr {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(types::field_to_string(&self.0).as_str())
+        serializer.serialize_str(field_to_string(&self.0).as_str())
     }
 }
 
@@ -90,16 +59,16 @@ impl From<&[Fr; 1]> for MerkleLeafStr {
     }
 }
 
-impl Serialize for common::TxType {
+impl Serialize for l2::TxType {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_i32(match self {
-            common::TxType::DepositToNew => 0,
-            common::TxType::DepositToOld => 1,
-            common::TxType::Transfer => 2,
-            common::TxType::Withdraw => 3,
-            common::TxType::PlaceOrder => 4,
-            common::TxType::SpotTrade => 5,
-            common::TxType::Nop => 6,
+            l2::TxType::DepositToNew => 0,
+            l2::TxType::DepositToOld => 1,
+            l2::TxType::Transfer => 2,
+            l2::TxType::Withdraw => 3,
+            l2::TxType::PlaceOrder => 4,
+            l2::TxType::SpotTrade => 5,
+            l2::TxType::Nop => 6,
         })
     }
 }
@@ -111,7 +80,7 @@ type MerklePathStr = Vec<MerkleLeafStr>;
 #[derive(Serialize)]
 pub struct L2BlockSerde {
     #[serde(rename(serialize = "txsType"))]
-    txs_type: Vec<common::TxType>,
+    txs_type: Vec<l2::TxType>,
     #[serde(rename(serialize = "encodedTxs"))]
     encoded_txs: Vec<Vec<FrStr>>,
     balance_path_elements: Vec<[MerklePathStr; 4]>,
@@ -134,7 +103,7 @@ fn array_map<U, T: Clone + Into<U>, const N: usize>(origin: [T; N]) -> [U; N] {
     TryFrom::try_from(collector).ok().unwrap()
 }
 
-fn from_merkle<const N: usize>(origin: [common::MerklePath; N]) -> [MerklePathStr; N] {
+fn from_merkle<const N: usize>(origin: [MerklePath; N]) -> [MerklePathStr; N] {
     let mut collector: Vec<MerklePathStr> = Vec::new();
     for i in &origin {
         collector.push(i.iter().map(From::from).collect());
@@ -142,8 +111,8 @@ fn from_merkle<const N: usize>(origin: [common::MerklePath; N]) -> [MerklePathSt
     TryFrom::try_from(collector).ok().unwrap()
 }
 
-impl From<common::L2Block> for L2BlockSerde {
-    fn from(origin: common::L2Block) -> Self {
+impl From<l2::L2Block> for L2BlockSerde {
+    fn from(origin: l2::L2Block) -> Self {
         L2BlockSerde {
             txs_type: origin.txs_type,
             encoded_txs: origin
