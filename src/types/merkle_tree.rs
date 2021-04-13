@@ -38,7 +38,7 @@ pub struct Tree {
     data: Vec<ValueMap>,
 }
 
-impl Tree {    
+impl Tree {
     pub fn print_config() {
         println!("merkletree valueMap type: {}", std::any::type_name::<ValueMap>())
     }
