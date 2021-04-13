@@ -1,3 +1,5 @@
+pub mod codec;
+
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/common.ts
 pub use crate::types::merkle_tree::MerklePath;
 use crate::types::primitives::{hash, shl, Fr};

@@ -2,8 +2,8 @@
 
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
 
-use super::codec::place_order_tx_data;
 use super::AccountState;
+use crate::types::l2::codec::place_order_tx_data;
 use crate::types::l2::{tx_detail_idx, DepositToOldTx, L2Block, Order, PlaceOrderTx, RawTx, SpotTradeTx, TxType, TX_LENGTH};
 use crate::types::merkle_tree::{empty_tree_root, Tree};
 use crate::types::primitives::{field_to_u32, u32_to_fr, Fr};
