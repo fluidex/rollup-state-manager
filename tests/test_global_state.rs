@@ -16,6 +16,7 @@ use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+// TODO: use ENV
 pub mod test_params {
     pub const NTXS: usize = 2;
     pub const BALANCELEVELS: usize = 2;
@@ -26,6 +27,7 @@ pub mod test_params {
     pub const MAXTOKENNUM: usize = 2usize.pow(BALANCELEVELS as u32);
     pub const VERBOSE: bool = false;
 
+    // TODO: enum & impl
     pub fn token_id(token_name: &str) -> u32 {
         match token_name {
             "ETH" => 0,
@@ -34,6 +36,7 @@ pub mod test_params {
         }
     }
 
+    // TODO: enum & impl
     pub fn prec(token_id: u32) -> u32 {
         match token_id {
             0 | 1 => 6,
@@ -41,6 +44,8 @@ pub mod test_params {
         }
     }
 }
+
+// TODO: move most of these to test_utils
 
 type OrdersType = HashMap<u32, (u32, u64)>;
 //index type?
