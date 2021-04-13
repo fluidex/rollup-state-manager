@@ -12,6 +12,7 @@ use state_keeper::types;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Lines, Write};
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -44,17 +45,125 @@ pub mod test_params {
 type PlaceOrderType = HashMap<u32, (u32, u64)>;
 //index type?
 #[derive(Debug)]
-struct PlaceOrder(PlaceOrderType);
+struct PlaceOrder {
+    ordermapping: PlaceOrderType,
+    place_bench: f32,
+    spot_bench: f32,
+}
 
-impl AsRef<PlaceOrderType> for PlaceOrder {
-    fn as_ref(&self) -> &PlaceOrderType {
-        &self.0
+impl Deref for PlaceOrder {
+    type Target = PlaceOrderType;
+    fn deref(&self) -> &Self::Target {
+        &self.ordermapping
     }
 }
 
-impl AsMut<PlaceOrderType> for PlaceOrder {
-    fn as_mut(&mut self) -> &mut PlaceOrderType {
-        &mut self.0
+impl DerefMut for PlaceOrder {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.ordermapping
+    }
+}
+
+impl Default for PlaceOrder {
+    fn default() -> Self {
+        PlaceOrder {
+            ordermapping: PlaceOrderType::new(),
+            place_bench: 0.0,
+            spot_bench: 0.0,
+        }
+    }
+}
+
+// TODO: rename
+type PlaceAccountType = HashMap<u32, u32>;
+//index type?
+#[derive(Debug)]
+struct PlaceAccount {
+    accountmapping: PlaceAccountType,
+    balance_bench: f32,
+}
+
+impl Deref for PlaceAccount {
+    type Target = PlaceAccountType;
+    fn deref(&self) -> &Self::Target {
+        &self.accountmapping
+    }
+}
+
+impl DerefMut for PlaceAccount {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.accountmapping
+    }
+}
+
+impl Default for PlaceAccount {
+    fn default() -> Self {
+        PlaceAccount {
+            accountmapping: PlaceAccountType::new(),
+            balance_bench: 0.0,
+        }
+    }
+}
+
+//make ad-hoc transform in account_id
+impl PlaceAccount {
+    fn obtain_place_id(&mut self, state: &mut GlobalState, account_id: u32) -> u32 {
+        match self.get(&account_id) {
+            Some(pl_id) => *pl_id,
+            None => {
+                let uid = state.create_new_account(1);
+                self.insert(account_id, uid);
+                if test_params::VERBOSE {
+                    println!("global account id {} to user account id {}", uid, account_id);
+                }
+                uid
+            }
+        }
+    }
+
+    pub fn transform_trade(
+        &mut self,
+        state: &mut GlobalState,
+        mut trade: types::matchengine::messages::TradeMessage,
+    ) -> types::matchengine::messages::TradeMessage {
+        trade.ask_user_id = self.obtain_place_id(state, trade.ask_user_id);
+        trade.bid_user_id = self.obtain_place_id(state, trade.bid_user_id);
+
+        trade
+    }
+
+    pub fn handle_deposit(&mut self, state: &mut GlobalState, mut deposit: types::matchengine::messages::BalanceMessage) {
+        //integrate the sanity check here ...
+        deposit.user_id = self.obtain_place_id(state, deposit.user_id);
+
+        assert!(!deposit.change.is_sign_negative(), "only support deposit now");
+
+        let token_id = test_params::token_id(&deposit.asset);
+
+        let balance_before = deposit.balance - deposit.change;
+        assert!(!balance_before.is_sign_negative(), "invalid balance {:?}", deposit);
+
+        let expected_balance_before = state.get_token_balance(deposit.user_id, token_id);
+        assert_eq!(
+            expected_balance_before,
+            test_utils::number_to_integer(&balance_before, test_params::prec(token_id))
+        );
+
+        let timing = Instant::now();
+
+        state.deposit_to_old(types::l2::DepositToOldTx {
+            token_id,
+            account_id: deposit.user_id,
+            amount: test_utils::number_to_integer(&deposit.change, test_params::prec(token_id)),
+        });
+
+        self.balance_bench += timing.elapsed().as_secs_f32();
+    }
+
+    fn take_bench(&mut self) -> (f32, f32) {
+        let ret = (self.balance_bench, 0.0);
+        self.balance_bench = 0.0;
+        ret
     }
 }
 
@@ -242,6 +351,13 @@ fn assert_balance_state(
 }
 
 impl PlaceOrder {
+    fn take_bench(&mut self) -> (f32, f32) {
+        let ret = (self.place_bench, self.spot_bench);
+        self.place_bench = 0.0;
+        self.spot_bench = 0.0;
+        ret
+    }
+
     fn assert_order_state<'c>(&self, state: &GlobalState, ask_order_state: OrderState<'c>, bid_order_state: OrderState<'c>) {
         let ask_order_local = state
             .get_account_order_by_id(ask_order_state.account_id, ask_order_state.order_id)
@@ -301,13 +417,14 @@ impl PlaceOrder {
         put_states.sort();
 
         for order_state in put_states.into_iter() {
-            if !self.as_ref().contains_key(&order_state.order_id) {
+            if !self.contains_key(&order_state.order_id) {
                 //why the returning order id is u32?
                 // in fact the GlobalState should not expose "inner idx/pos" to caller
                 // we'd better handle this inside GlobalState later
+                let timing = Instant::now();
                 let new_order_pos = state.place_order(order_state.place_order_tx());
-                self.as_mut()
-                    .insert(order_state.order_id, (order_state.account_id, new_order_pos as u64));
+                self.place_bench += timing.elapsed().as_secs_f32();
+                self.insert(order_state.order_id, (order_state.account_id, new_order_pos as u64));
                 if test_params::VERBOSE {
                     println!(
                         "global order id {} to user order id ({},{})",
@@ -328,7 +445,9 @@ impl PlaceOrder {
         );
         self.assert_order_state(state, ask_order_state_before, bid_order_state_before);
 
+        let timing = Instant::now();
         state.spot_trade(self.trade_into_spot_tx(&trade));
+        self.spot_bench += timing.elapsed().as_secs_f32();
 
         assert_balance_state(
             &trade.state_after.balance,
@@ -338,31 +457,73 @@ impl PlaceOrder {
             id_pair,
         );
         self.assert_order_state(state, ask_order_state_after, bid_order_state_after);
-
-        println!("trade {} test done", trade.id);
     }
 }
 
-fn handle_deposit(state: &mut GlobalState, deposit: types::matchengine::messages::BalanceMessage) {
-    //integrate the sanity check here ...
-    assert!(!deposit.change.is_sign_negative(), "only support deposit now");
+//if we use nightly build, we are able to use bench test ...
+fn bench_global_state(circuit_repo: &Path) -> Result<Vec<types::l2::L2Block>> {
+    let test_dir = circuit_repo.join("test").join("testdata");
+    let file = File::open(test_dir.join("msgs_float.jsonl"))?;
 
-    let token_id = test_params::token_id(&deposit.asset);
+    let messages: Vec<WrappedMessage> = BufReader::new(file)
+        .lines()
+        .map(Result::unwrap)
+        .map(parse_msg)
+        .map(Result::unwrap)
+        .filter(|msg| matches!(msg, WrappedMessage::BALANCE(_) | WrappedMessage::TRADE(_)))
+        .collect();
 
-    let balance_before = deposit.balance - deposit.change;
-    assert!(!balance_before.is_sign_negative(), "invalid balance {:?}", deposit);
+    println!("prepare bench: {} records", messages.len());
 
-    let expected_balance_before = state.get_token_balance(deposit.user_id, token_id);
-    assert_eq!(
-        expected_balance_before,
-        test_utils::number_to_integer(&balance_before, test_params::prec(token_id))
+    GlobalState::print_config();
+    // TODO: use ENV
+    //use custom states
+    let mut state = GlobalState::new(
+        10, //test_params::BALANCELEVELS,
+        10, //test_params::ORDERLEVELS,
+        10, //test_params::ACCOUNTLEVELS,
+        test_params::NTXS,
+        false,
     );
 
-    state.deposit_to_old(types::l2::DepositToOldTx {
-        token_id,
-        account_id: deposit.user_id,
-        amount: test_utils::number_to_integer(&deposit.change, test_params::prec(token_id)),
-    });
+    //amplify the records: in each iter we run records on a group of new accounts
+    let mut timing = Instant::now();
+    let mut place_order = PlaceOrder::default();
+    let mut place_account = PlaceAccount::default();
+    for i in 1..51 {
+        for msg in messages.iter() {
+            match msg {
+                WrappedMessage::BALANCE(balance) => {
+                    place_account.handle_deposit(&mut state, balance.clone());
+                }
+                WrappedMessage::TRADE(trade) => {
+                    let trade = place_account.transform_trade(&mut state, trade.clone());
+                    place_order.handle_trade(&mut state, trade);
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        place_order.clear();
+        place_account.clear();
+
+        if i % 10 == 0 {
+            let total = timing.elapsed().as_secs_f32();
+            let (balance_t, _) = place_account.take_bench();
+            let (plact_t, spot_t) = place_order.take_bench();
+            println!(
+                "{}th 10 iters in {:.5}s: balance {:.3}%, place {:.3}%, spot {:.3}%",
+                i / 10,
+                total,
+                balance_t * 100.0 / total,
+                plact_t * 100.0 / total,
+                spot_t * 100.0 / total
+            );
+            timing = Instant::now();
+        }
+    }
+
+    Ok(state.take_blocks())
 }
 
 fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<types::l2::L2Block>, test_utils::circuit::CircuitSource)> {
@@ -381,19 +542,24 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<types::l2::L2Block>, test_uti
 
     println!("genesis root {}", state.root());
 
-    let mut place_order = PlaceOrder(PlaceOrderType::new());
-
-    for _ in 0..test_params::MAXACCOUNTNUM {
-        state.create_new_account(1);
-    }
+    let mut place_order = PlaceOrder::default();
+    let mut place_account = PlaceAccount::default();
+    /*
+        for _ in 0..test_const::MAXACCOUNTNUM {
+            state.create_new_account(1);
+        }
+    */
 
     for line in lns {
         match line.map(parse_msg)?? {
             WrappedMessage::BALANCE(balance) => {
-                handle_deposit(&mut state, balance);
+                place_account.handle_deposit(&mut state, balance);
             }
             WrappedMessage::TRADE(trade) => {
+                let trade = place_account.transform_trade(&mut state, trade);
+                let trade_id = trade.id;
                 place_order.handle_trade(&mut state, trade);
+                println!("trade {} test done", trade_id);
             }
             _ => {
                 //other msg is omitted
@@ -466,6 +632,20 @@ fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<types::l2::L2Blo
     Ok(circuit_dir)
 }
 
+fn run_bench() -> Result<()> {
+    let circuit_repo = fs::canonicalize(PathBuf::from("../circuits")).expect("invalid circuits repo path");
+
+    let timing = Instant::now();
+    let blocks = bench_global_state(&circuit_repo)?;
+    println!(
+        "bench for {} blocks (TPS: {})",
+        blocks.len(),
+        (test_params::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
+    );
+
+    Ok(())
+}
+
 fn run() -> Result<()> {
     let circuit_repo = fs::canonicalize(PathBuf::from("../circuits")).expect("invalid circuits repo path");
 
@@ -495,4 +675,7 @@ fn main() {
         Ok(_) => println!("global_state tests generated"),
         Err(e) => panic!("{:#?}", e),
     }
+
+    #[cfg(feature = "bench_global_state")]
+    run_bench().expect("bench ok");
 }
