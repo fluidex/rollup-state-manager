@@ -6,7 +6,7 @@ use crate::test_utils::messages::{parse_msg, WrappedMessage};
 use crate::test_utils::L2BlockSerde;
 use anyhow::Result;
 use rust_decimal::Decimal;
-use state_keeper::state::{common, global_state};
+use state_keeper::state::global_state;
 use state_keeper::test_utils;
 use state_keeper::types;
 use std::collections::HashMap;
@@ -148,8 +148,8 @@ impl<'c> OrderState<'c> {
             _ => unreachable!(),
         }
     }
-    fn place_order_tx(&self) -> common::PlaceOrderTx {
-        common::PlaceOrderTx {
+    fn place_order_tx(&self) -> types::l2::PlaceOrderTx {
+        types::l2::PlaceOrderTx {
             order_id: self.order_id,
             account_id: self.account_id,
             token_id_sell: self.token_sell,
@@ -160,9 +160,9 @@ impl<'c> OrderState<'c> {
     }
 }
 
-impl<'c> From<OrderState<'c>> for common::Order {
+impl<'c> From<OrderState<'c>> for types::l2::Order {
     fn from(origin: OrderState<'c>) -> Self {
-        common::Order {
+        types::l2::Order {
             order_id: types::primitives::u32_to_fr(origin.order_id),
             //status: types::primitives::u32_to_fr(origin.status),
             tokenbuy: types::primitives::u32_to_fr(origin.token_buy),
@@ -246,20 +246,20 @@ impl PlaceOrder {
         let ask_order_local = state
             .get_account_order_by_id(ask_order_state.account_id, ask_order_state.order_id)
             .unwrap();
-        assert_eq!(ask_order_local, common::Order::from(ask_order_state));
+        assert_eq!(ask_order_local, types::l2::Order::from(ask_order_state));
 
         let bid_order_local = state
             .get_account_order_by_id(bid_order_state.account_id, bid_order_state.order_id)
             .unwrap();
-        assert_eq!(bid_order_local, common::Order::from(bid_order_state));
+        assert_eq!(bid_order_local, types::l2::Order::from(bid_order_state));
     }
 
-    fn trade_into_spot_tx(&self, trade: &types::matchengine::messages::TradeMessage) -> common::SpotTradeTx {
+    fn trade_into_spot_tx(&self, trade: &types::matchengine::messages::TradeMessage) -> types::l2::SpotTradeTx {
         //allow information can be obtained from trade
         let id_pair = TokenIdPair::from(TokenPair::from(trade.market.as_str()));
 
         match trade.ask_role {
-            types::matchengine::messages::MarketRole::MAKER => common::SpotTradeTx {
+            types::matchengine::messages::MarketRole::MAKER => types::l2::SpotTradeTx {
                 order1_account_id: trade.ask_user_id,
                 order2_account_id: trade.bid_user_id,
                 token_id_1to2: id_pair.0,
@@ -269,7 +269,7 @@ impl PlaceOrder {
                 order1_id: trade.ask_order_id as u32,
                 order2_id: trade.bid_order_id as u32,
             },
-            types::matchengine::messages::MarketRole::TAKER => common::SpotTradeTx {
+            types::matchengine::messages::MarketRole::TAKER => types::l2::SpotTradeTx {
                 order1_account_id: trade.bid_user_id,
                 order2_account_id: trade.ask_user_id,
                 token_id_1to2: id_pair.1,
@@ -358,14 +358,14 @@ fn handle_deposit(state: &mut global_state::GlobalState, deposit: types::matchen
         test_utils::number_to_integer(&balance_before, test_params::prec(token_id))
     );
 
-    state.deposit_to_old(common::DepositToOldTx {
+    state.deposit_to_old(types::l2::DepositToOldTx {
         token_id,
         account_id: deposit.user_id,
         amount: test_utils::number_to_integer(&deposit.change, test_params::prec(token_id)),
     });
 }
 
-fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<common::L2Block>, test_utils::circuit::CircuitSource)> {
+fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<types::l2::L2Block>, test_utils::circuit::CircuitSource)> {
     let test_dir = circuit_repo.join("test").join("testdata");
     let file = File::open(test_dir.join("msgs_float.jsonl"))?;
 
@@ -440,7 +440,7 @@ fn write_circuit(circuit_repo: &Path, test_dir: &Path, source: &test_utils::Circ
     Ok(circuit_dir)
 }
 
-fn write_input_output(dir: &Path, block: common::L2Block) -> Result<()> {
+fn write_input_output(dir: &Path, block: types::l2::L2Block) -> Result<()> {
     fs::create_dir_all(dir)?;
 
     let input_f = File::create(dir.join("input.json"))?;
@@ -453,7 +453,7 @@ fn write_input_output(dir: &Path, block: common::L2Block) -> Result<()> {
     Ok(())
 }
 
-fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<common::L2Block>, source: test_utils::CircuitSource) -> Result<PathBuf> {
+fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<types::l2::L2Block>, source: test_utils::CircuitSource) -> Result<PathBuf> {
     let test_dir = circuit_repo.join("testdata");
     let circuit_dir = write_circuit(circuit_repo, &test_dir, &source)?;
 

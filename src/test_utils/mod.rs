@@ -2,6 +2,7 @@ pub mod circuit;
 pub mod messages;
 
 use crate::state::common;
+pub use crate::types::l2;
 pub use crate::types::primitives::{field_to_string, u64_to_fr, Fr};
 pub use circuit::{format_circuit_name, CircuitSource, CircuitTestCase, CircuitTestData};
 use rust_decimal::prelude::ToPrimitive;
@@ -58,16 +59,16 @@ impl From<&[Fr; 1]> for MerkleLeafStr {
     }
 }
 
-impl Serialize for common::TxType {
+impl Serialize for l2::TxType {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_i32(match self {
-            common::TxType::DepositToNew => 0,
-            common::TxType::DepositToOld => 1,
-            common::TxType::Transfer => 2,
-            common::TxType::Withdraw => 3,
-            common::TxType::PlaceOrder => 4,
-            common::TxType::SpotTrade => 5,
-            common::TxType::Nop => 6,
+            l2::TxType::DepositToNew => 0,
+            l2::TxType::DepositToOld => 1,
+            l2::TxType::Transfer => 2,
+            l2::TxType::Withdraw => 3,
+            l2::TxType::PlaceOrder => 4,
+            l2::TxType::SpotTrade => 5,
+            l2::TxType::Nop => 6,
         })
     }
 }
@@ -79,7 +80,7 @@ type MerklePathStr = Vec<MerkleLeafStr>;
 #[derive(Serialize)]
 pub struct L2BlockSerde {
     #[serde(rename(serialize = "txsType"))]
-    txs_type: Vec<common::TxType>,
+    txs_type: Vec<l2::TxType>,
     #[serde(rename(serialize = "encodedTxs"))]
     encoded_txs: Vec<Vec<FrStr>>,
     balance_path_elements: Vec<[MerklePathStr; 4]>,
@@ -110,8 +111,8 @@ fn from_merkle<const N: usize>(origin: [common::MerklePath; N]) -> [MerklePathSt
     TryFrom::try_from(collector).ok().unwrap()
 }
 
-impl From<common::L2Block> for L2BlockSerde {
-    fn from(origin: common::L2Block) -> Self {
+impl From<l2::L2Block> for L2BlockSerde {
+    fn from(origin: l2::L2Block) -> Self {
         L2BlockSerde {
             txs_type: origin.txs_type,
             encoded_txs: origin

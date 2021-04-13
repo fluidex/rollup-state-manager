@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 #![allow(clippy::assertions_on_constants)]
-use crate::state::common::TX_LENGTH;
+use crate::types::l2::TX_LENGTH;
 use crate::types::primitives::Fr;
 use ff::Field;
 #[derive(Default)]
