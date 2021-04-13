@@ -2,13 +2,15 @@
 
 use super::primitives::{hash, Fr};
 pub use ff::{Field, PrimeField};
-use fnv::FnvHashMap;
 use rayon::prelude::*;
 use std::iter;
 
 type LeafIndex = u32;
 type LeafType = Fr;
-type ValueMap = FnvHashMap<LeafIndex, LeafType>;
+// use std::collections::BTreeMap as MerkleValueMapType;
+// use std::collections::HashMap as MerkleValueMapType;
+use fnv::FnvHashMap as MerkleValueMapType;
+type ValueMap = MerkleValueMapType<LeafIndex, LeafType>;
 
 pub struct MerkleProofN<const LENGTH: usize> {
     pub root: LeafType,
@@ -37,6 +39,9 @@ pub struct Tree {
 }
 
 impl Tree {
+    pub fn print_config() {
+        println!("merkletree valueMap type: {}", std::any::type_name::<ValueMap>())
+    }
     pub fn new(height: usize, default_leaf_node_value: LeafType) -> Self {
         // check overflow
         let _ = 2u32.checked_pow(height as u32).expect("tree depth error, overflow");

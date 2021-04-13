@@ -44,3 +44,4 @@ path = "tests/test_global_state.rs"
 
 [features]
 default = [ ]
+bench_global_state = [ ]
