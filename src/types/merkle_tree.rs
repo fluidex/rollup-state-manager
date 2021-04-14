@@ -120,14 +120,16 @@ impl Tree {
             self.recalculate_parent(i, idx);
         }
     }
-    // of course there is no such thing 'parallel' in Js
-    // self function is only used as pseudo code for future Rust rewrite
-    // TODO: change updates into something like Into<ParIter> ...
+    // update the merkle tree in parallel
+    // first, it calculates some mid-level nodes as cache in parallel
+    // then, it updates the tree sequentially, if a cache item is useful, then use it, if not, ignore the cache item and recalculate
+    // in fact if we use some 'unsafe/raw pointer', we can get more precise control and speed up more...
     pub fn set_value_parallel(&mut self, updates: &[(u32, LeafType)], parallel: usize) {
         let mut parallel = parallel;
         if parallel == 0 {
             parallel = 8; // TODO: a better default
         }
+        // TODO: change updates into something like Into<ParIter> ...
         for chunk in updates.chunks(parallel) {
             let diffs: Vec<Vec<HashCacheItem>> = chunk
                 .par_iter() // iterating over i32
