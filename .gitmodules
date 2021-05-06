@@ -1,0 +1,3 @@
+[submodule "circuits"]
+	path = circuits
+	url = https://github.com/Fluidex/circuits

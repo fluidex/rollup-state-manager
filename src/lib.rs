@@ -1,4 +1,5 @@
 #![allow(clippy::needless_range_loop)]
+#![allow(clippy::upper_case_acronyms)]
 #![allow(dead_code)]
 pub mod account;
 pub mod config;

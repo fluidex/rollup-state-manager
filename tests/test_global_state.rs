@@ -651,7 +651,7 @@ fn run_bench() -> Result<()> {
 }
 
 fn run() -> Result<()> {
-    let circuit_repo = fs::canonicalize(PathBuf::from("../circuits")).expect("invalid circuits repo path");
+    let circuit_repo = fs::canonicalize(PathBuf::from("circuits")).expect("invalid circuits repo path");
 
     let timing = Instant::now();
     let (blocks, components) = replay_msgs(&circuit_repo)?;
@@ -669,9 +669,7 @@ fn run() -> Result<()> {
 }
 
 /*
- * cargo run --bin export_circuit_test
- * npm -g install snarkit
- * npx snarkit test ../circuits/testdata/Block_2_2_7_2/
+ * have a look at scripts/global_state_test.sh
  */
 
 fn main() {
