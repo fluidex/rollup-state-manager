@@ -61,7 +61,7 @@ mod tests {
 
     #[test]
     fn test_account() {
-        // https://github.com/Fluidex/circuits/blob/46e7ee0bc69a49c981ccccbb9003900f78eb3d59/helper.ts/account_test.ts#L25
+        // https://github.com/Fluidex/circuits/blob/afeeda76e1309f3d8a14ec77ea082cb176acc90a/helper.ts/account_test.ts#L32
         let seed = hex::decode("87b34b2b842db0cc945659366068053f325ff227fd9c6788b2504ac2c4c5dc2a").unwrap();
         let acc: L2Account = L2Account::new(seed).unwrap();
         let priv_bigint = acc.priv_key.scalar_key().to_string();
@@ -78,12 +78,10 @@ mod tests {
             "Fr(0x20a41ccb24e55dba4fc9ebc17ae9d4c9097d7fe3387d492155568db6be2692a5)"
         );
         assert_eq!(acc.sign, true);
-        // TODO: which encoding is more reasonable?
-        let mut bjj_compressed = acc.bjj_compressed;
-        bjj_compressed.reverse();
+        let bjj_compressed = acc.bjj_compressed;
         assert_eq!(
             hex::encode(bjj_compressed),
-            "a0a41ccb24e55dba4fc9ebc17ae9d4c9097d7fe3387d492155568db6be2692a5"
+            "a59226beb68d565521497d38e37f7d09c9d4e97ac1ebc94fba5de524cb1ca4a0"
         );
         let sig = acc.sign_hash(&Fr::from_str("1357924680").unwrap()).unwrap();
         assert_eq!(
