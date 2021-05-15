@@ -29,7 +29,7 @@ pub struct PlaceOrderTxData {
 impl PlaceOrderTxData {
     pub fn encode(self) -> Vec<Fr> {
         // double check template config is consistent
-        assert!(TX_LENGTH == 34, "invalid length, check your template config");
+        assert!(TX_LENGTH == 54, "invalid length, check your template config");
         let mut results = vec![
             self.order_pos,
             self.old_order_id,

@@ -3,10 +3,9 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
 
 use super::AccountState;
-use crate::types::l2::codec::place_order_tx_data;
-use crate::types::l2::{tx_detail_idx, DepositToOldTx, L2Block, Order, PlaceOrderTx, RawTx, SpotTradeTx, TxType, TX_LENGTH};
+use crate::types::l2::{tx_detail_idx, DepositToOldTx, L2Block, Order, RawTx, SpotTradeTx, TxType, TX_LENGTH};
 use crate::types::merkle_tree::{empty_tree_root, Tree};
-use crate::types::primitives::{field_to_u32, u32_to_fr, Fr};
+use crate::types::primitives::{field_to_u32, field_to_bigint, bigint_to_fr, u32_to_fr, Fr};
 use ff::Field;
 use fnv::FnvHashMap;
 use std::collections::BTreeMap;
@@ -30,10 +29,14 @@ pub struct GlobalState {
     account_tree: Tree,
     // idx to balanceTree
     balance_trees: FnvHashMap<u32, Tree>,
-    order_trees: FnvHashMap<u32, Tree>,
+    // user -> order_id -> order
     order_map: FnvHashMap<u32, BTreeMap<u32, Order>>,
     // (user, order_id) -> order_pos
     order_id_to_pos: FnvHashMap<(u32, u32), u32>,
+    // (user, order_pos) -> order_id
+    order_pos_to_id: FnvHashMap<(u32, u32), u32>,
+    // user -> order_pos -> order_hash
+    order_trees: FnvHashMap<u32, Tree>,
     accounts: FnvHashMap<u32, AccountState>,
     buffered_txs: Vec<RawTx>,
     buffered_blocks: Vec<L2Block>,
@@ -41,10 +44,7 @@ pub struct GlobalState {
     default_order_leaf: Fr,
     default_order_root: Fr,
     default_account_leaf: Fr,
-    // here we use idx to indicate the location in the map
-    // idx must be less than 2**n
-    // mean while id means the global incremental seq/nouce
-    next_order_idxs: FnvHashMap<u32, u32>,
+    next_order_positions: FnvHashMap<u32, u32>,
     max_order_num_per_user: u32,
     verbose: bool,
 }
@@ -75,10 +75,11 @@ impl GlobalState {
             order_trees: FnvHashMap::default(),                            // FnvHashMap[account_id]order_tree
             order_map: FnvHashMap::default(),
             order_id_to_pos: FnvHashMap::default(),
+            order_pos_to_id: FnvHashMap::default(),
             accounts: FnvHashMap::default(), // FnvHashMap[account_id]acount_state
             buffered_txs: Vec::new(),
             buffered_blocks: Vec::new(),
-            next_order_idxs: FnvHashMap::default(),
+            next_order_positions: FnvHashMap::default(),
             max_order_num_per_user,
             n_tx,
             verbose,
@@ -129,25 +130,8 @@ impl GlobalState {
     pub fn get_account(&self, account_id: u32) -> AccountState {
         *self.accounts.get(&account_id).unwrap()
     }
-    fn get_next_order_idx_for_user(&self, account_id: u32) -> (u32, bool /*is_overwrite*/) {
-        let cur_idx = *self.next_order_idxs.get(&account_id).unwrap();
-        let leaf_num = self.order_trees.get(&account_id).unwrap().max_leaf_num();
-        for offset in 0..leaf_num {
-            let order_idx = (cur_idx + offset) % leaf_num;
-            match self.get_account_order_by_pos(account_id, order_idx) {
-                None => return (order_idx, false),
-                Some(order) => {
-                    // so there is already an order in this location
-                    if order.is_filled() {
-                        return (order_idx, true);
-                    }
-                    // the order is active
-                    continue;
-                }
-            }
-        }
-        // we cannot find a order slot that can be overwrite
-        panic!("order tree full for user {}", account_id);
+    fn get_next_order_pos_for_user(&self, account_id: u32) -> u32 {
+        *self.next_order_positions.get(&account_id).unwrap()
     }
     pub fn create_new_account(&mut self, next_order_id: u32) -> u32 {
         let account_id = self.balance_trees.len() as u32;
@@ -162,12 +146,15 @@ impl GlobalState {
             .insert(account_id, Tree::new(self.order_levels, self.default_order_leaf));
         self.order_map.insert(account_id, BTreeMap::<u32, Order>::default());
         self.account_tree.set_value(account_id, self.default_account_leaf);
-        self.next_order_idxs.insert(account_id, next_order_id);
+        self.next_order_positions.insert(account_id, next_order_id);
         //println!("add account", account_id);
         account_id
     }
     pub fn get_order_pos_by_id(&self, account_id: u32, order_id: u32) -> u32 {
         *self.order_id_to_pos.get(&(account_id, order_id)).unwrap()
+    }
+    fn get_order_id_by_pos(&self, account_id: u32, order_pos: u32) -> Option<&u32> {
+        self.order_pos_to_id.get(&(account_id, order_pos))
     }
 
     pub fn set_account_order(&mut self, account_id: u32, order_pos: u32, order: Order) {
@@ -182,27 +169,54 @@ impl GlobalState {
         self.order_id_to_pos.insert((account_id, order_id), order_pos);
         self.recalculate_from_order_tree(account_id);
     }
-    pub fn create_new_order(&mut self, tx: &PlaceOrderTx) -> (u32, Order) {
-        let (order_pos, _is_overwrite) = self.get_next_order_idx_for_user(tx.account_id);
-        //if order_id >= 2u32.pow(self.order_levels as u32) {
-        //    panic!("order_id {} overflows for order_levels {}", order_id, self.order_levels);
-        //}
-        let old_order = self.get_account_order_by_pos(tx.account_id, order_pos).unwrap_or_default();
-        let order = Order {
-            order_id: u32_to_fr(tx.order_id),
-            tokenbuy: u32_to_fr(tx.token_id_buy),
-            tokensell: u32_to_fr(tx.token_id_sell),
-            filled_sell: Fr::zero(),
-            filled_buy: Fr::zero(),
-            total_sell: tx.amount_sell,
-            total_buy: tx.amount_buy,
-        };
-        self.set_account_order(tx.account_id, order_pos, order);
-        let next_order_idx = (order_pos + 1) % self.max_order_num_per_user;
-        self.next_order_idxs.insert(tx.account_id, next_order_idx);
-        (order_pos, old_order)
+
+    // find a position range 0..2**n where the slot is either empty or occupied by a close order
+    // so we can place the new order here
+    fn update_next_order_pos(&mut self, account_id: u32, start_pos: u32) {
+        for i in 0..2u32.pow(self.order_levels as u32) {
+            let candidate_pos = (start_pos + i) % 2u32.pow(self.order_levels as u32);
+            let order = self.get_account_order_by_pos(account_id, candidate_pos);
+            let is_empty_or_filled = order.filled_buy >= order.total_buy && order.filled_sell >= order.total_sell;
+            if is_empty_or_filled {
+                self.next_order_positions.insert(account_id, candidate_pos);
+                return;
+            }
+        }
+        panic!("Cannot find order pos");
     }
 
+    fn place_order_into_tree(&mut self, account_id: u32, order_id: u32) -> Order {
+        if !self.has_order(account_id, order_id) {
+            panic!("invalid order {} {}", account_id, order_id);
+        }
+        match self.order_id_to_pos.get(&(account_id, order_id)) {
+            Some(_pos) => self.get_account_order_by_id(account_id, order_id),
+            None => {
+                let pos = self.get_next_order_pos_for_user(account_id);
+                let old_order = self.get_account_order_by_pos(account_id, pos);
+                self.update_order_leaf(account_id, pos, order_id);
+                self.update_next_order_pos(account_id, pos + 1);
+                old_order
+            }
+        }
+    }
+
+    fn update_order_leaf(&mut self, account_id: u32, order_pos: u32, order_id: u32) {
+        assert!(self.order_trees.contains_key(&account_id), "set_account_order");
+        if order_pos >= 2u32.pow(self.order_levels as u32) {
+            panic!("order position {} invalid", order_pos);
+        }
+
+        let order = self.order_map.get(&account_id).unwrap().get(&order_id).unwrap();
+        self.order_trees.get_mut(&account_id).unwrap().set_value(order_pos, order.hash());
+        self.order_id_to_pos.insert((account_id, order_id), order_pos);
+        self.order_pos_to_id.insert((account_id, order_pos), order_id);
+        self.recalculate_from_order_tree(account_id);
+    }
+
+    pub fn update_order_state(&mut self, account_id: u32, order: Order) {
+        self.order_map.get_mut(&account_id).unwrap().insert(field_to_u32(&order.order_id), order);
+    }
     pub fn get_token_balance(&self, account_id: u32, token_id: u32) -> Fr {
         self.balance_trees.get(&account_id).unwrap().get_leaf(token_id)
     }
@@ -211,13 +225,17 @@ impl GlobalState {
         self.balance_trees.get_mut(&account_id).unwrap().set_value(token_id, balance);
         self.recalculate_from_balance_tree(account_id);
     }
-    fn get_account_order_by_pos(&self, account_id: u32, order_pos: u32) -> Option<Order> {
-        self.order_map.get(&account_id).unwrap().get(&order_pos).cloned()
+    pub fn has_order(&self, account_id: u32, order_id: u32) -> bool {
+        self.order_map.contains_key(&account_id) && self.order_map.get(&account_id).unwrap().contains_key(&order_id)
     }
-    pub fn get_account_order_by_id(&self, account_id: u32, order_id: u32) -> Option<Order> {
-        // TODO: make order_pos Option<>?
-        let order_pos = self.get_order_pos_by_id(account_id, order_id);
-        self.get_account_order_by_pos(account_id, order_pos)
+    fn get_account_order_by_pos(&self, account_id: u32, order_pos: u32) -> Order {
+        match self.get_order_id_by_pos(account_id, order_pos) {
+            Some(order_id) => self.get_account_order_by_id(account_id, *order_id),
+            None => Order::default()
+        }
+    }
+    pub fn get_account_order_by_id(&self, account_id: u32, order_id: u32) -> Order {
+        *self.order_map.get(&account_id).unwrap().get(&order_id).unwrap()
     }
 
     pub fn trivial_order_path_elements(&self) -> Vec<[Fr; 1]> {
@@ -348,19 +366,33 @@ impl GlobalState {
     pub fn deposit_to_old(&mut self, tx: DepositToOldTx) {
         //assert!(self.accounts.get(tx.account_id).eth_addr != 0n, "deposit_to_old");
         let proof = self.state_proof(tx.account_id, tx.token_id);
+        let old_balance = self.get_token_balance(tx.account_id, tx.token_id);
+        let nonce = self.accounts.get(&tx.account_id).unwrap().nonce;
+        let acc = self.accounts.get(&tx.account_id).unwrap();
         // first, generate the tx
 
         let mut encoded_tx = [Fr::zero(); TX_LENGTH];
-        encoded_tx[tx_detail_idx::TOKEN_ID] = u32_to_fr(tx.token_id);
         encoded_tx[tx_detail_idx::AMOUNT] = tx.amount;
+
+        encoded_tx[tx_detail_idx::TOKEN_ID1] = u32_to_fr(tx.token_id);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = u32_to_fr(tx.account_id);
+        encoded_tx[tx_detail_idx::BALANCE1] = old_balance;
+        encoded_tx[tx_detail_idx::NONCE1] = nonce;
+        encoded_tx[tx_detail_idx::ETH_ADDR1] = acc.eth_addr;
+        encoded_tx[tx_detail_idx::SIGN1] = acc.sign;
+        encoded_tx[tx_detail_idx::AY1] = acc.ay;
+
+        encoded_tx[tx_detail_idx::TOKEN_ID2] = u32_to_fr(tx.token_id);
         encoded_tx[tx_detail_idx::ACCOUNT_ID2] = u32_to_fr(tx.account_id);
-        let old_balance = self.get_token_balance(tx.account_id, tx.token_id);
-        encoded_tx[tx_detail_idx::BALANCE2] = old_balance;
-        encoded_tx[tx_detail_idx::NONCE2] = self.accounts.get(&tx.account_id).unwrap().nonce;
-        let acc = self.accounts.get(&tx.account_id).unwrap();
+        encoded_tx[tx_detail_idx::BALANCE2] =
+            bigint_to_fr(field_to_bigint(&old_balance) + field_to_bigint(&tx.amount));
+        encoded_tx[tx_detail_idx::NONCE2] = nonce;
         encoded_tx[tx_detail_idx::ETH_ADDR2] = acc.eth_addr;
         encoded_tx[tx_detail_idx::SIGN2] = acc.sign;
         encoded_tx[tx_detail_idx::AY2] = acc.ay;
+
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = u32_to_fr(1u32);
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = u32_to_fr(1u32);
 
         let mut raw_tx = RawTx {
             tx_type: TxType::DepositToOld,
@@ -520,88 +552,37 @@ impl GlobalState {
       self.add_raw_tx(raw_tx);
     }
     */
-    pub fn place_order(&mut self, tx: PlaceOrderTx) -> u32 {
-        if self.verbose {
-            println!("PlaceOrder {:#?} operation id {}", tx, self.buffered_txs.len());
-        }
-        // TODO: check order signature
-        //assert!(self.accounts.get(tx.account_id).eth_addr != 0n, "PlaceOrder account: account_id" + tx.account_id);
 
-        let account = *self.accounts.get(&tx.account_id).unwrap();
-        let proof = self.state_proof(tx.account_id, tx.token_id_sell);
-
-        let mut raw_tx = RawTx {
-            tx_type: TxType::PlaceOrder,
-            payload: Default::default(),
-            balance_path0: proof.balance_path.clone(),
-            balance_path1: proof.balance_path.clone(),
-            balance_path2: proof.balance_path.clone(),
-            balance_path3: proof.balance_path,
-            order_path0: Default::default(),
-            order_path1: self.trivial_order_path_elements(),
-            order_root0: account.order_root,
-            order_root1: Default::default(),
-            account_path0: proof.account_path.clone(),
-            account_path1: proof.account_path,
-            root_before: self.root(),
-            root_after: Default::default(),
-        };
-        //println!("orderRoo0", raw_tx.order_root0);
-
-        let (order_pos, old_order) = self.create_new_order(&tx);
-
-        // fill in the tx
-        let mut tx_data: place_order_tx_data::PlaceOrderTxData = Default::default();
-
-        tx_data.order_pos = u32_to_fr(order_pos);
-        tx_data.old_order_id = old_order.order_id;
-        tx_data.new_order_id = u32_to_fr(tx.order_id);
-        tx_data.old_order_tokensell = old_order.tokensell;
-        tx_data.old_order_filledsell = old_order.filled_sell;
-        tx_data.old_order_amountsell = old_order.total_sell;
-        tx_data.old_order_tokenbuy = old_order.tokenbuy;
-        tx_data.old_order_filledbuy = old_order.filled_buy;
-        tx_data.old_order_amountbuy = old_order.total_buy;
-        tx_data.new_order_tokensell = u32_to_fr(tx.token_id_sell);
-        tx_data.new_order_amountsell = tx.amount_sell;
-        tx_data.new_order_tokenbuy = u32_to_fr(tx.token_id_buy);
-        tx_data.new_order_amountbuy = tx.amount_buy;
-        tx_data.accountID = u32_to_fr(tx.account_id);
-        tx_data.balance = proof.leaf;
-        tx_data.nonce = account.nonce;
-        tx_data.sign = account.sign;
-        tx_data.ay = account.ay;
-        tx_data.ethAddr = account.eth_addr;
-
-        raw_tx.payload = tx_data.encode();
-        raw_tx.order_path0 = self.order_trees.get(&tx.account_id).unwrap().get_proof(order_pos).path_elements;
-        //println!("raw_tx.order_path0", raw_tx.order_path0)
-        raw_tx.order_root1 = self.order_trees.get(&tx.account_id).unwrap().get_proof(order_pos).root;
-
-        raw_tx.root_after = self.root();
-        self.add_raw_tx(raw_tx);
-        if self.verbose {
-            //println!("create order ", order_id, tx);
-        }
-        order_pos
-    }
+    // case1: old order is empty
+    // case2: old order is valid old order with different order id, but we will replace it.
+    // case3: old order has same order id, we will modify it
     pub fn spot_trade(&mut self, tx: SpotTradeTx) {
         //assert!(self.accounts.get(tx.order1_account_id).eth_addr != 0n, "SpotTrade account1");
         //assert!(self.accounts.get(tx.order2_account_id).eth_addr != 0n, "SpotTrade account2");
 
-        assert!(tx.order1_id < 2u32.pow(self.order_levels as u32), "order1 id overflows");
-        assert!(tx.order2_id < 2u32.pow(self.order_levels as u32), "order2 id overflows");
+        if tx.order1_account_id == tx.order2_account_id {
+            panic!("self trade no allowed");
+        }
+        assert!(self.has_order(tx.order1_account_id, tx.order1_id), "unknown order1");
+        assert!(self.has_order(tx.order2_account_id, tx.order2_id), "unknown order2");
 
-        let account1 = self.accounts.get(&tx.order1_account_id).unwrap();
-        let account2 = self.accounts.get(&tx.order2_account_id).unwrap();
+        let old_root = self.root();
+
+        let account1 = self.accounts.get(&tx.order1_account_id).unwrap().clone();
+        let order_root0 = account1.order_root;
+        let account2 = self.accounts.get(&tx.order2_account_id).unwrap().clone();
         let proof_order1_seller = self.state_proof(tx.order1_account_id, tx.token_id_1to2);
         let proof_order2_seller = self.state_proof(tx.order2_account_id, tx.token_id_2to1);
 
+        // old_order1 is same as old_order1_in_tree when case3
+        // not same when case1 and case2
+        let old_order1 = self.get_account_order_by_id(tx.order1_account_id, tx.order1_id);
+        let old_order2 = self.get_account_order_by_id(tx.order2_account_id, tx.order2_id);
+        let old_order1_in_tree = self.place_order_into_tree(tx.order1_account_id, tx.order1_id);
+        let old_order2_in_tree = self.place_order_into_tree(tx.order2_account_id, tx.order2_id);
+
         let order1_pos = self.get_order_pos_by_id(tx.order1_account_id, tx.order1_id);
         let order2_pos = self.get_order_pos_by_id(tx.order2_account_id, tx.order2_id);
-
-        let order1 = *self.order_map.get(&tx.order1_account_id).unwrap().get(&order1_pos).unwrap();
-        let order2 = *self.order_map.get(&tx.order2_account_id).unwrap().get(&order2_pos).unwrap();
 
         // first, generate the tx
 
@@ -622,30 +603,41 @@ impl GlobalState {
         let account1_balance_buy = self.get_token_balance(tx.order1_account_id, tx.token_id_2to1);
         assert!(account1_balance_sell > tx.amount_1to2, "balance_1to2");
         assert!(account2_balance_sell > tx.amount_2to1, "balance_2to1");
-        encoded_tx[tx_detail_idx::TOKEN_ID] = u32_to_fr(tx.token_id_1to2);
+
+        encoded_tx[tx_detail_idx::OLD_ORDER1_ID] = old_order1_in_tree.order_id;
+        encoded_tx[tx_detail_idx::OLD_ORDER1_TOKEN_SELL] = old_order1_in_tree.tokensell;
+        encoded_tx[tx_detail_idx::OLD_ORDER1_FILLED_SELL] = old_order1_in_tree.filled_sell;
+        encoded_tx[tx_detail_idx::OLD_ORDER1_AMOUNT_SELL] = old_order1_in_tree.total_sell;
+        encoded_tx[tx_detail_idx::OLD_ORDER1_TOKEN_BUY] = old_order1_in_tree.tokenbuy;
+        encoded_tx[tx_detail_idx::OLD_ORDER1_FILLED_BUY] = old_order1_in_tree.filled_buy;
+        encoded_tx[tx_detail_idx::OLD_ORDER1_AMOUNT_BUY] = old_order1_in_tree.total_buy;
+
+        encoded_tx[tx_detail_idx::OLD_ORDER2_ID] = old_order2_in_tree.order_id;
+        encoded_tx[tx_detail_idx::OLD_ORDER2_TOKEN_SELL] = old_order2_in_tree.tokensell;
+        encoded_tx[tx_detail_idx::OLD_ORDER2_FILLED_SELL] = old_order2_in_tree.filled_sell;
+        encoded_tx[tx_detail_idx::OLD_ORDER2_AMOUNT_SELL] = old_order2_in_tree.total_sell;
+        encoded_tx[tx_detail_idx::OLD_ORDER2_TOKEN_BUY] = old_order2_in_tree.tokenbuy;
+        encoded_tx[tx_detail_idx::OLD_ORDER2_FILLED_BUY] = old_order2_in_tree.filled_buy;
+        encoded_tx[tx_detail_idx::OLD_ORDER2_AMOUNT_BUY] = old_order2_in_tree.total_buy;
+
         encoded_tx[tx_detail_idx::AMOUNT] = tx.amount_1to2;
-        encoded_tx[tx_detail_idx::BALANCE1] = account1_balance_sell;
-        encoded_tx[tx_detail_idx::BALANCE2] = account2_balance_buy;
-        encoded_tx[tx_detail_idx::BALANCE3] = account2_balance_sell;
-        encoded_tx[tx_detail_idx::BALANCE4] = account1_balance_buy;
-        encoded_tx[tx_detail_idx::TOKEN_ID2] = u32_to_fr(tx.token_id_2to1);
         encoded_tx[tx_detail_idx::AMOUNT2] = tx.amount_2to1;
-        encoded_tx[tx_detail_idx::TOKEN_ID3] = u32_to_fr(order1_pos);
-        encoded_tx[tx_detail_idx::ORDER1_ID] = u32_to_fr(tx.order1_id);
-        encoded_tx[tx_detail_idx::ORDER1_AMOUNT_SELL] = order1.total_sell;
-        encoded_tx[tx_detail_idx::ORDER1_AMOUNT_BUY] = order1.total_buy;
-        encoded_tx[tx_detail_idx::ORDER1_FILLED_SELL] = order1.filled_sell;
-        encoded_tx[tx_detail_idx::ORDER1_FILLED_BUY] = order1.filled_buy;
-        encoded_tx[tx_detail_idx::TOKEN_ID4] = u32_to_fr(order2_pos);
-        encoded_tx[tx_detail_idx::ORDER2_ID] = u32_to_fr(tx.order2_id);
-        encoded_tx[tx_detail_idx::ORDER2_AMOUNT_SELL] = order2.total_sell;
-        encoded_tx[tx_detail_idx::ORDER2_AMOUNT_BUY] = order2.total_buy;
-        encoded_tx[tx_detail_idx::ORDER2_FILLED_SELL] = order2.filled_sell;
-        encoded_tx[tx_detail_idx::ORDER2_FILLED_BUY] = order2.filled_buy;
+        encoded_tx[tx_detail_idx::ORDER1_POS] = u32_to_fr(order1_pos);
+        encoded_tx[tx_detail_idx::ORDER2_POS] = u32_to_fr(order2_pos);
+
+        encoded_tx[tx_detail_idx::BALANCE1] = account1_balance_sell;
+        encoded_tx[tx_detail_idx::BALANCE2] =
+            bigint_to_fr(field_to_bigint(&account2_balance_buy) + field_to_bigint(&tx.amount_1to2));
+        encoded_tx[tx_detail_idx::BALANCE3] = account2_balance_sell;
+        encoded_tx[tx_detail_idx::BALANCE4] =
+            bigint_to_fr(field_to_bigint(&account1_balance_buy) + field_to_bigint(&tx.amount_2to1));
+
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = u32_to_fr(1u32);
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = u32_to_fr(1u32);
 
         let mut raw_tx = RawTx {
             tx_type: TxType::SpotTrade,
-            payload: encoded_tx.to_vec(),
+            payload: Vec::default(),
             balance_path0: proof_order1_seller.balance_path,
             balance_path1: Default::default(),
             balance_path2: proof_order2_seller.balance_path,
@@ -662,11 +654,11 @@ impl GlobalState {
                 .unwrap()
                 .get_proof(order2_pos)
                 .path_elements,
-            order_root0: account1.order_root, // not really used in the circuit
-            order_root1: account2.order_root, // not really used in the circuit
+            order_root0: order_root0,
+            order_root1: Default::default(),
             account_path0: proof_order1_seller.account_path,
             account_path1: Default::default(),
-            root_before: self.root(),
+            root_before: old_root,
             root_after: Default::default(),
         };
 
@@ -678,12 +670,6 @@ impl GlobalState {
             .get_mut(&tx.order1_account_id)
             .unwrap()
             .set_value(tx.token_id_1to2, balance1);
-        raw_tx.balance_path3 = self
-            .balance_trees
-            .get(&tx.order1_account_id)
-            .unwrap()
-            .get_proof(tx.token_id_2to1)
-            .path_elements;
         // account2 after sending, before receiving
         let mut balance2 = account2_balance_sell;
         balance2.sub_assign(&tx.amount_2to1);
@@ -691,53 +677,86 @@ impl GlobalState {
             .get_mut(&tx.order2_account_id)
             .unwrap()
             .set_value(tx.token_id_2to1, balance2);
+
+        let mut order1_filled_sell = old_order1.filled_sell;
+        order1_filled_sell.add_assign(&tx.amount_1to2);
+        let mut order1_filled_buy = old_order1.filled_buy;
+        order1_filled_buy.add_assign(&tx.amount_2to1);
+        let new_order1 = Order {
+            order_id: u32_to_fr(tx.order1_id),
+            tokenbuy: u32_to_fr(tx.token_id_2to1),
+            tokensell: u32_to_fr(tx.token_id_1to2),
+            filled_sell: order1_filled_sell,
+            filled_buy: order1_filled_buy,
+            total_sell: old_order1.total_sell,
+            total_buy: old_order1.total_buy,
+        };
+        self.update_order_state(tx.order1_account_id, new_order1);
+        self.update_order_leaf(tx.order1_account_id, order1_pos, tx.order1_id);
+
+        let mut account1_balance_buy = account1_balance_buy;
+        account1_balance_buy.add_assign(&tx.amount_2to1);
+        self.set_token_balance(tx.order1_account_id, tx.token_id_2to1, account1_balance_buy);
+
+        let mut order2_filled_sell = old_order2.filled_sell;
+        order2_filled_sell.add_assign(&tx.amount_2to1);
+        let mut order2_filled_buy = old_order2.filled_buy;
+        order2_filled_buy.add_assign(&tx.amount_1to2);
+        let new_order2 = Order {
+            order_id: u32_to_fr(tx.order2_id),
+            tokenbuy: u32_to_fr(tx.token_id_1to2),
+            tokensell: u32_to_fr(tx.token_id_2to1),
+            filled_sell: order2_filled_sell,
+            filled_buy: order2_filled_buy,
+            total_sell: old_order2.total_sell,
+            total_buy: old_order2.total_buy,
+        };
+        self.update_order_state(tx.order2_account_id, new_order2);
+        self.update_order_leaf(tx.order2_account_id, order2_pos, tx.order2_id);
+
+        let mut account2_balance_buy = account2_balance_buy;
+        account2_balance_buy.add_assign(&tx.amount_1to2);
+        self.set_token_balance(tx.order2_account_id, tx.token_id_1to2, account2_balance_buy);
+
+        raw_tx.balance_path3 = self
+            .balance_trees
+            .get(&tx.order1_account_id)
+            .unwrap()
+            .get_proof(tx.token_id_2to1)
+            .path_elements;
         raw_tx.balance_path1 = self
             .balance_trees
             .get(&tx.order2_account_id)
             .unwrap()
             .get_proof(tx.token_id_1to2)
             .path_elements;
-
-        let mut order1_filled_sell = order1.filled_sell;
-        order1_filled_sell.add_assign(&tx.amount_1to2);
-        let mut order1_filled_buy = order1.filled_buy;
-        order1_filled_buy.add_assign(&tx.amount_2to1);
-        let new_order1 = Order {
-            order_id: order1.order_id,
-            tokenbuy: u32_to_fr(tx.token_id_2to1),
-            tokensell: u32_to_fr(tx.token_id_1to2),
-            filled_sell: order1_filled_sell,
-            filled_buy: order1_filled_buy,
-            total_sell: order1.total_sell,
-            total_buy: order1.total_buy,
-        };
-        self.set_account_order(tx.order1_account_id, order1_pos, new_order1);
-        let mut account1_balance_buy = account1_balance_buy;
-        account1_balance_buy.add_assign(&tx.amount_2to1);
-        self.set_token_balance(tx.order1_account_id, tx.token_id_2to1, account1_balance_buy);
         raw_tx.account_path1 = self.account_tree.get_proof(tx.order2_account_id).path_elements;
+        raw_tx.order_root1 = self.accounts.get(&tx.order2_account_id).unwrap().order_root;
 
-        let mut order2_filled_sell = order2.filled_sell;
-        order2_filled_sell.add_assign(&tx.amount_2to1);
-        let mut order2_filled_buy = order2.filled_buy;
-        order2_filled_buy.add_assign(&tx.amount_1to2);
-        let new_order2 = Order {
-            order_id: order2.order_id,
-            tokenbuy: u32_to_fr(tx.token_id_1to2),
-            tokensell: u32_to_fr(tx.token_id_2to1),
-            filled_sell: order2_filled_sell,
-            filled_buy: order2_filled_buy,
-            total_sell: order2.total_sell,
-            total_buy: order2.total_buy,
-        };
-        self.set_account_order(tx.order2_account_id, order2_pos, new_order2);
-        let mut account2_balance_buy = account2_balance_buy;
-        account2_balance_buy.add_assign(&tx.amount_1to2);
-        self.set_token_balance(tx.order2_account_id, tx.token_id_1to2, account2_balance_buy);
+        encoded_tx[tx_detail_idx::NEW_ORDER1_ID] = new_order1.order_id;
+        encoded_tx[tx_detail_idx::NEW_ORDER1_TOKEN_SELL] = new_order1.tokensell;
+        encoded_tx[tx_detail_idx::NEW_ORDER1_FILLED_SELL] = new_order1.filled_sell;
+        encoded_tx[tx_detail_idx::NEW_ORDER1_AMOUNT_SELL] = new_order1.total_sell;
+        encoded_tx[tx_detail_idx::NEW_ORDER1_TOKEN_BUY] = new_order1.tokenbuy;
+        encoded_tx[tx_detail_idx::NEW_ORDER1_FILLED_BUY] = new_order1.filled_buy;
+        encoded_tx[tx_detail_idx::NEW_ORDER1_AMOUNT_BUY] = new_order1.total_buy;
 
+        encoded_tx[tx_detail_idx::NEW_ORDER2_ID] = new_order2.order_id;
+        encoded_tx[tx_detail_idx::NEW_ORDER2_TOKEN_SELL] = new_order2.tokensell;
+        encoded_tx[tx_detail_idx::NEW_ORDER2_FILLED_SELL] = new_order2.filled_sell;
+        encoded_tx[tx_detail_idx::NEW_ORDER2_AMOUNT_SELL] = new_order2.total_sell;
+        encoded_tx[tx_detail_idx::NEW_ORDER2_TOKEN_BUY] = new_order2.tokenbuy;
+        encoded_tx[tx_detail_idx::NEW_ORDER2_FILLED_BUY] = new_order2.filled_buy;
+        encoded_tx[tx_detail_idx::NEW_ORDER2_AMOUNT_BUY] = new_order2.total_buy;
+
+        encoded_tx[tx_detail_idx::TOKEN_ID1] = new_order1.tokensell;
+        encoded_tx[tx_detail_idx::TOKEN_ID2] = new_order2.tokenbuy;
+
+        raw_tx.payload = encoded_tx.to_vec();
         raw_tx.root_after = self.root();
         self.add_raw_tx(raw_tx);
     }
+
     pub fn nop(&mut self) {
         // assume we already have initialized the account tree and the balance tree
         let trivial_proof = self.state_proof(0, 0);
