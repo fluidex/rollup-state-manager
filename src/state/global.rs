@@ -570,9 +570,9 @@ impl GlobalState {
 
         let old_root = self.root();
 
-        let account1 = self.accounts.get(&tx.order1_account_id).unwrap().clone();
+        let account1 = *self.accounts.get(&tx.order1_account_id).unwrap();
         let order_root0 = account1.order_root;
-        let account2 = self.accounts.get(&tx.order2_account_id).unwrap().clone();
+        let account2 = *self.accounts.get(&tx.order2_account_id).unwrap();
         let proof_order1_seller = self.state_proof(tx.order1_account_id, tx.token_id_1to2);
         let proof_order2_seller = self.state_proof(tx.order2_account_id, tx.token_id_2to1);
 
@@ -654,7 +654,7 @@ impl GlobalState {
                 .unwrap()
                 .get_proof(order2_pos)
                 .path_elements,
-            order_root0: order_root0,
+            order_root0,
             order_root1: Default::default(),
             account_path0: proof_order1_seller.account_path,
             account_path1: Default::default(),
