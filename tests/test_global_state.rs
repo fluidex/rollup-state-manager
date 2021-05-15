@@ -2,10 +2,10 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::large_enum_variant)]
 
-use crate::types::l2::Order;
 use crate::test_utils::messages::{parse_msg, WrappedMessage};
 use crate::test_utils::L2BlockSerde;
-use crate::types::primitives::{u32_to_fr};
+use crate::types::l2::Order;
+use crate::types::primitives::u32_to_fr;
 use anyhow::Result;
 use rust_decimal::Decimal;
 use state_keeper::state::GlobalState;
@@ -350,12 +350,10 @@ impl Orders {
     }
 
     fn assert_order_state<'c>(&self, state: &GlobalState, ask_order_state: OrderState<'c>, bid_order_state: OrderState<'c>) {
-        let ask_order_local = state
-            .get_account_order_by_id(ask_order_state.account_id, ask_order_state.order_id);
+        let ask_order_local = state.get_account_order_by_id(ask_order_state.account_id, ask_order_state.order_id);
         assert_eq!(ask_order_local, types::l2::Order::from(ask_order_state));
 
-        let bid_order_local = state
-            .get_account_order_by_id(bid_order_state.account_id, bid_order_state.order_id);
+        let bid_order_local = state.get_account_order_by_id(bid_order_state.account_id, bid_order_state.order_id);
         assert_eq!(bid_order_local, types::l2::Order::from(bid_order_state));
     }
 
@@ -388,7 +386,8 @@ impl Orders {
     }
 
     fn check_global_state_knows_order(&self, state: &mut GlobalState, order_state: &OrderState) {
-        let is_new_order = order_state.origin.finished_base == Decimal::new(0, 0) && order_state.origin.finished_quote == Decimal::new(0, 0);
+        let is_new_order =
+            order_state.origin.finished_base == Decimal::new(0, 0) && order_state.origin.finished_quote == Decimal::new(0, 0);
         let order_id = order_state.order_id;
         if is_new_order {
             assert!(!state.has_order(order_state.account_id, order_id), "invalid new order");
@@ -403,7 +402,10 @@ impl Orders {
             };
             state.update_order_state(order_state.account_id, order_to_put);
         } else {
-            assert!(state.has_order(order_state.account_id, order_id), "invalid old order, too many open orders?");
+            assert!(
+                state.has_order(order_state.account_id, order_id),
+                "invalid old order, too many open orders?"
+            );
         }
     }
 

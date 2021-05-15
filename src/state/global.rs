@@ -5,7 +5,7 @@
 use super::AccountState;
 use crate::types::l2::{tx_detail_idx, DepositToOldTx, L2Block, Order, RawTx, SpotTradeTx, TxType, TX_LENGTH};
 use crate::types::merkle_tree::{empty_tree_root, Tree};
-use crate::types::primitives::{field_to_u32, field_to_bigint, bigint_to_fr, u32_to_fr, Fr};
+use crate::types::primitives::{bigint_to_fr, field_to_bigint, field_to_u32, u32_to_fr, Fr};
 use ff::Field;
 use fnv::FnvHashMap;
 use std::collections::BTreeMap;
@@ -215,7 +215,10 @@ impl GlobalState {
     }
 
     pub fn update_order_state(&mut self, account_id: u32, order: Order) {
-        self.order_map.get_mut(&account_id).unwrap().insert(field_to_u32(&order.order_id), order);
+        self.order_map
+            .get_mut(&account_id)
+            .unwrap()
+            .insert(field_to_u32(&order.order_id), order);
     }
     pub fn get_token_balance(&self, account_id: u32, token_id: u32) -> Fr {
         self.balance_trees.get(&account_id).unwrap().get_leaf(token_id)
@@ -231,7 +234,7 @@ impl GlobalState {
     fn get_account_order_by_pos(&self, account_id: u32, order_pos: u32) -> Order {
         match self.get_order_id_by_pos(account_id, order_pos) {
             Some(order_id) => self.get_account_order_by_id(account_id, *order_id),
-            None => Order::default()
+            None => Order::default(),
         }
     }
     pub fn get_account_order_by_id(&self, account_id: u32, order_id: u32) -> Order {
@@ -384,8 +387,7 @@ impl GlobalState {
 
         encoded_tx[tx_detail_idx::TOKEN_ID2] = u32_to_fr(tx.token_id);
         encoded_tx[tx_detail_idx::ACCOUNT_ID2] = u32_to_fr(tx.account_id);
-        encoded_tx[tx_detail_idx::BALANCE2] =
-            bigint_to_fr(field_to_bigint(&old_balance) + field_to_bigint(&tx.amount));
+        encoded_tx[tx_detail_idx::BALANCE2] = bigint_to_fr(field_to_bigint(&old_balance) + field_to_bigint(&tx.amount));
         encoded_tx[tx_detail_idx::NONCE2] = nonce;
         encoded_tx[tx_detail_idx::ETH_ADDR2] = acc.eth_addr;
         encoded_tx[tx_detail_idx::SIGN2] = acc.sign;
@@ -626,11 +628,9 @@ impl GlobalState {
         encoded_tx[tx_detail_idx::ORDER2_POS] = u32_to_fr(order2_pos);
 
         encoded_tx[tx_detail_idx::BALANCE1] = account1_balance_sell;
-        encoded_tx[tx_detail_idx::BALANCE2] =
-            bigint_to_fr(field_to_bigint(&account2_balance_buy) + field_to_bigint(&tx.amount_1to2));
+        encoded_tx[tx_detail_idx::BALANCE2] = bigint_to_fr(field_to_bigint(&account2_balance_buy) + field_to_bigint(&tx.amount_1to2));
         encoded_tx[tx_detail_idx::BALANCE3] = account2_balance_sell;
-        encoded_tx[tx_detail_idx::BALANCE4] =
-            bigint_to_fr(field_to_bigint(&account1_balance_buy) + field_to_bigint(&tx.amount_2to1));
+        encoded_tx[tx_detail_idx::BALANCE4] = bigint_to_fr(field_to_bigint(&account1_balance_buy) + field_to_bigint(&tx.amount_2to1));
 
         encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = u32_to_fr(1u32);
         encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = u32_to_fr(1u32);
