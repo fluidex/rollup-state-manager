@@ -7,7 +7,7 @@ cd $DIR/..
 # make sure submodule is correctly cloned!!
 git submodule update --init --recursive
 git pull --recurse-submodules
-cd circuits; npm i
 cargo run --release --bin test_global_state
+cd circuits; npm i
 snarkit --version || npm -g install snarkit
-snarkit test circuits/testdata/Block_2_2_7_2/ --backend=wasm
+snarkit test testdata/Block_2_2_7_2/ --backend=wasm
