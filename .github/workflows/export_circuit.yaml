@@ -52,5 +52,9 @@ jobs:
 
       - name: Test export_circuit
         run: |
-          git config --global pull.ff true
-          ./tests/export_circuit/test.sh
+          git submodule update --init --recursive
+          cargo run --release --bin gen_export_circuit_testcase
+          cd circuits
+          npm i
+          npm -g install snarkit
+          snarkit test testdata/CheckLeafUpdate_2/ --backend=wasm
