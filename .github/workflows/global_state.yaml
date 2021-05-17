@@ -51,4 +51,6 @@ jobs:
           components: rustfmt, clippy
 
       - name: Test global_state
-        run: ./tests/global_state/test.sh
+        run: |
+          git config pull.ff true
+          ./tests/global_state/test.sh

@@ -6,7 +6,7 @@ cd $DIR/../..
 
 # make sure submodule is correctly cloned!!
 git submodule update --init --recursive
-git pull origin master --recurse-submodules --ff-only
+git pull origin master --recurse-submodules
 cargo run --release --bin gen_export_circuit_testcase
 
 cd $DIR/../../circuits; npm i
