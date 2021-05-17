@@ -50,6 +50,11 @@ jobs:
           override: true
           components: rustfmt, clippy
 
+      - name: Install Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+
       - name: Test global_state
         run: |
           git submodule update --init --recursive
