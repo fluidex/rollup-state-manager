@@ -52,5 +52,5 @@ jobs:
 
       - name: Test export_circuit
         run: |
-          git config pull.ff true
+          git config --global pull.ff true
           ./tests/export_circuit/test.sh

@@ -52,5 +52,5 @@ jobs:
 
       - name: Test global_state
         run: |
-          git config pull.ff true
+          git config --global pull.ff true
           ./tests/global_state/test.sh
