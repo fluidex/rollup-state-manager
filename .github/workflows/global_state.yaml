@@ -51,7 +51,4 @@ jobs:
           components: rustfmt, clippy
 
       - name: Test global_state
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --release --
+        run: ./tests/global_state/test.sh

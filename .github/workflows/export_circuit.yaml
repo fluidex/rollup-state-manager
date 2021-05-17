@@ -51,7 +51,4 @@ jobs:
           components: rustfmt, clippy
 
       - name: Test export_circuit
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --release --
+        run: ./tests/export_circuit/test.sh
