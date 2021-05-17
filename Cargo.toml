@@ -35,12 +35,12 @@ name = "state_keeper"
 path = "src/bin/main.rs"
 
 [[bin]]
-name = "test_export_circuit"
-path = "tests/test_export_circuit.rs"
+name = "gen_export_circuit_testcase"
+path = "tests/export_circuit/gen_testcase.rs"
 
 [[bin]]
-name = "test_global_state"
-path = "tests/test_global_state.rs"
+name = "gen_global_state_testcase"
+path = "tests/global_state/gen_testcase.rs"
 
 [features]
 default = [ ]

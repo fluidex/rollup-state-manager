@@ -1,4 +1,4 @@
-use ff::to_hex;
+use ff::{from_hex, to_hex};
 use ff::{PrimeField, PrimeFieldRepr};
 use lazy_static::lazy_static;
 use num_bigint::BigInt;
@@ -36,6 +36,9 @@ pub fn u32_to_fr(x: u32) -> Fr {
 }
 pub fn u64_to_fr(x: u64) -> Fr {
     Fr::from_repr(poseidon_rs::FrRepr::from(x)).unwrap()
+}
+pub fn bigint_to_fr(x: BigInt) -> Fr {
+    from_hex(&x.to_str_radix(16)).unwrap()
 }
 pub fn field_to_u32(x: &Fr) -> u32 {
     field_to_string(x).parse::<u32>().unwrap()

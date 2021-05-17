@@ -4,6 +4,8 @@
 
 use crate::test_utils::messages::{parse_msg, WrappedMessage};
 use crate::test_utils::L2BlockSerde;
+use crate::types::l2::Order;
+use crate::types::primitives::u32_to_fr;
 use anyhow::Result;
 use rust_decimal::Decimal;
 use state_keeper::state::GlobalState;
@@ -51,28 +53,13 @@ type OrdersType = HashMap<u32, (u32, u64)>;
 //index type?
 #[derive(Debug)]
 struct Orders {
-    ordermapping: OrdersType,
     place_bench: f32,
     spot_bench: f32,
-}
-
-impl Deref for Orders {
-    type Target = OrdersType;
-    fn deref(&self) -> &Self::Target {
-        &self.ordermapping
-    }
-}
-
-impl DerefMut for Orders {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.ordermapping
-    }
 }
 
 impl Default for Orders {
     fn default() -> Self {
         Orders {
-            ordermapping: OrdersType::new(),
             place_bench: 0.0,
             spot_bench: 0.0,
         }
@@ -363,14 +350,10 @@ impl Orders {
     }
 
     fn assert_order_state<'c>(&self, state: &GlobalState, ask_order_state: OrderState<'c>, bid_order_state: OrderState<'c>) {
-        let ask_order_local = state
-            .get_account_order_by_id(ask_order_state.account_id, ask_order_state.order_id)
-            .unwrap();
+        let ask_order_local = state.get_account_order_by_id(ask_order_state.account_id, ask_order_state.order_id);
         assert_eq!(ask_order_local, types::l2::Order::from(ask_order_state));
 
-        let bid_order_local = state
-            .get_account_order_by_id(bid_order_state.account_id, bid_order_state.order_id)
-            .unwrap();
+        let bid_order_local = state.get_account_order_by_id(bid_order_state.account_id, bid_order_state.order_id);
         assert_eq!(bid_order_local, types::l2::Order::from(bid_order_state));
     }
 
@@ -402,6 +385,30 @@ impl Orders {
         }
     }
 
+    fn check_global_state_knows_order(&self, state: &mut GlobalState, order_state: &OrderState) {
+        let is_new_order =
+            order_state.origin.finished_base == Decimal::new(0, 0) && order_state.origin.finished_quote == Decimal::new(0, 0);
+        let order_id = order_state.order_id;
+        if is_new_order {
+            assert!(!state.has_order(order_state.account_id, order_id), "invalid new order");
+            let order_to_put = Order {
+                order_id: u32_to_fr(order_id),
+                tokensell: u32_to_fr(order_state.token_sell),
+                tokenbuy: u32_to_fr(order_state.token_buy),
+                filled_sell: u32_to_fr(0),
+                filled_buy: u32_to_fr(0),
+                total_sell: test_utils::number_to_integer(&order_state.total_sell, test_params::prec(order_state.token_sell)),
+                total_buy: test_utils::number_to_integer(&order_state.total_buy, test_params::prec(order_state.token_buy)),
+            };
+            state.update_order_state(order_state.account_id, order_to_put);
+        } else {
+            assert!(
+                state.has_order(order_state.account_id, order_id),
+                "invalid old order, too many open orders?"
+            );
+        }
+    }
+
     fn handle_trade(&mut self, state: &mut GlobalState, trade: types::matchengine::messages::TradeMessage) {
         let token_pair = TokenPair::from(trade.market.as_str());
         let id_pair = TokenIdPair::from(token_pair);
@@ -420,25 +427,8 @@ impl Orders {
         let mut put_states = vec![&ask_order_state_before, &bid_order_state_before];
         put_states.sort();
 
-        for order_state in put_states.into_iter() {
-            if !self.contains_key(&order_state.order_id) {
-                //why the returning order id is u32?
-                // in fact the GlobalState should not expose "inner idx/pos" to caller
-                // we'd better handle this inside GlobalState later
-                let timing = Instant::now();
-                let new_order_pos = state.place_order(order_state.place_order_tx());
-                self.place_bench += timing.elapsed().as_secs_f32();
-                self.insert(order_state.order_id, (order_state.account_id, new_order_pos as u64));
-                if test_params::VERBOSE {
-                    println!(
-                        "global order id {} to user order id ({},{})",
-                        order_state.order_id, order_state.account_id, new_order_pos
-                    );
-                }
-            } else if test_params::VERBOSE {
-                println!("skip put order {}", order_state.order_id);
-            }
-        }
+        self.check_global_state_knows_order(state, &ask_order_state_before);
+        self.check_global_state_knows_order(state, &bid_order_state_before);
 
         assert_balance_state(
             &trade.state_before.balance,
@@ -508,7 +498,6 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<types::l2::L2Block>> {
             }
         }
 
-        orders.clear();
         accounts.clear();
 
         if i % 10 == 0 {
@@ -674,7 +663,7 @@ fn run() -> Result<()> {
 
 fn main() {
     match run() {
-        Ok(_) => println!("global_state tests generated"),
+        Ok(_) => println!("global_state test_case generated"),
         Err(e) => panic!("{:#?}", e),
     }
 
