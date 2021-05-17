@@ -1,0 +1,65 @@
+name: integration-test
+
+on:
+  push:
+    branches:
+      - master
+      - prod
+      - release/*
+  pull_request:
+    branches:
+      - master
+      - prod
+      - release/*
+
+jobs:
+  export_circuit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust:
+          - 1.51.0
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Cache cargo registry
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo target
+        uses: actions/cache@v2
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install 1.51.0 toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: 1.51.0
+          override: true
+          components: rustfmt, clippy
+
+      - name: Install Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+
+      - name: Test export_circuit
+        run: |
+          git submodule update --init --recursive
+          cargo run --release --bin gen_export_circuit_testcase
+          cd circuits
+          npm i
+          npm -g install snarkit
+          snarkit test testdata/CheckLeafUpdate_2/ --backend=wasm
