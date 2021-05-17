@@ -3,12 +3,6 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-/*
- * cargo run --bin export_circuit_test
- * npm -g install snarkit
- * npx snarkit test ../circuits/testdata/CheckLeafUpdate_2/
- */
-
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/binary_merkle_tree.ts
 mod test_case {
     use ff::{Field, PrimeField};
@@ -76,7 +70,7 @@ fn write_test_case(circuit_repo: &Path, test_dir: &Path, t: CircuitTestCase) -> 
 }
 
 fn run() -> anyhow::Result<()> {
-    let circuit_repo = fs::canonicalize(PathBuf::from("../circuits")).expect("invalid circuits repo path");
+    let circuit_repo = fs::canonicalize(PathBuf::from("circuits")).expect("invalid circuits repo path");
     let test_dir = circuit_repo.join("testdata");
     write_test_case(&circuit_repo, &test_dir, test_case::check_leaf_update())
 }

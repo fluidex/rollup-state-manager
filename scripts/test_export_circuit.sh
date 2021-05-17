@@ -8,6 +8,7 @@ cd $DIR/..
 git submodule update --init --recursive
 git pull --recurse-submodules
 cargo run --release --bin test_global_state
-cd circuits; npm i
+
+cd $DIR/../circuits; npm i
 snarkit --version || npm -g install snarkit
-snarkit test testdata/Block_2_2_7_2/ --backend=wasm
+snarkit test testdata/CheckLeafUpdate_2/ --backend=wasm
