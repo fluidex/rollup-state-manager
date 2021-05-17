@@ -77,7 +77,7 @@ fn run() -> anyhow::Result<()> {
 
 fn main() {
     match run() {
-        Ok(_) => println!("test_export_circuit pass"),
+        Ok(_) => println!("export_circuit test_case generated"),
         Err(e) => panic!("{:#?}", e),
     }
 }

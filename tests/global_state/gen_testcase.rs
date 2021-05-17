@@ -663,7 +663,7 @@ fn run() -> Result<()> {
 
 fn main() {
     match run() {
-        Ok(_) => println!("global_state tests generated"),
+        Ok(_) => println!("global_state test_case generated"),
         Err(e) => panic!("{:#?}", e),
     }
 

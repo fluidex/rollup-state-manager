@@ -7,7 +7,7 @@ cd $DIR/..
 # make sure submodule is correctly cloned!!
 git submodule update --init --recursive
 git pull --recurse-submodules
-cargo run --release --bin test_global_state
+cargo run --release --bin gen_global_state_testcase
 
 cd $DIR/../circuits; npm i
 snarkit --version || npm -g install snarkit
