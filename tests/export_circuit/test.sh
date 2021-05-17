@@ -11,4 +11,4 @@ cargo run --release --bin gen_export_circuit_testcase
 
 cd $DIR/../../circuits; npm i
 snarkit --version || npm -g install snarkit
-snarkit test testdata/CheckLeafUpdate_2/ --backend=wasm
+snarkit test testdata/CheckLeafUpdate_2/ --force_recompile --backend=wasm
