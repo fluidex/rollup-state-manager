@@ -1,4 +1,4 @@
-use state_keeper::test_utils::{self, CircuitTestCase};
+use rollup_state_manager::test_utils::{self, CircuitTestCase};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -6,10 +6,10 @@ use std::path::{Path, PathBuf};
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/binary_merkle_tree.ts
 mod test_case {
     use ff::{Field, PrimeField};
+    use rollup_state_manager::test_utils::{field_to_string, Fr};
+    use rollup_state_manager::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
+    use rollup_state_manager::types::merkle_tree::Tree;
     use serde_json::json;
-    use state_keeper::test_utils::{field_to_string, Fr};
-    use state_keeper::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
-    use state_keeper::types::merkle_tree::Tree;
 
     pub fn check_leaf_update() -> CircuitTestCase {
         let leaves: Vec<Fr> = vec![10, 11, 12, 13]

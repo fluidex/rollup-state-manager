@@ -1,5 +1,5 @@
 [package]
-name = "state_keeper"
+name = "rollup_state_manager"
 version = "0.1.0"
 authors = [ "HAOYUatHZ <haoyu@protonmail.com>" ]
 edition = "2018"
@@ -31,7 +31,7 @@ serde_derive = "1.0.90"
 serde_json = "1.0.64"
 
 [[bin]]
-name = "state_keeper"
+name = "rollup_state_manager"
 path = "src/bin/main.rs"
 
 [[bin]]
@@ -40,7 +40,7 @@ path = "tests/export_circuit/gen_testcase.rs"
 
 [[bin]]
 name = "gen_global_state_testcase"
-path = "tests/global_state/gen_testcase.rs"
+path = "tests/global_state/main.rs"
 
 [features]
 default = [ ]

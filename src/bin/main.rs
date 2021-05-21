@@ -1,4 +1,4 @@
-use state_keeper::config;
+use rollup_state_manager::config;
 
 fn main() {
     dotenv::dotenv().ok();
