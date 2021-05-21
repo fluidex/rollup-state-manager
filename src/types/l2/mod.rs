@@ -1,4 +1,7 @@
 pub mod codec;
+pub mod mod_tx_data;
+
+pub use mod_tx_data::*;
 
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/common.ts
 pub use crate::types::merkle_tree::MerklePath;
@@ -56,63 +59,6 @@ pub enum TxType {
     PlaceOrder,
     SpotTrade,
     Nop,
-}
-pub const TX_LENGTH: usize = 54;
-pub mod tx_detail_idx {
-    pub const ENABLE_BALANCE_CHECK1: usize = 0;
-    pub const ACCOUNT_ID1: usize = 1;
-    pub const TOKEN_ID1: usize = 2;
-    pub const BALANCE1: usize = 3;
-    pub const ETH_ADDR1: usize = 4;
-    pub const SIGN1: usize = 5;
-    pub const AY1: usize = 6;
-    pub const NONCE1: usize = 7;
-    pub const ENABLE_BALANCE_CHECK2: usize = 8;
-    pub const ACCOUNT_ID2: usize = 9;
-    pub const TOKEN_ID2: usize = 10;
-    pub const BALANCE2: usize = 11;
-    pub const ETH_ADDR2: usize = 12;
-    pub const SIGN2: usize = 13;
-    pub const AY2: usize = 14;
-    pub const NONCE2: usize = 15;
-    pub const SIG_L2_HASH: usize = 16;
-    pub const S: usize = 17;
-    pub const R8X: usize = 18;
-    pub const R8Y: usize = 19;
-    pub const AMOUNT: usize = 20;
-    pub const AMOUNT2: usize = 21;
-    pub const BALANCE3: usize = 22;
-    pub const BALANCE4: usize = 23;
-    pub const ORDER1_POS: usize = 24;
-    pub const ORDER2_POS: usize = 25;
-    pub const OLD_ORDER1_ID: usize = 26;
-    pub const OLD_ORDER1_TOKEN_SELL: usize = 27;
-    pub const OLD_ORDER1_FILLED_SELL: usize = 28;
-    pub const OLD_ORDER1_AMOUNT_SELL: usize = 29;
-    pub const OLD_ORDER1_TOKEN_BUY: usize = 30;
-    pub const OLD_ORDER1_FILLED_BUY: usize = 31;
-    pub const OLD_ORDER1_AMOUNT_BUY: usize = 32;
-    pub const NEW_ORDER1_ID: usize = 33;
-    pub const NEW_ORDER1_TOKEN_SELL: usize = 34;
-    pub const NEW_ORDER1_FILLED_SELL: usize = 35;
-    pub const NEW_ORDER1_AMOUNT_SELL: usize = 36;
-    pub const NEW_ORDER1_TOKEN_BUY: usize = 37;
-    pub const NEW_ORDER1_FILLED_BUY: usize = 38;
-    pub const NEW_ORDER1_AMOUNT_BUY: usize = 39;
-    pub const OLD_ORDER2_ID: usize = 40;
-    pub const OLD_ORDER2_TOKEN_SELL: usize = 41;
-    pub const OLD_ORDER2_FILLED_SELL: usize = 42;
-    pub const OLD_ORDER2_AMOUNT_SELL: usize = 43;
-    pub const OLD_ORDER2_TOKEN_BUY: usize = 44;
-    pub const OLD_ORDER2_FILLED_BUY: usize = 45;
-    pub const OLD_ORDER2_AMOUNT_BUY: usize = 46;
-    pub const NEW_ORDER2_ID: usize = 47;
-    pub const NEW_ORDER2_TOKEN_SELL: usize = 48;
-    pub const NEW_ORDER2_FILLED_SELL: usize = 49;
-    pub const NEW_ORDER2_AMOUNT_SELL: usize = 50;
-    pub const NEW_ORDER2_TOKEN_BUY: usize = 51;
-    pub const NEW_ORDER2_FILLED_BUY: usize = 52;
-    pub const NEW_ORDER2_AMOUNT_BUY: usize = 53;
 }
 
 pub struct RawTx {
