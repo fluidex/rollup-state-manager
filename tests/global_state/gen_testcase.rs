@@ -1,6 +1,6 @@
 use crate::types::*;
 use anyhow::Result;
-use rollup_state_manager::state::GlobalState;
+use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils;
 use rollup_state_manager::test_utils::messages::{parse_msg, WrappedMessage};
 use rollup_state_manager::test_utils::L2BlockSerde;
@@ -16,15 +16,15 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<types::l2::L2Block>, test_uti
 
     let lns: Lines<BufReader<File>> = BufReader::new(file).lines();
 
-    let mut state = GlobalState::new(
+    let state = GlobalState::new(
         test_params::BALANCELEVELS,
         test_params::ORDERLEVELS,
         test_params::ACCOUNTLEVELS,
-        test_params::NTXS,
         test_params::VERBOSE,
     );
+    let mut witgen = WitnessGenerator::new(state, test_params::NTXS, test_params::VERBOSE);
 
-    println!("genesis root {}", state.root());
+    println!("genesis root {}", witgen.root());
 
     let mut orders = Orders::default();
     let mut accounts = Accounts::default();
@@ -37,12 +37,12 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<types::l2::L2Block>, test_uti
     for line in lns {
         match line.map(parse_msg)?? {
             WrappedMessage::BALANCE(balance) => {
-                accounts.handle_deposit(&mut state, balance);
+                accounts.handle_deposit(&mut witgen, balance);
             }
             WrappedMessage::TRADE(trade) => {
-                let trade = accounts.transform_trade(&mut state, trade);
+                let trade = accounts.transform_trade(&mut witgen, trade);
                 let trade_id = trade.id;
-                orders.handle_trade(&mut state, trade);
+                orders.handle_trade(&mut witgen, trade);
                 println!("trade {} test done", trade_id);
             }
             _ => {
@@ -51,7 +51,7 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<types::l2::L2Block>, test_uti
         }
     }
 
-    state.flush_with_nop();
+    witgen.flush_with_nop();
 
     let component = test_utils::circuit::CircuitSource {
         src: String::from("src/block.circom"),
@@ -64,7 +64,7 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<types::l2::L2Block>, test_uti
         ),
     };
 
-    Ok((state.take_blocks(), component))
+    Ok((witgen.take_blocks(), component))
 }
 
 //just grap from export_circuit_test.rs ...

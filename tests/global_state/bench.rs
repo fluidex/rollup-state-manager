@@ -1,7 +1,7 @@
 use crate::types::{test_params, Accounts, Orders};
 
 use anyhow::Result;
-use rollup_state_manager::state::GlobalState;
+use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils::messages::{parse_msg, WrappedMessage};
 use rollup_state_manager::types;
 use std::fs::{self, File};
@@ -27,13 +27,14 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<types::l2::L2Block>> {
     GlobalState::print_config();
     // TODO: use ENV
     //use custom states
-    let mut state = GlobalState::new(
+    let verbose = false;
+    let state = GlobalState::new(
         10, //test_params::BALANCELEVELS,
         10, //test_params::ORDERLEVELS,
         10, //test_params::ACCOUNTLEVELS,
-        test_params::NTXS,
-        false,
+        verbose,
     );
+    let mut witgen = WitnessGenerator::new(state, test_params::NTXS, verbose);
 
     //amplify the records: in each iter we run records on a group of new accounts
     let mut timing = Instant::now();
@@ -43,11 +44,11 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<types::l2::L2Block>> {
         for msg in messages.iter() {
             match msg {
                 WrappedMessage::BALANCE(balance) => {
-                    accounts.handle_deposit(&mut state, balance.clone());
+                    accounts.handle_deposit(&mut witgen, balance.clone());
                 }
                 WrappedMessage::TRADE(trade) => {
-                    let trade = accounts.transform_trade(&mut state, trade.clone());
-                    orders.handle_trade(&mut state, trade);
+                    let trade = accounts.transform_trade(&mut witgen, trade.clone());
+                    orders.handle_trade(&mut witgen, trade);
                 }
                 _ => unreachable!(),
             }
@@ -71,7 +72,7 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<types::l2::L2Block>> {
         }
     }
 
-    Ok(state.take_blocks())
+    Ok(witgen.take_blocks())
 }
 
 pub(super) fn run_bench() -> Result<()> {

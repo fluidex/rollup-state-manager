@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rollup_state_manager::state::GlobalState;
+use rollup_state_manager::state::WitnessGenerator;
 use rollup_state_manager::test_utils;
 use rollup_state_manager::types;
 use rollup_state_manager::types::l2::Order;
@@ -65,11 +65,11 @@ impl Orders {
         ret
     }
 
-    fn assert_order_state<'c>(&self, state: &GlobalState, ask_order_state: OrderState<'c>, bid_order_state: OrderState<'c>) {
-        let ask_order_local = state.get_account_order_by_id(ask_order_state.account_id, ask_order_state.order_id);
+    fn assert_order_state<'c>(&self, witgen: &WitnessGenerator, ask_order_state: OrderState<'c>, bid_order_state: OrderState<'c>) {
+        let ask_order_local = witgen.get_account_order_by_id(ask_order_state.account_id, ask_order_state.order_id);
         assert_eq!(ask_order_local, types::l2::Order::from(ask_order_state));
 
-        let bid_order_local = state.get_account_order_by_id(bid_order_state.account_id, bid_order_state.order_id);
+        let bid_order_local = witgen.get_account_order_by_id(bid_order_state.account_id, bid_order_state.order_id);
         assert_eq!(bid_order_local, types::l2::Order::from(bid_order_state));
     }
 
@@ -101,12 +101,12 @@ impl Orders {
         }
     }
 
-    fn check_global_state_knows_order(&self, state: &mut GlobalState, order_state: &OrderState) {
+    fn check_global_state_knows_order(&self, witgen: &mut WitnessGenerator, order_state: &OrderState) {
         let is_new_order =
             order_state.origin.finished_base == Decimal::new(0, 0) && order_state.origin.finished_quote == Decimal::new(0, 0);
         let order_id = order_state.order_id;
         if is_new_order {
-            assert!(!state.has_order(order_state.account_id, order_id), "invalid new order");
+            assert!(!witgen.has_order(order_state.account_id, order_id), "invalid new order");
             let order_to_put = Order {
                 order_id: u32_to_fr(order_id),
                 tokensell: u32_to_fr(order_state.token_sell),
@@ -116,16 +116,16 @@ impl Orders {
                 total_sell: test_utils::number_to_integer(&order_state.total_sell, test_params::prec(order_state.token_sell)),
                 total_buy: test_utils::number_to_integer(&order_state.total_buy, test_params::prec(order_state.token_buy)),
             };
-            state.update_order_state(order_state.account_id, order_to_put);
+            witgen.update_order_state(order_state.account_id, order_to_put);
         } else {
             assert!(
-                state.has_order(order_state.account_id, order_id),
+                witgen.has_order(order_state.account_id, order_id),
                 "invalid old order, too many open orders?"
             );
         }
     }
 
-    pub fn handle_trade(&mut self, state: &mut GlobalState, trade: types::matchengine::messages::TradeMessage) {
+    pub fn handle_trade(&mut self, witgen: &mut WitnessGenerator, trade: types::matchengine::messages::TradeMessage) {
         let token_pair = TokenPair::from(trade.market.as_str());
         let id_pair = TokenIdPair::from(token_pair);
 
@@ -143,30 +143,30 @@ impl Orders {
         let mut put_states = vec![&ask_order_state_before, &bid_order_state_before];
         put_states.sort();
 
-        self.check_global_state_knows_order(state, &ask_order_state_before);
-        self.check_global_state_knows_order(state, &bid_order_state_before);
+        self.check_global_state_knows_order(witgen, &ask_order_state_before);
+        self.check_global_state_knows_order(witgen, &bid_order_state_before);
 
         assert_balance_state(
             &trade.state_before.balance,
-            state,
+            witgen,
             bid_order_state_before.account_id,
             ask_order_state_before.account_id,
             id_pair,
         );
-        self.assert_order_state(state, ask_order_state_before, bid_order_state_before);
+        self.assert_order_state(witgen, ask_order_state_before, bid_order_state_before);
 
         let timing = Instant::now();
-        state.spot_trade(self.trade_into_spot_tx(&trade));
+        witgen.spot_trade(self.trade_into_spot_tx(&trade));
         self.spot_bench += timing.elapsed().as_secs_f32();
 
         assert_balance_state(
             &trade.state_after.balance,
-            state,
+            witgen,
             bid_order_state_after.account_id,
             ask_order_state_after.account_id,
             id_pair,
         );
-        self.assert_order_state(state, ask_order_state_after, bid_order_state_after);
+        self.assert_order_state(witgen, ask_order_state_after, bid_order_state_after);
     }
 }
 
@@ -202,11 +202,11 @@ impl Default for Accounts {
 
 //make ad-hoc transform in account_id
 impl Accounts {
-    fn userid_to_treeindex(&mut self, state: &mut GlobalState, account_id: u32) -> u32 {
+    fn userid_to_treeindex(&mut self, witgen: &mut WitnessGenerator, account_id: u32) -> u32 {
         match self.get(&account_id) {
             Some(idx) => *idx,
             None => {
-                let uid = state.create_new_account(1);
+                let uid = witgen.create_new_account(1);
                 self.insert(account_id, uid);
                 if test_params::VERBOSE {
                     println!("global account index {} to user account id {}", uid, account_id);
@@ -218,18 +218,18 @@ impl Accounts {
 
     pub fn transform_trade(
         &mut self,
-        state: &mut GlobalState,
+        witgen: &mut WitnessGenerator,
         mut trade: types::matchengine::messages::TradeMessage,
     ) -> types::matchengine::messages::TradeMessage {
-        trade.ask_user_id = self.userid_to_treeindex(state, trade.ask_user_id);
-        trade.bid_user_id = self.userid_to_treeindex(state, trade.bid_user_id);
+        trade.ask_user_id = self.userid_to_treeindex(witgen, trade.ask_user_id);
+        trade.bid_user_id = self.userid_to_treeindex(witgen, trade.bid_user_id);
 
         trade
     }
 
-    pub fn handle_deposit(&mut self, state: &mut GlobalState, mut deposit: types::matchengine::messages::BalanceMessage) {
+    pub fn handle_deposit(&mut self, witgen: &mut WitnessGenerator, mut deposit: types::matchengine::messages::BalanceMessage) {
         //integrate the sanity check here ...
-        deposit.user_id = self.userid_to_treeindex(state, deposit.user_id);
+        deposit.user_id = self.userid_to_treeindex(witgen, deposit.user_id);
 
         assert!(!deposit.change.is_sign_negative(), "only support deposit now");
 
@@ -238,7 +238,7 @@ impl Accounts {
         let balance_before = deposit.balance - deposit.change;
         assert!(!balance_before.is_sign_negative(), "invalid balance {:?}", deposit);
 
-        let expected_balance_before = state.get_token_balance(deposit.user_id, token_id);
+        let expected_balance_before = witgen.get_token_balance(deposit.user_id, token_id);
         assert_eq!(
             expected_balance_before,
             test_utils::number_to_integer(&balance_before, test_params::prec(token_id))
@@ -246,7 +246,7 @@ impl Accounts {
 
         let timing = Instant::now();
 
-        state.deposit_to_old(types::l2::DepositToOldTx {
+        witgen.deposit_to_old(types::l2::DepositToOldTx {
             token_id,
             account_id: deposit.user_id,
             amount: test_utils::number_to_integer(&deposit.change, test_params::prec(token_id)),
@@ -410,27 +410,27 @@ impl CommonBalanceState {
         }
     }
 
-    fn build_local(state: &GlobalState, bid_id: u32, ask_id: u32, id_pair: TokenIdPair) -> Self {
+    fn build_local(witgen: &WitnessGenerator, bid_id: u32, ask_id: u32, id_pair: TokenIdPair) -> Self {
         let base_id = id_pair.0;
         let quote_id = id_pair.1;
 
         CommonBalanceState {
-            bid_user_base: state.get_token_balance(bid_id, base_id),
-            bid_user_quote: state.get_token_balance(bid_id, quote_id),
-            ask_user_base: state.get_token_balance(ask_id, base_id),
-            ask_user_quote: state.get_token_balance(ask_id, quote_id),
+            bid_user_base: witgen.get_token_balance(bid_id, base_id),
+            bid_user_quote: witgen.get_token_balance(bid_id, quote_id),
+            ask_user_base: witgen.get_token_balance(ask_id, base_id),
+            ask_user_quote: witgen.get_token_balance(ask_id, quote_id),
         }
     }
 }
 
 fn assert_balance_state(
     balance_state: &types::matchengine::messages::VerboseBalanceState,
-    state: &GlobalState,
+    witgen: &WitnessGenerator,
     bid_id: u32,
     ask_id: u32,
     id_pair: TokenIdPair,
 ) {
-    let local_balance = CommonBalanceState::build_local(state, bid_id, ask_id, id_pair);
+    let local_balance = CommonBalanceState::build_local(witgen, bid_id, ask_id, id_pair);
     let parsed_state = CommonBalanceState::parse(balance_state, id_pair);
     assert_eq!(local_balance, parsed_state);
 }
