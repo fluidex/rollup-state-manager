@@ -1229,6 +1229,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24d5f089152e60f62d28b835fbff2cd2e8dc0baf1ac13343bef92ab7eed84548"
 
 [[package]]
+name = "rollup_state_manager"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrayref",
+ "babyjubjub-rs",
+ "config",
+ "dotenv",
+ "env_logger",
+ "ff_ce 0.11.0",
+ "fnv",
+ "franklin-crypto",
+ "hex",
+ "itertools 0.10.0",
+ "lazy_static",
+ "log",
+ "num-bigint 0.2.6",
+ "poseidon-rs",
+ "rand 0.8.3",
+ "rayon",
+ "regex",
+ "rust_decimal",
+ "serde 1.0.125",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "rust-ini"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1346,34 +1374,6 @@ name = "splitmut"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c85070f382340e8b23a75808e83573ddf65f9ad9143df9573ca37c1ed2ee956a"
-
-[[package]]
-name = "state_keeper"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arrayref",
- "babyjubjub-rs",
- "config",
- "dotenv",
- "env_logger",
- "ff_ce 0.11.0",
- "fnv",
- "franklin-crypto",
- "hex",
- "itertools 0.10.0",
- "lazy_static",
- "log",
- "num-bigint 0.2.6",
- "poseidon-rs",
- "rand 0.8.3",
- "rayon",
- "regex",
- "rust_decimal",
- "serde 1.0.125",
- "serde_derive",
- "serde_json",
-]
 
 [[package]]
 name = "static_assertions"
