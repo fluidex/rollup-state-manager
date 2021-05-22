@@ -347,38 +347,36 @@ impl WitnessGenerator {
     // case2: old order is valid old order with different order id, but we will replace it.
     // case3: old order has same order id, we will modify it
     pub fn spot_trade(&mut self, tx: SpotTradeTx) {
-        //assert!(self.accounts.get(tx.order1_account_id).eth_addr != 0n, "SpotTrade account1");
-        //assert!(self.accounts.get(tx.order2_account_id).eth_addr != 0n, "SpotTrade account2");
-
-        if tx.order1_account_id == tx.order2_account_id {
+        //assert!(self.accounts.get(accID1).eth_addr != 0n, "SpotTrade account1");
+        //assert!(self.accounts.get(accID2).eth_addr != 0n, "SpotTrade account2");
+        let acc_id1 = tx.order1_account_id;
+        let acc_id2 = tx.order2_account_id;
+        if acc_id1 == acc_id2 {
             panic!("self trade no allowed");
         }
-        assert!(self.state.has_order(tx.order1_account_id, tx.order1_id), "unknown order1");
-        assert!(self.state.has_order(tx.order2_account_id, tx.order2_id), "unknown order2");
+        assert!(self.state.has_order(acc_id1, tx.order1_id), "unknown order1");
+        assert!(self.state.has_order(acc_id2, tx.order2_id), "unknown order2");
 
         let old_root = self.state.root();
+        let proof_order1_seller = self.state.balance_full_proof(acc_id1, tx.token_id_1to2);
+        let proof_order2_seller = self.state.balance_full_proof(acc_id2, tx.token_id_2to1);
 
-        let account1 = self.state.get_account(tx.order1_account_id);
+        let account1 = self.state.get_account(acc_id1);
         let order_root0 = account1.order_root;
-        let account2 = self.state.get_account(tx.order2_account_id);
-        let proof_order1_seller = self.state.balance_full_proof(tx.order1_account_id, tx.token_id_1to2);
-        let proof_order2_seller = self.state.balance_full_proof(tx.order2_account_id, tx.token_id_2to1);
+        let account2 = self.state.get_account(acc_id2);
 
         // old_order1 is same as old_order1_in_tree when case3
         // not same when case1 and case2
-        let mut order1 = self.state.get_account_order_by_id(tx.order1_account_id, tx.order1_id);
-        let mut order2 = self.state.get_account_order_by_id(tx.order2_account_id, tx.order2_id);
-        let old_order1_in_tree = self.state.place_order_into_tree(tx.order1_account_id, tx.order1_id);
-        let old_order2_in_tree = self.state.place_order_into_tree(tx.order2_account_id, tx.order2_id);
-
-        let order1_pos = self.state.get_order_pos_by_id(tx.order1_account_id, tx.order1_id);
-        let order2_pos = self.state.get_order_pos_by_id(tx.order2_account_id, tx.order2_id);
+        let mut order1 = self.state.get_account_order_by_id(acc_id1, tx.order1_id);
+        let mut order2 = self.state.get_account_order_by_id(acc_id2, tx.order2_id);
+        let (order1_pos, old_order1_in_tree) = self.state.find_pos_for_order(acc_id1, tx.order1_id);
+        let (order2_pos, old_order2_in_tree) = self.state.find_pos_for_order(acc_id2, tx.order2_id);
 
         // first, generate the tx
 
         let mut encoded_tx = [Fr::zero(); TX_LENGTH];
-        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = u32_to_fr(tx.order1_account_id);
-        encoded_tx[tx_detail_idx::ACCOUNT_ID2] = u32_to_fr(tx.order2_account_id);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = u32_to_fr(acc_id1);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID2] = u32_to_fr(acc_id2);
         encoded_tx[tx_detail_idx::ETH_ADDR1] = account1.eth_addr;
         encoded_tx[tx_detail_idx::ETH_ADDR2] = account2.eth_addr;
         encoded_tx[tx_detail_idx::SIGN1] = account1.sign;
@@ -409,21 +407,22 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::ORDER1_POS] = u32_to_fr(order1_pos);
         encoded_tx[tx_detail_idx::ORDER2_POS] = u32_to_fr(order2_pos);
 
-        let account1_balance_sell = self.state.get_token_balance(tx.order1_account_id, tx.token_id_1to2);
-        assert!(account1_balance_sell > tx.amount_1to2.to_fr(), "balance_1to2");
-        let account1_balance_sell_new = fr_sub(&account1_balance_sell, &tx.amount_1to2.to_fr());
-        let account2_balance_buy = self.state.get_token_balance(tx.order2_account_id, tx.token_id_1to2);
-        let account2_balance_buy_new = fr_add(&account2_balance_buy, &tx.amount_1to2.to_fr());
-        let account2_balance_sell = self.state.get_token_balance(tx.order2_account_id, tx.token_id_2to1);
-        assert!(account2_balance_sell > tx.amount_2to1.to_fr(), "balance_2to1");
-        let account2_balance_sell_new = fr_sub(&account2_balance_sell, &tx.amount_2to1.to_fr());
-        let account1_balance_buy = self.state.get_token_balance(tx.order1_account_id, tx.token_id_2to1);
-        let account1_balance_buy_new = fr_add(&account1_balance_buy, &tx.amount_2to1.to_fr());
+        let acc1_balance_sell = self.state.get_token_balance(acc_id1, tx.token_id_1to2);
+        assert!(acc1_balance_sell > tx.amount_1to2.to_fr(), "balance_1to2");
+        let acc1_balance_sell_new = fr_sub(&acc1_balance_sell, &tx.amount_1to2.to_fr());
+        let acc1_balance_buy = self.state.get_token_balance(acc_id1, tx.token_id_2to1);
+        let acc1_balance_buy_new = fr_add(&acc1_balance_buy, &tx.amount_2to1.to_fr());
 
-        encoded_tx[tx_detail_idx::BALANCE1] = account1_balance_sell;
-        encoded_tx[tx_detail_idx::BALANCE2] = account2_balance_buy_new;
-        encoded_tx[tx_detail_idx::BALANCE3] = account2_balance_sell;
-        encoded_tx[tx_detail_idx::BALANCE4] = account1_balance_buy_new;
+        let acc2_balance_sell = self.state.get_token_balance(acc_id2, tx.token_id_2to1);
+        assert!(acc2_balance_sell > tx.amount_2to1.to_fr(), "balance_2to1");
+        let acc2_balance_sell_new = fr_sub(&acc2_balance_sell, &tx.amount_2to1.to_fr());
+        let acc2_balance_buy = self.state.get_token_balance(acc_id2, tx.token_id_1to2);
+        let acc2_balance_buy_new = fr_add(&acc2_balance_buy, &tx.amount_1to2.to_fr());
+
+        encoded_tx[tx_detail_idx::BALANCE1] = acc1_balance_sell;
+        encoded_tx[tx_detail_idx::BALANCE2] = acc2_balance_buy_new;
+        encoded_tx[tx_detail_idx::BALANCE3] = acc2_balance_sell;
+        encoded_tx[tx_detail_idx::BALANCE4] = acc1_balance_buy_new;
 
         encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = u32_to_fr(1u32);
         encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = u32_to_fr(1u32);
@@ -435,8 +434,8 @@ impl WitnessGenerator {
             balance_path1: Default::default(),
             balance_path2: proof_order2_seller.balance_path,
             balance_path3: Default::default(),
-            order_path0: self.state.order_proof(tx.order1_account_id, order1_pos).path_elements,
-            order_path1: self.state.order_proof(tx.order2_account_id, order2_pos).path_elements,
+            order_path0: self.state.order_proof(acc_id1, order1_pos).path_elements,
+            order_path1: self.state.order_proof(acc_id2, order2_pos).path_elements,
             order_root0,
             order_root1: Default::default(),
             account_path0: proof_order1_seller.account_path,
@@ -445,31 +444,26 @@ impl WitnessGenerator {
             root_after: Default::default(),
         };
 
-        // account1 after sending, before receiving
-        self.state
-            .set_token_balance(tx.order1_account_id, tx.token_id_1to2, account1_balance_sell_new);
-        // account2 after sending, before receiving
-        self.state
-            .set_token_balance(tx.order2_account_id, tx.token_id_2to1, account2_balance_sell_new);
-
         order1.trade_with(&tx.amount_1to2.to_fr(), &tx.amount_2to1.to_fr());
-        self.state.update_order_state(tx.order1_account_id, order1);
-        self.state.update_order_leaf(tx.order1_account_id, order1_pos, tx.order1_id);
-
-        self.state
-            .set_token_balance(tx.order1_account_id, tx.token_id_2to1, account1_balance_buy_new);
-
+        self.state.update_order_state(acc_id1, order1);
         order2.trade_with(&tx.amount_2to1.to_fr(), &tx.amount_1to2.to_fr());
-        self.state.update_order_state(tx.order2_account_id, order2);
-        self.state.update_order_leaf(tx.order2_account_id, order2_pos, tx.order2_id);
+        self.state.update_order_state(acc_id2, order2);
 
-        self.state
-            .set_token_balance(tx.order2_account_id, tx.token_id_1to2, account2_balance_buy_new);
+        // TODO: parallel the following updates
+        self.state.set_order_leaf_hash_raw(acc_id1, order1_pos, &order1.hash());
+        self.state.set_token_balance_raw(acc_id1, tx.token_id_1to2, acc1_balance_sell_new);
+        self.state.set_token_balance_raw(acc_id1, tx.token_id_2to1, acc1_balance_buy_new);
+        self.state.recalculate_from_account_state(acc_id1);
 
-        raw_tx.balance_path3 = self.state.balance_proof(tx.order1_account_id, tx.token_id_2to1).path_elements;
-        raw_tx.balance_path1 = self.state.balance_proof(tx.order2_account_id, tx.token_id_1to2).path_elements;
-        raw_tx.account_path1 = self.state.account_proof(tx.order2_account_id).path_elements;
-        raw_tx.order_root1 = self.state.get_account(tx.order2_account_id).order_root;
+        self.state.set_order_leaf_hash_raw(acc_id2, order2_pos, &order2.hash());
+        self.state.set_token_balance_raw(acc_id2, tx.token_id_1to2, acc2_balance_buy_new);
+        self.state.set_token_balance_raw(acc_id2, tx.token_id_2to1, acc2_balance_sell_new);
+        self.state.recalculate_from_account_state(acc_id2);
+
+        raw_tx.balance_path3 = self.state.balance_proof(acc_id1, tx.token_id_2to1).path_elements;
+        raw_tx.balance_path1 = self.state.balance_proof(acc_id2, tx.token_id_1to2).path_elements;
+        raw_tx.account_path1 = self.state.account_proof(acc_id2).path_elements;
+        raw_tx.order_root1 = self.state.get_account(acc_id2).order_root;
 
         encoded_tx[tx_detail_idx::NEW_ORDER1_ID] = order1.order_id;
         encoded_tx[tx_detail_idx::NEW_ORDER1_TOKEN_SELL] = order1.tokensell;
