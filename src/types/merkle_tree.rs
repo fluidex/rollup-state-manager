@@ -36,13 +36,18 @@ pub struct Tree {
     // data[0] is leaf nodes, and data[-1] is root
     // the `logical size` of data[0] is of size 2**height
     data: Vec<ValueMap>,
+
+    batch_update: bool,
+    batch_size: usize,
+    parallel: usize,
+    updates: Vec<(u32, LeafType)>,
 }
 
 impl Tree {
     pub fn print_config() {
         println!("merkletree valueMap type: {}", std::any::type_name::<ValueMap>())
     }
-    pub fn new(height: usize, default_leaf_node_value: LeafType) -> Self {
+    pub fn new(height: usize, default_leaf_node_value: LeafType, batch_update: bool, batch_size: usize) -> Self {
         // check overflow
         let _ = 2u32.checked_pow(height as u32).expect("tree depth error, overflow");
         // 2**height leaves, and the total height of the tree is
@@ -56,6 +61,10 @@ impl Tree {
             height,
             default_nodes,
             data,
+            batch_update,
+            batch_size,
+            parallel: 2, // TODO: use environment setting as parallelism should be global
+            updates: Vec::new(),
         }
     }
     pub fn max_leaf_num(&self) -> u32 {
@@ -107,24 +116,35 @@ impl Tree {
         self.data[level].insert(idx, new_hash);
     }
     pub fn set_value(&mut self, idx: u32, value: LeafType) {
-        let mut idx = idx;
-        if self.get_leaf(idx) == value {
-            return;
+        if !self.batch_update {
+            let mut idx = idx;
+            if self.get_leaf(idx) == value {
+                return;
+            }
+            if idx >= self.max_leaf_num() {
+                panic!("invalid tree idx {}", idx);
+            }
+            self.data[0].insert(idx, value);
+            for i in 1..=self.height {
+                idx = self.parent_idx(idx);
+                self.recalculate_parent(i, idx);
+            }
+        } else {
+            self.updates.push((idx, value));
+            if self.updates.len() == self.batch_size {
+                self.flush_updates();
+            }
         }
-        if idx >= self.max_leaf_num() {
-            panic!("invalid tree idx {}", idx);
-        }
-        self.data[0].insert(idx, value);
-        for i in 1..=self.height {
-            idx = self.parent_idx(idx);
-            self.recalculate_parent(i, idx);
-        }
+    }
+    pub fn flush_updates(&mut self) {
+        self.set_value_parallel(self.updates.clone(), self.parallel);
+        self.updates.clear();
     }
     // update the merkle tree in parallel
     // first, it calculates some mid-level nodes as cache in parallel
     // then, it updates the tree sequentially, if a cache item is useful, then use it, if not, ignore the cache item and recalculate
     // in fact if we use some 'unsafe/raw pointer', we can get more precise control and speed up more...
-    pub fn set_value_parallel(&mut self, updates: &[(u32, LeafType)], parallel: usize) {
+    pub fn set_value_parallel(&mut self, updates: Vec<(u32, LeafType)>, parallel: usize) {
         let mut parallel = parallel;
         if parallel == 0 {
             parallel = 8; // TODO: a better default
@@ -229,8 +249,8 @@ impl Tree {
     }
 }
 
-pub fn empty_tree_root(level: usize, leaf: LeafType) -> LeafType {
-    Tree::new(level, leaf).get_root()
+pub fn empty_tree_root(level: usize, leaf: LeafType, batch_update: bool, batch_size: usize) -> LeafType {
+    Tree::new(level, leaf, batch_update, batch_size).get_root()
 }
 
 #[cfg(test)]
@@ -243,7 +263,7 @@ mod tests {
     #[ignore]
     fn bench_tree() {
         let h = 20;
-        let mut tree = Tree::new(h, Fr::zero());
+        let mut tree = Tree::new(h, Fr::zero(), false, 0);
         for i in 0..100 {
             let start = Instant::now();
             let inner_count = 100;
@@ -263,9 +283,9 @@ mod tests {
     fn test_parallel_update() {
         let h = 20;
         // RAYON_NUM_THREADS can change threads num used
-        let mut tree1 = Tree::new(h, Fr::zero());
+        let mut tree1 = Tree::new(h, Fr::zero(), false, 0);
 
-        let mut tree2 = Tree::new(h, Fr::zero());
+        let mut tree2 = Tree::new(h, Fr::zero(), true, 100);
         let count = 100;
         let mut updates = Vec::new();
         let rand_elem = || {
@@ -281,9 +301,10 @@ mod tests {
         }
         for (idx, value) in updates.iter() {
             tree1.set_value(*idx, *value);
+            tree2.set_value(*idx, *value);
         }
 
-        tree2.set_value_parallel(&updates, 4);
+        // tree2.set_value_parallel(&updates, 4);
         assert_eq!(tree1.get_root(), tree2.get_root());
     }
 
@@ -292,7 +313,7 @@ mod tests {
     fn bench_tree_parallel() {
         let h = 20;
         // RAYON_NUM_THREADS can change threads num used
-        let mut tree = Tree::new(h, Fr::zero());
+        let mut tree = Tree::new(h, Fr::zero(),true, 100);
 
         for i in 0..10 {
             let start = Instant::now();
@@ -308,16 +329,19 @@ mod tests {
             };
             for _ in 0..inner_count {
                 same_updates.push((i, rand_elem()));
+                // tree.set_value(i, rand_elem());
             }
             let mut dense_updates = Vec::new();
             for j in 0..inner_count {
                 dense_updates.push((j, rand_elem()));
+                // tree.set_value(j, rand_elem());
             }
             let mut sparse_updates = Vec::new();
             for _ in 0..inner_count {
                 sparse_updates.push((rand_idx(), rand_elem()));
+                tree.set_value(rand_idx(), rand_elem());
             }
-            tree.set_value_parallel(&sparse_updates, 2);
+            // tree.set_value_parallel(&sparse_updates, 2);
             // Rescue
             // 2021.03.15(Apple M1): typescript:            100 ops takes 4934ms
             // 2021.03.26(Apple M1): rust:                  100 ops takes 1160ms
