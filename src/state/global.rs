@@ -10,13 +10,22 @@ use ff::Field;
 use fnv::FnvHashMap;
 use std::collections::BTreeMap;
 
-pub struct StateProof {
+pub struct BalanceProof {
     pub leaf: Fr,
-    pub root: Fr,
-    pub balance_root: Fr,
-    pub order_root: Fr,
     pub balance_path: Vec<[Fr; 1]>,
+    // in fact we can calculate xx_root using leaf and path
+    pub balance_root: Fr,
+    pub account_hash: Fr,
     pub account_path: Vec<[Fr; 1]>,
+    pub root: Fr,
+}
+pub struct OrderProof {
+    pub leaf: Fr,
+    pub order_path: Vec<[Fr; 1]>,
+    pub order_root: Fr,
+    pub account_hash: Fr,
+    pub account_path: Vec<[Fr; 1]>,
+    pub root: Fr,
 }
 
 // TODO: too many unwrap here
@@ -188,6 +197,11 @@ impl GlobalState {
         panic!("Cannot find order pos");
     }
 
+    // this function will update merkle tree till orderRoot rather than global root
+    // use this function only when you know what you are doing
+    //pub fn place_order_into_tree_partial(&mut self, account_id: u32, order_id: u32, ) -> Order {
+    //}
+
     pub fn place_order_into_tree(&mut self, account_id: u32, order_id: u32) -> Order {
         if !self.has_order(account_id, order_id) {
             panic!("invalid order {} {}", account_id, order_id);
@@ -253,25 +267,25 @@ impl GlobalState {
     pub fn balance_proof(&self, account_id: u32, token_id: u32) -> MerkleProof {
         self.balance_trees.get(&account_id).unwrap().get_proof(token_id)
     }
+    // get proof if `value` is in the tree without really updating
+    //pub fn balance_proof_with(self, account_id: u32, token_id: u32, value: Fr) -> MerkleProof
     pub fn account_proof(&self, account_id: u32) -> MerkleProof {
         self.account_tree.get_proof(account_id)
     }
-    pub fn state_proof(&self, account_id: u32, token_id: u32) -> StateProof {
+    pub fn balance_full_proof(&self, account_id: u32, token_id: u32) -> BalanceProof {
         let balance_proof = self.balance_proof(account_id, token_id);
         let account_proof = self.account_proof(account_id);
-        let order_root = self.order_trees.get(&account_id).unwrap().get_root();
-        //assert!(accountLeaf == balance_root, "state_proof");
-        StateProof {
+        BalanceProof {
             leaf: balance_proof.leaf,
-            root: account_proof.root,
-            balance_root: balance_proof.root,
-            order_root,
             balance_path: balance_proof.path_elements,
+            balance_root: balance_proof.root,
+            account_hash: account_proof.leaf,
             account_path: account_proof.path_elements,
+            root: account_proof.root,
         }
     }
-    pub fn trivial_state_proof(&self) -> StateProof {
+    pub fn trivial_state_proof(&self) -> BalanceProof {
         // TODO: cache this
-        self.state_proof(0, 0)
+        self.balance_full_proof(0, 0)
     }
 }
