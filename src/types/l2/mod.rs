@@ -3,7 +3,7 @@ pub mod mod_tx_data;
 pub use mod_tx_data::*;
 
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/common.ts
-use super::fixnum::Float832;
+use super::fixnum::Float864;
 pub use crate::types::merkle_tree::MerklePath;
 use crate::types::primitives::{hash, shl, Fr};
 use anyhow::bail;
@@ -94,7 +94,7 @@ pub struct L2Block {
     pub new_account_roots: Vec<Fr>,
 }
 
-pub type AmountType = Float832;
+pub type AmountType = Float864;
 
 #[derive(Debug)]
 pub struct PlaceOrderTx {
@@ -128,7 +128,7 @@ pub struct SpotTradeTx {
 pub const PUBDATA_LEN: usize = 60;
 pub const ACCOUNT_ID_LEN: usize = 4;
 pub const TOKEN_ID_LEN: usize = 2;
-pub const AMOUNT_LEN: usize = 5;
+pub const AMOUNT_LEN: usize = 9;
 //pub type PUBDATA = [u8; PUBDATA_LEN];
 
 // https://github.com/Fluidex/circuits/issues/144
@@ -174,7 +174,7 @@ fn test_deposit_to_old_pubdata() {
     let tx = DepositToOldTx {
         account_id: 1323,
         token_id: 232,
-        amount: Float832 {
+        amount: AmountType {
             significand: 756,
             exponent: 11,
         },

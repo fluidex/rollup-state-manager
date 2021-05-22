@@ -20,8 +20,8 @@ pub fn decimal_to_fr(num: &Decimal, prec: u32) -> Fr {
     u64_to_fr(decimal_to_u64(num, prec))
 }
 
-pub fn decimal_to_amount(num: &Decimal, prec: u32) -> Float832 {
-    Float832::from_decimal(num, prec).unwrap()
+pub fn decimal_to_amount(num: &Decimal, prec: u32) -> Float864 {
+    Float864::from_decimal(num, prec).unwrap()
 }
 
 #[cfg(test)]
@@ -36,13 +36,13 @@ fn test_decimal_to_fr() {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Float832 {
+pub struct Float864 {
     pub exponent: u8,
     // 5 bytes seems enough?
     pub significand: u64,
 }
 
-impl Float832 {
+impl Float864 {
     pub fn to_bigint(&self) -> BigInt {
         let s = BigInt::from(self.significand);
         s * BigInt::from(10).pow(self.exponent)
@@ -94,22 +94,22 @@ impl Float832 {
         }
         // TODO: a better way...
         let significand: u64 = n.floor().to_string().parse::<u64>()?;
-        Ok(Float832 { exponent, significand })
+        Ok(Float864 { exponent, significand })
     }
 }
 
 #[cfg(test)]
 #[test]
-fn test_float832() {
+fn test_float864() {
     use std::str::FromStr;
     // 1.23456 * 10**18
     let d0 = Decimal::new(123456, 5);
-    let f = Float832::from_decimal(&d0, 18).unwrap();
+    let f = Float864::from_decimal(&d0, 18).unwrap();
     assert_eq!(f.exponent, 13);
     assert_eq!(f.significand, 123456);
     let d = f.to_decimal(18);
     assert_eq!(d, Decimal::from_str("1.23456").unwrap());
-    let f2 = Float832::decode(&f.encode()).unwrap();
+    let f2 = Float864::decode(&f.encode()).unwrap();
     assert_eq!(f2.exponent, 13);
     assert_eq!(f2.significand, 123456);
 }
