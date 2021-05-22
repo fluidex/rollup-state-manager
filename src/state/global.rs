@@ -19,7 +19,6 @@ pub struct StateProof {
     pub account_path: Vec<[Fr; 1]>,
 }
 
-// TODO: change to snake_case
 // TODO: too many unwrap here
 pub struct GlobalState {
     balance_levels: usize,

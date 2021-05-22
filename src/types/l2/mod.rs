@@ -6,6 +6,9 @@ pub use mod_tx_data::*;
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/common.ts
 pub use crate::types::merkle_tree::MerklePath;
 use crate::types::primitives::{hash, shl, Fr};
+use rust_decimal::Decimal;
+use std::convert::TryInto;
+//use num_traits::FromPrimitive;
 use ff::Field;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -91,17 +94,10 @@ pub struct L2Block {
     pub new_account_roots: Vec<Fr>,
 }
 
-// TODO: remove previous_...
 #[derive(Debug)]
 pub struct PlaceOrderTx {
     pub order_id: u32,
     pub account_id: u32,
-    //pub previous_token_id_sell: u32,
-    //pub previous_token_id_buy: u32,
-    //pub previous_amount_sell: Fr,
-    //pub previous_amount_buy: Fr,
-    //pub previous_filled_sell: Fr,
-    //pub previous_filled_buy: Fr,
     pub token_id_sell: u32,
     pub token_id_buy: u32,
     pub amount_sell: Fr,
@@ -126,3 +122,79 @@ pub struct SpotTradeTx {
     pub order1_id: u32,
     pub order2_id: u32,
 }
+
+// https://github.com/Fluidex/circuits/issues/144
+
+pub struct Float832 {
+    pub exponent: u8,
+    pub significand: u32,
+}
+
+impl Float832 {
+    pub fn encode(&self) -> Vec<u8> {
+        let mut result = self.exponent.to_be_bytes().to_vec();
+        result.append(&mut self.significand.to_be_bytes().to_vec());
+        result
+    }
+    pub fn decode(data: &Vec<u8>) -> Self {
+        let exponent = u8::from_be_bytes(data[0..1].try_into().unwrap());
+        let significand = u32::from_be_bytes(data[1..5].try_into().unwrap());
+        Self { exponent, significand }
+    }
+    pub fn to_decimal(&self, prec: u32) -> Decimal {
+        // for example, (significand:1, exponent:17) means 10**17, when prec is 18,
+        // it is 0.1 (ETH)
+        Decimal::new(self.significand as i64, 0) * Decimal::new(10, 0).powi(self.exponent as u64) / Decimal::new(10, 0).powi(prec as u64)
+    }
+    pub fn from_decimal(d: &Decimal, prec: u32) -> Self {
+        // if d is "0.1" and prec is 18, result is (significand:1, exponent:17)
+        let ten = Decimal::new(10, 0);
+        let exp = ten.powi(prec as u64);
+        println!("mul {} {}", d, exp);
+        let mut n = d * exp;
+        assert!(n == n.floor(), "decimal precision error");
+        let mut exponent = 0;
+        loop {
+            let next = n / ten;
+            if next == next.floor() {
+                exponent += 1;
+                n = next;
+            } else {
+                break;
+            }
+        }
+        if n > Decimal::new(std::u32::MAX as i64, 0) {
+            panic!("invalid precision {} {}", d, prec);
+        }
+        // TODO: a better way...
+        println!("n is {}", n.to_string());
+        let significand: u32 = n.floor().to_string().parse::<u32>().unwrap();
+        Float832 { exponent, significand }
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn test_float832_from_decimal() {
+    use std::str::FromStr;
+    // 1.23456 * 10**18
+    let d0 = Decimal::new(123456, 5);
+    let f = Float832::from_decimal(&d0, 18);
+    assert_eq!(f.exponent, 13);
+    assert_eq!(f.significand, 123456);
+    let d = f.to_decimal(18);
+    assert_eq!(d, Decimal::from_str("1.23456").unwrap());
+    let f2 = Float832::decode(&f.encode());
+    assert_eq!(f2.exponent, 13);
+    assert_eq!(f2.significand, 123456);
+}
+
+pub type BalanceType = u32;
+pub type AmountType = u32;
+/*
+impl DepositToOldTx {
+    pub fn to_pubdata(&self) -> Vec<u8> {
+
+    }
+}
+*/
