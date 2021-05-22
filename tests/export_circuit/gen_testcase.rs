@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/binary_merkle_tree.ts
 mod test_case {
     use ff::{Field, PrimeField};
-    use rollup_state_manager::test_utils::{field_to_string, Fr};
+    use rollup_state_manager::test_utils::{fr_to_string, Fr};
     use rollup_state_manager::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
     use rollup_state_manager::types::merkle_tree::Tree;
     use serde_json::json;
@@ -23,13 +23,13 @@ mod test_case {
         let proof2 = tree.get_proof(2);
         // TODO: we need a path index function?
         //
-        let field_slice_to_string = |arr: &[Fr]| arr.iter().map(field_to_string).collect::<Vec<String>>();
+        let field_slice_to_string = |arr: &[Fr]| arr.iter().map(fr_to_string).collect::<Vec<String>>();
         let input = json!({
             "enabled": 1,
-            "oldLeaf": field_to_string(&proof1.leaf),
-            "oldRoot": field_to_string(&proof1.root),
-            "newLeaf": field_to_string(&proof2.leaf),
-            "newRoot": field_to_string(&proof2.root),
+            "oldLeaf": fr_to_string(&proof1.leaf),
+            "oldRoot": fr_to_string(&proof1.root),
+            "newLeaf": fr_to_string(&proof2.leaf),
+            "newRoot": fr_to_string(&proof2.root),
             "path_elements": proof1.path_elements.iter().map(|x| field_slice_to_string(x)).collect::<Vec<_>>(),
             "path_index": [0, 1],
         });

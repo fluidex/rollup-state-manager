@@ -1,4 +1,4 @@
-use crate::types::primitives::{field_to_bigint, Fr};
+use crate::types::primitives::{fr_to_bigint, Fr};
 use anyhow::Result;
 use arrayref::array_ref;
 use babyjubjub_rs::{decompress_point, Point, PrivateKey};
@@ -48,7 +48,7 @@ impl L2Account {
         })
     }
     pub fn sign_hash(&self, h: &Fr) -> Result<Signature, String> {
-        let h_b = field_to_bigint(h);
+        let h_b = fr_to_bigint(h);
         decompress_signature(&self.priv_key.sign(h_b)?.compress())
     }
 }
@@ -56,7 +56,7 @@ impl L2Account {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::primitives::field_to_string;
+    use crate::types::primitives::fr_to_string;
     use ff::PrimeField;
 
     #[test]
@@ -85,11 +85,11 @@ mod tests {
         );
         let sig = acc.sign_hash(&Fr::from_str("1357924680").unwrap()).unwrap();
         assert_eq!(
-            field_to_string(&sig.r_b8.x),
+            fr_to_string(&sig.r_b8.x),
             "15679698175365968671287592821268512384454163537665670071564984871581219397966"
         );
         assert_eq!(
-            field_to_string(&sig.r_b8.y),
+            fr_to_string(&sig.r_b8.y),
             "1705544521394286010135369499330220710333064238375605681220284175409544486013"
         );
         assert_eq!(

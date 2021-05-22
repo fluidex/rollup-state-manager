@@ -5,7 +5,7 @@
 use super::global::GlobalState;
 use crate::types::l2::{tx_detail_idx, DepositToOldTx, L2Block, Order, RawTx, SpotTradeTx, TxType, TX_LENGTH};
 use crate::types::merkle_tree::Tree;
-use crate::types::primitives::{bigint_to_fr, field_to_bigint, u32_to_fr, Fr};
+use crate::types::primitives::{bigint_to_fr, fr_to_bigint, u32_to_fr, Fr};
 use ff::Field;
 
 // TODO: change to snake_case
@@ -162,7 +162,7 @@ impl WitnessGenerator {
         // first, generate the tx
 
         let mut encoded_tx = [Fr::zero(); TX_LENGTH];
-        encoded_tx[tx_detail_idx::AMOUNT] = tx.amount;
+        encoded_tx[tx_detail_idx::AMOUNT] = tx.amount.to_fr();
 
         encoded_tx[tx_detail_idx::TOKEN_ID1] = u32_to_fr(tx.token_id);
         encoded_tx[tx_detail_idx::ACCOUNT_ID1] = u32_to_fr(tx.account_id);
@@ -174,7 +174,8 @@ impl WitnessGenerator {
 
         encoded_tx[tx_detail_idx::TOKEN_ID2] = u32_to_fr(tx.token_id);
         encoded_tx[tx_detail_idx::ACCOUNT_ID2] = u32_to_fr(tx.account_id);
-        encoded_tx[tx_detail_idx::BALANCE2] = bigint_to_fr(field_to_bigint(&old_balance) + field_to_bigint(&tx.amount));
+        // TODO: rewrite this
+        encoded_tx[tx_detail_idx::BALANCE2] = bigint_to_fr(fr_to_bigint(&old_balance) + fr_to_bigint(&tx.amount.to_fr()));
         encoded_tx[tx_detail_idx::NONCE2] = nonce;
         encoded_tx[tx_detail_idx::ETH_ADDR2] = acc.eth_addr;
         encoded_tx[tx_detail_idx::SIGN2] = acc.sign;
@@ -201,7 +202,7 @@ impl WitnessGenerator {
         };
 
         let mut balance = old_balance;
-        balance.add_assign(&tx.amount);
+        balance.add_assign(&tx.amount.to_fr());
         self.state.set_token_balance(tx.account_id, tx.token_id, balance);
 
         raw_tx.root_after = self.state.root();
@@ -390,8 +391,8 @@ impl WitnessGenerator {
         let account2_balance_buy = self.state.get_token_balance(tx.order2_account_id, tx.token_id_1to2);
         let account2_balance_sell = self.state.get_token_balance(tx.order2_account_id, tx.token_id_2to1);
         let account1_balance_buy = self.state.get_token_balance(tx.order1_account_id, tx.token_id_2to1);
-        assert!(account1_balance_sell > tx.amount_1to2, "balance_1to2");
-        assert!(account2_balance_sell > tx.amount_2to1, "balance_2to1");
+        assert!(account1_balance_sell > tx.amount_1to2.to_fr(), "balance_1to2");
+        assert!(account2_balance_sell > tx.amount_2to1.to_fr(), "balance_2to1");
 
         encoded_tx[tx_detail_idx::OLD_ORDER1_ID] = old_order1_in_tree.order_id;
         encoded_tx[tx_detail_idx::OLD_ORDER1_TOKEN_SELL] = old_order1_in_tree.tokensell;
@@ -409,15 +410,15 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::OLD_ORDER2_FILLED_BUY] = old_order2_in_tree.filled_buy;
         encoded_tx[tx_detail_idx::OLD_ORDER2_AMOUNT_BUY] = old_order2_in_tree.total_buy;
 
-        encoded_tx[tx_detail_idx::AMOUNT] = tx.amount_1to2;
-        encoded_tx[tx_detail_idx::AMOUNT2] = tx.amount_2to1;
+        encoded_tx[tx_detail_idx::AMOUNT] = tx.amount_1to2.to_fr();
+        encoded_tx[tx_detail_idx::AMOUNT2] = tx.amount_2to1.to_fr();
         encoded_tx[tx_detail_idx::ORDER1_POS] = u32_to_fr(order1_pos);
         encoded_tx[tx_detail_idx::ORDER2_POS] = u32_to_fr(order2_pos);
 
         encoded_tx[tx_detail_idx::BALANCE1] = account1_balance_sell;
-        encoded_tx[tx_detail_idx::BALANCE2] = bigint_to_fr(field_to_bigint(&account2_balance_buy) + field_to_bigint(&tx.amount_1to2));
+        encoded_tx[tx_detail_idx::BALANCE2] = bigint_to_fr(fr_to_bigint(&account2_balance_buy) + fr_to_bigint(&tx.amount_1to2.to_fr()));
         encoded_tx[tx_detail_idx::BALANCE3] = account2_balance_sell;
-        encoded_tx[tx_detail_idx::BALANCE4] = bigint_to_fr(field_to_bigint(&account1_balance_buy) + field_to_bigint(&tx.amount_2to1));
+        encoded_tx[tx_detail_idx::BALANCE4] = bigint_to_fr(fr_to_bigint(&account1_balance_buy) + fr_to_bigint(&tx.amount_2to1.to_fr()));
 
         encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = u32_to_fr(1u32);
         encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = u32_to_fr(1u32);
@@ -442,7 +443,7 @@ impl WitnessGenerator {
         // do not update state root
         // account1 after sending, before receiving
         let mut balance1 = account1_balance_sell;
-        balance1.sub_assign(&tx.amount_1to2);
+        balance1.sub_assign(&tx.amount_1to2.to_fr());
         self.state.set_token_balance(tx.order1_account_id, tx.token_id_1to2, balance1);
         /*
 
@@ -453,7 +454,7 @@ impl WitnessGenerator {
             */
         // account2 after sending, before receiving
         let mut balance2 = account2_balance_sell;
-        balance2.sub_assign(&tx.amount_2to1);
+        balance2.sub_assign(&tx.amount_2to1.to_fr());
 
         self.state.set_token_balance(tx.order2_account_id, tx.token_id_2to1, balance2);
         /*
@@ -464,9 +465,9 @@ impl WitnessGenerator {
             */
 
         let mut order1_filled_sell = old_order1.filled_sell;
-        order1_filled_sell.add_assign(&tx.amount_1to2);
+        order1_filled_sell.add_assign(&tx.amount_1to2.to_fr());
         let mut order1_filled_buy = old_order1.filled_buy;
-        order1_filled_buy.add_assign(&tx.amount_2to1);
+        order1_filled_buy.add_assign(&tx.amount_2to1.to_fr());
         let new_order1 = Order {
             order_id: u32_to_fr(tx.order1_id),
             tokenbuy: u32_to_fr(tx.token_id_2to1),
@@ -480,14 +481,14 @@ impl WitnessGenerator {
         self.state.update_order_leaf(tx.order1_account_id, order1_pos, tx.order1_id);
 
         let mut account1_balance_buy = account1_balance_buy;
-        account1_balance_buy.add_assign(&tx.amount_2to1);
+        account1_balance_buy.add_assign(&tx.amount_2to1.to_fr());
         self.state
             .set_token_balance(tx.order1_account_id, tx.token_id_2to1, account1_balance_buy);
 
         let mut order2_filled_sell = old_order2.filled_sell;
-        order2_filled_sell.add_assign(&tx.amount_2to1);
+        order2_filled_sell.add_assign(&tx.amount_2to1.to_fr());
         let mut order2_filled_buy = old_order2.filled_buy;
-        order2_filled_buy.add_assign(&tx.amount_1to2);
+        order2_filled_buy.add_assign(&tx.amount_1to2.to_fr());
         let new_order2 = Order {
             order_id: u32_to_fr(tx.order2_id),
             tokenbuy: u32_to_fr(tx.token_id_1to2),
@@ -501,7 +502,7 @@ impl WitnessGenerator {
         self.state.update_order_leaf(tx.order2_account_id, order2_pos, tx.order2_id);
 
         let mut account2_balance_buy = account2_balance_buy;
-        account2_balance_buy.add_assign(&tx.amount_1to2);
+        account2_balance_buy.add_assign(&tx.amount_1to2.to_fr());
         self.state
             .set_token_balance(tx.order2_account_id, tx.token_id_1to2, account2_balance_buy);
 
