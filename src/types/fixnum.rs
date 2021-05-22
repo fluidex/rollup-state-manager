@@ -38,7 +38,8 @@ fn test_decimal_to_fr() {
 #[derive(Debug, Clone, Copy)]
 pub struct Float832 {
     pub exponent: u8,
-    pub significand: u32,
+    // 5 bytes seems enough?
+    pub significand: u64,
 }
 
 impl Float832 {
@@ -56,7 +57,7 @@ impl Float832 {
     }
     pub fn decode(data: &[u8]) -> Result<Self> {
         let exponent = u8::from_be_bytes(data[0..1].try_into()?);
-        let significand = u32::from_be_bytes(data[1..5].try_into()?);
+        let significand = u64::from_be_bytes(data[1..9].try_into()?);
         Ok(Self { exponent, significand })
     }
     pub fn to_decimal(&self, prec: u32) -> Decimal {
@@ -88,11 +89,11 @@ impl Float832 {
                 break;
             }
         }
-        if n > Decimal::new(std::u32::MAX as i64, 0) {
-            bail!("invalid precision {} {}", d, prec);
+        if n > Decimal::new((std::u64::MAX / 4) as i64, 0) {
+            bail!("invalid precision {} {} {}", d, prec, n);
         }
         // TODO: a better way...
-        let significand: u32 = n.floor().to_string().parse::<u32>()?;
+        let significand: u64 = n.floor().to_string().parse::<u64>()?;
         Ok(Float832 { exponent, significand })
     }
 }

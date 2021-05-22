@@ -41,7 +41,12 @@ pub fn u64_to_fr(x: u64) -> Fr {
     Fr::from_repr(poseidon_rs::FrRepr::from(x)).unwrap()
 }
 pub fn bigint_to_fr(x: BigInt) -> Fr {
-    from_hex(&x.to_str_radix(16)).unwrap()
+    let mut s = x.to_str_radix(16);
+    if s.len() % 2 != 0 {
+        // convert "f" to "0f"
+        s.insert(0, '0');
+    }
+    from_hex(&s).unwrap()
 }
 pub fn fr_to_u32(x: &Fr) -> u32 {
     fr_to_string(x).parse::<u32>().unwrap()
