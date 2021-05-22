@@ -3,7 +3,7 @@ pub mod messages;
 
 pub use crate::types::l2;
 pub use crate::types::merkle_tree::MerklePath;
-pub use crate::types::primitives::{field_to_string, u64_to_fr, Fr};
+pub use crate::types::primitives::{fr_to_string, u64_to_fr, Fr};
 pub use circuit::{format_circuit_name, CircuitSource, CircuitTestCase, CircuitTestData};
 use serde::ser::SerializeSeq;
 use serde::Serialize;
@@ -13,7 +13,7 @@ pub struct FrStr(Fr);
 
 impl Serialize for FrStr {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(field_to_string(&self.0).as_str())
+        serializer.serialize_str(fr_to_string(&self.0).as_str())
     }
 }
 

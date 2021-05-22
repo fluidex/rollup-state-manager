@@ -5,7 +5,7 @@
 use super::AccountState;
 use crate::types::l2::Order;
 use crate::types::merkle_tree::{empty_tree_root, MerkleProof, Tree};
-use crate::types::primitives::{field_to_u32, Fr};
+use crate::types::primitives::{fr_to_u32, Fr};
 use ff::Field;
 use fnv::FnvHashMap;
 use std::collections::BTreeMap;
@@ -168,7 +168,7 @@ impl GlobalState {
         self.order_trees.get_mut(&account_id).unwrap().set_value(order_pos, order.hash());
         self.order_map.get_mut(&account_id).unwrap().insert(order_pos, order);
         // TODO: better type here...
-        let order_id: u32 = field_to_u32(&order.order_id);
+        let order_id: u32 = fr_to_u32(&order.order_id);
         self.order_id_to_pos.insert((account_id, order_id), order_pos);
         self.recalculate_from_order_tree(account_id);
     }
@@ -221,7 +221,7 @@ impl GlobalState {
         self.order_map
             .get_mut(&account_id)
             .unwrap()
-            .insert(field_to_u32(&order.order_id), order);
+            .insert(fr_to_u32(&order.order_id), order);
     }
     pub fn get_token_balance(&self, account_id: u32, token_id: u32) -> Fr {
         self.balance_trees.get(&account_id).unwrap().get_leaf(token_id)

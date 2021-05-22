@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use rollup_state_manager::state::WitnessGenerator;
 use rollup_state_manager::types;
+use rollup_state_manager::types::fixnum;
 use rollup_state_manager::types::l2::Order;
-use rollup_state_manager::types::math;
 use rollup_state_manager::types::primitives::u32_to_fr;
 use rust_decimal::Decimal;
 use std::ops::{Deref, DerefMut};
@@ -83,8 +83,8 @@ impl Orders {
                 order2_account_id: trade.bid_user_id,
                 token_id_1to2: id_pair.0,
                 token_id_2to1: id_pair.1,
-                amount_1to2: math::number_to_integer(&trade.amount, test_params::prec(id_pair.0)),
-                amount_2to1: math::number_to_integer(&trade.quote_amount, test_params::prec(id_pair.1)),
+                amount_1to2: fixnum::decimal_to_amount(&trade.amount, test_params::prec(id_pair.0)),
+                amount_2to1: fixnum::decimal_to_amount(&trade.quote_amount, test_params::prec(id_pair.1)),
                 order1_id: trade.ask_order_id as u32,
                 order2_id: trade.bid_order_id as u32,
             },
@@ -93,8 +93,8 @@ impl Orders {
                 order2_account_id: trade.ask_user_id,
                 token_id_1to2: id_pair.1,
                 token_id_2to1: id_pair.0,
-                amount_1to2: math::number_to_integer(&trade.quote_amount, test_params::prec(id_pair.1)),
-                amount_2to1: math::number_to_integer(&trade.amount, test_params::prec(id_pair.0)),
+                amount_1to2: fixnum::decimal_to_amount(&trade.quote_amount, test_params::prec(id_pair.1)),
+                amount_2to1: fixnum::decimal_to_amount(&trade.amount, test_params::prec(id_pair.0)),
                 order1_id: trade.bid_order_id as u32,
                 order2_id: trade.ask_order_id as u32,
             },
@@ -113,8 +113,8 @@ impl Orders {
                 tokenbuy: u32_to_fr(order_state.token_buy),
                 filled_sell: u32_to_fr(0),
                 filled_buy: u32_to_fr(0),
-                total_sell: math::number_to_integer(&order_state.total_sell, test_params::prec(order_state.token_sell)),
-                total_buy: math::number_to_integer(&order_state.total_buy, test_params::prec(order_state.token_buy)),
+                total_sell: fixnum::decimal_to_amount(&order_state.total_sell, test_params::prec(order_state.token_sell)).to_fr(),
+                total_buy: fixnum::decimal_to_amount(&order_state.total_buy, test_params::prec(order_state.token_buy)).to_fr(),
             };
             witgen.update_order_state(order_state.account_id, order_to_put);
         } else {
@@ -241,7 +241,7 @@ impl Accounts {
         let expected_balance_before = witgen.get_token_balance(deposit.user_id, token_id);
         assert_eq!(
             expected_balance_before,
-            math::number_to_integer(&balance_before, test_params::prec(token_id))
+            fixnum::decimal_to_amount(&balance_before, test_params::prec(token_id)).to_fr()
         );
 
         let timing = Instant::now();
@@ -249,7 +249,7 @@ impl Accounts {
         witgen.deposit_to_old(types::l2::DepositToOldTx {
             token_id,
             account_id: deposit.user_id,
-            amount: math::number_to_integer(&deposit.change, test_params::prec(token_id)),
+            amount: fixnum::decimal_to_amount(&deposit.change, test_params::prec(token_id)),
         });
 
         self.balance_bench += timing.elapsed().as_secs_f32();
@@ -361,10 +361,10 @@ impl<'c> From<OrderState<'c>> for types::l2::Order {
             //status: types::primitives::u32_to_fr(origin.status),
             tokenbuy: types::primitives::u32_to_fr(origin.token_buy),
             tokensell: types::primitives::u32_to_fr(origin.token_sell),
-            filled_sell: math::number_to_integer(&origin.filled_sell, test_params::prec(origin.token_sell)),
-            filled_buy: math::number_to_integer(&origin.filled_buy, test_params::prec(origin.token_buy)),
-            total_sell: math::number_to_integer(&origin.total_sell, test_params::prec(origin.token_sell)),
-            total_buy: math::number_to_integer(&origin.total_buy, test_params::prec(origin.token_buy)),
+            filled_sell: fixnum::decimal_to_amount(&origin.filled_sell, test_params::prec(origin.token_sell)).to_fr(),
+            filled_buy: fixnum::decimal_to_amount(&origin.filled_buy, test_params::prec(origin.token_buy)).to_fr(),
+            total_sell: fixnum::decimal_to_amount(&origin.total_sell, test_params::prec(origin.token_sell)).to_fr(),
+            total_buy: fixnum::decimal_to_amount(&origin.total_buy, test_params::prec(origin.token_buy)).to_fr(),
         }
     }
 }
@@ -403,10 +403,10 @@ impl CommonBalanceState {
         let quote_id = id_pair.1;
 
         CommonBalanceState {
-            bid_user_base: math::number_to_integer(&origin.bid_user_base, test_params::prec(base_id)),
-            bid_user_quote: math::number_to_integer(&origin.bid_user_quote, test_params::prec(quote_id)),
-            ask_user_base: math::number_to_integer(&origin.ask_user_base, test_params::prec(base_id)),
-            ask_user_quote: math::number_to_integer(&origin.ask_user_quote, test_params::prec(quote_id)),
+            bid_user_base: fixnum::decimal_to_amount(&origin.bid_user_base, test_params::prec(base_id)).to_fr(),
+            bid_user_quote: fixnum::decimal_to_amount(&origin.bid_user_quote, test_params::prec(quote_id)).to_fr(),
+            ask_user_base: fixnum::decimal_to_amount(&origin.ask_user_base, test_params::prec(base_id)).to_fr(),
+            ask_user_quote: fixnum::decimal_to_amount(&origin.ask_user_quote, test_params::prec(quote_id)).to_fr(),
         }
     }
 

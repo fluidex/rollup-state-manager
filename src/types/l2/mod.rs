@@ -1,15 +1,15 @@
-pub mod codec;
 pub mod mod_tx_data;
 
 pub use mod_tx_data::*;
 
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/common.ts
+use super::fixnum::Float832;
 pub use crate::types::merkle_tree::MerklePath;
 use crate::types::primitives::{hash, shl, Fr};
-use rust_decimal::Decimal;
-use std::convert::TryInto;
-//use num_traits::FromPrimitive;
+use anyhow::bail;
+use anyhow::Result;
 use ff::Field;
+use std::convert::TryInto;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Order {
@@ -94,6 +94,8 @@ pub struct L2Block {
     pub new_account_roots: Vec<Fr>,
 }
 
+pub type AmountType = Float832;
+
 #[derive(Debug)]
 pub struct PlaceOrderTx {
     pub order_id: u32,
@@ -108,7 +110,7 @@ pub struct PlaceOrderTx {
 pub struct DepositToOldTx {
     pub account_id: u32,
     pub token_id: u32,
-    pub amount: Fr,
+    pub amount: AmountType,
 }
 
 #[derive(Debug)]
@@ -117,84 +119,70 @@ pub struct SpotTradeTx {
     pub order2_account_id: u32,
     pub token_id_1to2: u32,
     pub token_id_2to1: u32,
-    pub amount_1to2: Fr,
-    pub amount_2to1: Fr,
+    pub amount_1to2: AmountType,
+    pub amount_2to1: AmountType,
     pub order1_id: u32,
     pub order2_id: u32,
 }
 
+pub const PUBDATA_LEN: usize = 60;
+pub const ACCOUNT_ID_LEN: usize = 4;
+pub const TOKEN_ID_LEN: usize = 2;
+pub const AMOUNT_LEN: usize = 5;
+//pub type PUBDATA = [u8; PUBDATA_LEN];
+
 // https://github.com/Fluidex/circuits/issues/144
-
-pub struct Float832 {
-    pub exponent: u8,
-    pub significand: u32,
-}
-
-impl Float832 {
-    pub fn encode(&self) -> Vec<u8> {
-        let mut result = self.exponent.to_be_bytes().to_vec();
-        result.append(&mut self.significand.to_be_bytes().to_vec());
+impl DepositToOldTx {
+    pub fn to_pubdata(&self) -> Vec<u8> {
+        let mut result = vec![TxType::DepositToOld as u8];
+        result.append(&mut self.account_id.to_be_bytes().to_vec());
+        result.append(&mut (self.token_id as u16).to_be_bytes().to_vec());
+        result.append(&mut self.amount.encode());
+        assert!(result.len() <= PUBDATA_LEN);
+        result.append(&mut vec![0; PUBDATA_LEN - result.len()]);
         result
     }
-    pub fn decode(data: &Vec<u8>) -> Self {
-        let exponent = u8::from_be_bytes(data[0..1].try_into().unwrap());
-        let significand = u32::from_be_bytes(data[1..5].try_into().unwrap());
-        Self { exponent, significand }
-    }
-    pub fn to_decimal(&self, prec: u32) -> Decimal {
-        // for example, (significand:1, exponent:17) means 10**17, when prec is 18,
-        // it is 0.1 (ETH)
-        Decimal::new(self.significand as i64, 0) * Decimal::new(10, 0).powi(self.exponent as u64) / Decimal::new(10, 0).powi(prec as u64)
-    }
-    pub fn from_decimal(d: &Decimal, prec: u32) -> Self {
-        // if d is "0.1" and prec is 18, result is (significand:1, exponent:17)
-        let ten = Decimal::new(10, 0);
-        let exp = ten.powi(prec as u64);
-        println!("mul {} {}", d, exp);
-        let mut n = d * exp;
-        assert!(n == n.floor(), "decimal precision error");
-        let mut exponent = 0;
-        loop {
-            let next = n / ten;
-            if next == next.floor() {
-                exponent += 1;
-                n = next;
-            } else {
-                break;
-            }
+    pub fn from_pubdata(data: &[u8]) -> Result<Self> {
+        if data.len() != PUBDATA_LEN {
+            bail!("invalid len for DepositToOldTx");
         }
-        if n > Decimal::new(std::u32::MAX as i64, 0) {
-            panic!("invalid precision {} {}", d, prec);
+        let mut idx: usize = 0;
+
+        if data[0] != TxType::DepositToOld as u8 {
+            bail!("invalid type for DepositToOldTx");
         }
-        // TODO: a better way...
-        println!("n is {}", n.to_string());
-        let significand: u32 = n.floor().to_string().parse::<u32>().unwrap();
-        Float832 { exponent, significand }
+        idx += 1;
+
+        let account_id = u32::from_be_bytes(data[idx..(idx + ACCOUNT_ID_LEN)].try_into()?);
+        idx += ACCOUNT_ID_LEN;
+
+        let token_id = (u16::from_be_bytes(data[idx..(idx + TOKEN_ID_LEN)].try_into()?)) as u32;
+        idx += TOKEN_ID_LEN;
+
+        let amount = AmountType::decode(&data[idx..(idx + AMOUNT_LEN)])?;
+        Ok(Self {
+            account_id,
+            token_id,
+            amount,
+        })
     }
 }
 
 #[cfg(test)]
 #[test]
-fn test_float832_from_decimal() {
-    use std::str::FromStr;
-    // 1.23456 * 10**18
-    let d0 = Decimal::new(123456, 5);
-    let f = Float832::from_decimal(&d0, 18);
-    assert_eq!(f.exponent, 13);
-    assert_eq!(f.significand, 123456);
-    let d = f.to_decimal(18);
-    assert_eq!(d, Decimal::from_str("1.23456").unwrap());
-    let f2 = Float832::decode(&f.encode());
-    assert_eq!(f2.exponent, 13);
-    assert_eq!(f2.significand, 123456);
+fn test_deposit_to_old_pubdata() {
+    let tx = DepositToOldTx {
+        account_id: 1323,
+        token_id: 232,
+        amount: Float832 {
+            significand: 756,
+            exponent: 11,
+        },
+    };
+    let pubdata1 = tx.to_pubdata();
+    println!("pubdata {:?}", pubdata1);
+    let tx2 = DepositToOldTx::from_pubdata(&pubdata1).unwrap();
+    assert_eq!(tx.account_id, tx2.account_id);
+    assert_eq!(tx.token_id, tx2.token_id);
+    assert_eq!(tx.amount.to_bigint(), tx2.amount.to_bigint());
 }
-
-pub type BalanceType = u32;
-pub type AmountType = u32;
-/*
-impl DepositToOldTx {
-    pub fn to_pubdata(&self) -> Vec<u8> {
-
-    }
-}
-*/
