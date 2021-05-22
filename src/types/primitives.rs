@@ -1,5 +1,5 @@
 use ff::{from_hex, to_hex};
-use ff::{PrimeField, PrimeFieldRepr};
+use ff::{Field, PrimeField, PrimeFieldRepr};
 use lazy_static::lazy_static;
 use num_bigint::BigInt;
 
@@ -30,6 +30,18 @@ pub fn shl(a: &Fr, x: u32) -> Fr {
     let mut repr = a.into_repr();
     repr.shl(x);
     Fr::from_repr(repr).unwrap()
+}
+
+pub fn fr_sub(a: &Fr, b: &Fr) -> Fr {
+    let mut r = *a;
+    r.sub_assign(b);
+    r
+}
+
+pub fn fr_add(a: &Fr, b: &Fr) -> Fr {
+    let mut r = *a;
+    r.add_assign(b);
+    r
 }
 
 // TODO: these functions needed to be rewrite...
