@@ -31,6 +31,9 @@ pub fn shl(a: &Fr, x: u32) -> Fr {
     repr.shl(x);
     Fr::from_repr(repr).unwrap()
 }
+
+// TODO: these functions needed to be rewrite...
+
 pub fn u32_to_fr(x: u32) -> Fr {
     Fr::from_str(&format!("{}", x)).unwrap()
 }
@@ -38,14 +41,19 @@ pub fn u64_to_fr(x: u64) -> Fr {
     Fr::from_repr(poseidon_rs::FrRepr::from(x)).unwrap()
 }
 pub fn bigint_to_fr(x: BigInt) -> Fr {
-    from_hex(&x.to_str_radix(16)).unwrap()
+    let mut s = x.to_str_radix(16);
+    if s.len() % 2 != 0 {
+        // convert "f" to "0f"
+        s.insert(0, '0');
+    }
+    from_hex(&s).unwrap()
 }
-pub fn field_to_u32(x: &Fr) -> u32 {
-    field_to_string(x).parse::<u32>().unwrap()
+pub fn fr_to_u32(x: &Fr) -> u32 {
+    fr_to_string(x).parse::<u32>().unwrap()
 }
-pub fn field_to_bigint(elem: &Fr) -> BigInt {
+pub fn fr_to_bigint(elem: &Fr) -> BigInt {
     BigInt::parse_bytes(to_hex(elem).as_bytes(), 16).unwrap()
 }
-pub fn field_to_string(elem: &Fr) -> String {
-    field_to_bigint(&elem).to_str_radix(10)
+pub fn fr_to_string(elem: &Fr) -> String {
+    fr_to_bigint(&elem).to_str_radix(10)
 }
