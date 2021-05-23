@@ -1,4 +1,5 @@
 #![allow(clippy::field_reassign_with_default)]
+#![allow(clippy::vec_init_then_push)]
 
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
 
@@ -450,15 +451,36 @@ impl WitnessGenerator {
         self.state.update_order_state(acc_id2, order2);
 
         // TODO: parallel the following updates
-        self.state.set_order_leaf_hash_raw(acc_id1, order1_pos, &order1.hash());
-        self.state.set_token_balance_raw(acc_id1, tx.token_id_1to2, acc1_balance_sell_new);
-        self.state.set_token_balance_raw(acc_id1, tx.token_id_2to1, acc1_balance_buy_new);
-        self.state.recalculate_from_account_state(acc_id1);
+        // multi thread: genesis 18 blocks (TPS: 211.20428)
+        let mut handlers = vec![];
+        handlers.push(self.state.set_order_leaf_hash_raw(acc_id1, order1_pos, order1.hash()));
+        handlers.push(self.state.set_token_balance_raw(acc_id1, tx.token_id_1to2, acc1_balance_sell_new));
+        handlers.push(self.state.set_token_balance_raw(acc_id1, tx.token_id_2to1, acc1_balance_buy_new));
 
-        self.state.set_order_leaf_hash_raw(acc_id2, order2_pos, &order2.hash());
-        self.state.set_token_balance_raw(acc_id2, tx.token_id_1to2, acc2_balance_buy_new);
-        self.state.set_token_balance_raw(acc_id2, tx.token_id_2to1, acc2_balance_sell_new);
-        self.state.recalculate_from_account_state(acc_id2);
+        handlers.push(self.state.set_order_leaf_hash_raw(acc_id2, order2_pos, order2.hash()));
+        handlers.push(self.state.set_token_balance_raw(acc_id2, tx.token_id_1to2, acc2_balance_buy_new));
+        handlers.push(self.state.set_token_balance_raw(acc_id2, tx.token_id_2to1, acc2_balance_sell_new));
+        for handler in handlers {
+            handler.join().unwrap();
+        }
+
+        handlers = vec![];
+        handlers.push(self.state.recalculate_from_account_state(acc_id1));
+        handlers.push(self.state.recalculate_from_account_state(acc_id2));
+        for handler in handlers {
+            handler.join().unwrap();
+        }
+
+        // single thread: genesis 18 blocks (TPS: 76.10165)
+        // self.state.set_order_leaf_hash_raw(acc_id1, order1_pos, &order1.hash());
+        // self.state.set_token_balance_raw(acc_id1, tx.token_id_1to2, acc1_balance_sell_new);
+        // self.state.set_token_balance_raw(acc_id1, tx.token_id_2to1, acc1_balance_buy_new);
+        // self.state.recalculate_from_account_state(acc_id1);
+
+        // self.state.set_order_leaf_hash_raw(acc_id2, order2_pos, &order2.hash());
+        // self.state.set_token_balance_raw(acc_id2, tx.token_id_1to2, acc2_balance_buy_new);
+        // self.state.set_token_balance_raw(acc_id2, tx.token_id_2to1, acc2_balance_sell_new);
+        // self.state.recalculate_from_account_state(acc_id2);
 
         raw_tx.balance_path3 = self.state.balance_proof(acc_id1, tx.token_id_2to1).path_elements;
         raw_tx.balance_path1 = self.state.balance_proof(acc_id2, tx.token_id_1to2).path_elements;
