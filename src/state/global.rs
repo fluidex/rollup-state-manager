@@ -192,7 +192,7 @@ impl GlobalState {
         for i in 0..2u32.pow(self.order_levels as u32) {
             let candidate_pos = (start_pos + i) % 2u32.pow(self.order_levels as u32);
             let order = self.get_account_order_by_pos(account_id, candidate_pos);
-            let is_empty_or_filled = order.filled_buy >= order.total_buy && order.filled_sell >= order.total_sell;
+            let is_empty_or_filled = order.filled_buy >= order.total_buy || order.filled_sell >= order.total_sell;
             if is_empty_or_filled {
                 self.next_order_positions.insert(account_id, candidate_pos);
                 return;
