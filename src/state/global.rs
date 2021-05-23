@@ -1,4 +1,5 @@
 #![allow(clippy::field_reassign_with_default)]
+#![allow(clippy::vec_init_then_push)]
 
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
 
@@ -9,6 +10,10 @@ use crate::types::primitives::{fr_to_u32, Fr};
 use ff::Field;
 use fnv::FnvHashMap;
 use std::collections::BTreeMap;
+use std::{
+    sync::{Arc, Mutex},
+    thread,
+};
 
 pub struct BalanceProof {
     pub leaf: Fr,
@@ -27,15 +32,22 @@ pub struct OrderProof {
     pub account_path: Vec<[Fr; 1]>,
     pub root: Fr,
 }
+#[derive(Clone)]
+pub struct AccountUpdates {
+    pub account_id: u32,
+    pub balance_updates: Vec<(u32, Fr)>,
+    pub order_updates: Vec<(u32, Fr)>,
+}
 
 // TODO: too many unwrap here
+// TODO: do we really need Arc/Mutex?
 pub struct GlobalState {
     balance_levels: usize,
     order_levels: usize,
     account_levels: usize,
-    account_tree: Tree,
+    account_tree: Arc<Mutex<Tree>>,
     // idx to balanceTree
-    balance_trees: FnvHashMap<u32, Tree>,
+    balance_trees: FnvHashMap<u32, Arc<Mutex<Tree>>>,
     // user -> order_id -> order
     order_map: FnvHashMap<u32, BTreeMap<u32, Order>>,
     // (user, order_id) -> order_pos
@@ -43,7 +55,7 @@ pub struct GlobalState {
     // (user, order_pos) -> order_id
     order_pos_to_id: FnvHashMap<(u32, u32), u32>,
     // user -> order_pos -> order_hash
-    order_trees: FnvHashMap<u32, Tree>,
+    order_trees: FnvHashMap<u32, Arc<Mutex<Tree>>>,
     accounts: FnvHashMap<u32, AccountState>,
     default_balance_root: Fr,
     default_order_leaf: Fr,
@@ -80,9 +92,9 @@ impl GlobalState {
             default_order_root,
             // default_account_leaf depends on default_order_root and default_balance_root
             default_account_leaf,
-            account_tree: Tree::new(account_levels, default_account_leaf), // Tree<account_hash>
-            balance_trees: FnvHashMap::default(),                          // FnvHashMap[account_id]balance_tree
-            order_trees: FnvHashMap::default(),                            // FnvHashMap[account_id]order_tree
+            account_tree: Arc::new(Mutex::new(Tree::new(account_levels, default_account_leaf))), // Tree<account_hash>
+            balance_trees: FnvHashMap::default(),                                                // FnvHashMap[account_id]balance_tree
+            order_trees: FnvHashMap::default(),                                                  // FnvHashMap[account_id]order_tree
             order_map: FnvHashMap::default(),
             order_id_to_pos: FnvHashMap::default(),
             order_pos_to_id: FnvHashMap::default(),
@@ -94,23 +106,20 @@ impl GlobalState {
         }
     }
     pub fn root(&self) -> Fr {
-        self.account_tree.get_root()
+        self.account_tree.lock().unwrap().get_root()
     }
-    pub fn recalculate_from_account_state(&mut self, account_id: u32) {
+    fn recalculate_account_state_hash(&mut self, account_id: u32) -> Fr {
         let mut acc = self.accounts.get_mut(&account_id).unwrap();
-        acc.balance_root = self.balance_trees.get(&account_id).unwrap().get_root();
-        acc.order_root = self.order_trees.get(&account_id).unwrap().get_root();
-        self.account_tree.set_value(account_id, acc.hash());
+        // TODO: for balance_root/order_root, we maintain two 'truth' here
+        // not a good idea
+        acc.balance_root = self.balance_trees.get(&account_id).unwrap().lock().unwrap().get_root();
+        acc.order_root = self.order_trees.get(&account_id).unwrap().lock().unwrap().get_root();
+        acc.hash()
     }
-    // deprecated
-    fn recalculate_from_balance_tree(&mut self, account_id: u32) {
-        self.accounts.get_mut(&account_id).unwrap().balance_root = self.balance_trees.get(&account_id).unwrap().get_root();
-        self.recalculate_from_account_state(account_id);
-    }
-    // deprecated
-    fn recalculate_from_order_tree(&mut self, account_id: u32) {
-        self.accounts.get_mut(&account_id).unwrap().order_root = self.order_trees.get(&account_id).unwrap().get_root();
-        self.recalculate_from_account_state(account_id);
+    pub fn flush_account_state(&mut self, account_id: u32) {
+        let hash = self.recalculate_account_state_hash(account_id);
+        let tree = self.account_tree.clone();
+        tree.lock().unwrap().set_value(account_id, hash);
     }
     /*
     pub fn setAccountKey(&mut self, account_id: Fr, account: Account) {
@@ -127,15 +136,14 @@ impl GlobalState {
         return self.accounts.get(&account_id).unwrap().eth_addr;
     }
 
-    // TODO: we should change account_id to u32 later?
     pub fn set_account_nonce(&mut self, account_id: u32, nonce: Fr) {
         self.accounts.get_mut(&account_id).unwrap().update_nonce(nonce);
-        self.recalculate_from_account_state(account_id);
+        self.flush_account_state(account_id);
     }
-    // self function should only be used in tests for convenience
+    // this function should only be used in tests for convenience
     pub fn set_account_order_root(&mut self, account_id: u32, order_root: Fr) {
         self.accounts.get_mut(&account_id).unwrap().update_order_root(order_root);
-        self.recalculate_from_account_state(account_id);
+        self.flush_account_state(account_id);
     }
     fn increase_nonce(&mut self, account_id: u32) {
         let mut nonce = self.accounts.get(&account_id).unwrap().nonce;
@@ -157,11 +165,14 @@ impl GlobalState {
 
         let account_state = AccountState::empty(self.default_balance_root, self.default_order_root);
         self.accounts.insert(account_id, account_state);
-        self.balance_trees.insert(account_id, Tree::new(self.balance_levels, Fr::zero()));
-        self.order_trees
-            .insert(account_id, Tree::new(self.order_levels, self.default_order_leaf));
+        self.balance_trees
+            .insert(account_id, Arc::new(Mutex::new(Tree::new(self.balance_levels, Fr::zero()))));
+        self.order_trees.insert(
+            account_id,
+            Arc::new(Mutex::new(Tree::new(self.order_levels, self.default_order_leaf))),
+        );
         self.order_map.insert(account_id, BTreeMap::<u32, Order>::default());
-        self.account_tree.set_value(account_id, self.default_account_leaf);
+        self.account_tree.lock().unwrap().set_value(account_id, self.default_account_leaf);
         self.next_order_positions.insert(account_id, next_order_id);
         //println!("add account", account_id);
         account_id
@@ -178,12 +189,17 @@ impl GlobalState {
         if order_pos >= 2u32.pow(self.order_levels as u32) {
             panic!("order_pos {} invalid for order_levels {}", order_pos, self.order_levels);
         }
-        self.order_trees.get_mut(&account_id).unwrap().set_value(order_pos, order.hash());
+        self.order_trees
+            .get_mut(&account_id)
+            .unwrap()
+            .lock()
+            .unwrap()
+            .set_value(order_pos, order.hash());
         self.order_map.get_mut(&account_id).unwrap().insert(order_pos, order);
         // TODO: better type here...
         let order_id: u32 = fr_to_u32(&order.order_id);
         self.order_id_to_pos.insert((account_id, order_id), order_pos);
-        self.recalculate_from_order_tree(account_id);
+        self.flush_account_state(account_id);
     }
 
     // find a position range 0..2**n where the slot is either empty or occupied by a close order
@@ -232,25 +248,73 @@ impl GlobalState {
         self.order_id_to_pos.insert((account_id, order_id), order_pos);
         self.order_pos_to_id.insert((account_id, order_pos), order_id);
     }
-    pub fn set_order_leaf_hash(&mut self, account_id: u32, order_pos: u32, order_hash: &Fr) {
+    pub fn set_order_leaf_hash(&mut self, account_id: u32, order_pos: u32, order_hash: Fr) {
         self.set_order_leaf_hash_raw(account_id, order_pos, order_hash);
-        self.recalculate_from_order_tree(account_id);
+        self.flush_account_state(account_id);
     }
-    pub fn set_order_leaf_hash_raw(&mut self, account_id: u32, order_pos: u32, order_hash: &Fr) {
+    pub fn set_order_leaf_hash_raw(&mut self, account_id: u32, order_pos: u32, order_hash: Fr) {
         assert!(self.order_trees.contains_key(&account_id), "set_order_leaf_hash_raw");
-        self.order_trees.get_mut(&account_id).unwrap().set_value(order_pos, *order_hash);
+        let tree = self.order_trees.get_mut(&account_id).unwrap().clone();
+        tree.lock().unwrap().set_value(order_pos, order_hash);
     }
 
     pub fn get_token_balance(&self, account_id: u32, token_id: u32) -> Fr {
-        self.balance_trees.get(&account_id).unwrap().get_leaf(token_id)
+        self.balance_trees.get(&account_id).unwrap().lock().unwrap().get_leaf(token_id)
     }
     pub fn set_token_balance(&mut self, account_id: u32, token_id: u32, balance: Fr) {
         self.set_token_balance_raw(account_id, token_id, balance);
-        self.recalculate_from_balance_tree(account_id);
+        self.flush_account_state(account_id)
+    }
+    pub fn batch_update(&mut self, updates: Vec<AccountUpdates>, parallel: bool) {
+        if parallel {
+            let mut handlers = vec![];
+            let balance_parallel = 2;
+            let order_parallel = 1;
+            let account_parallel = 2;
+            for update in updates.clone() {
+                let account_id = update.account_id;
+                assert!(self.balance_trees.contains_key(&account_id), "set_token_balance");
+                let balance_tree = self.balance_trees.get_mut(&account_id).unwrap().clone();
+                let balance_updates = update.balance_updates;
+                handlers.push(thread::spawn(move || {
+                    balance_tree.lock().unwrap().set_value_parallel(&balance_updates, balance_parallel);
+                }));
+                assert!(self.order_trees.contains_key(&account_id), "set_order_leaf_hash_raw");
+                let order_tree = self.order_trees.get_mut(&account_id).unwrap().clone();
+                let order_updates = update.order_updates;
+                handlers.push(thread::spawn(move || {
+                    order_tree.lock().unwrap().set_value_parallel(&order_updates, order_parallel);
+                }));
+            }
+            for handler in handlers {
+                handler.join().unwrap();
+            }
+            let mut account_updates = vec![];
+            for update in updates {
+                let account_hash = self.recalculate_account_state_hash(update.account_id);
+                account_updates.push((update.account_id, account_hash));
+            }
+            self.account_tree
+                .lock()
+                .unwrap()
+                .set_value_parallel(&account_updates, account_parallel);
+        } else {
+            for update in updates {
+                let account_id = update.account_id;
+                for balance_update in update.balance_updates {
+                    self.set_token_balance_raw(account_id, balance_update.0, balance_update.1);
+                }
+                for order_update in update.order_updates {
+                    self.set_order_leaf_hash_raw(account_id, order_update.0, order_update.1);
+                }
+                self.flush_account_state(account_id);
+            }
+        }
     }
     pub fn set_token_balance_raw(&mut self, account_id: u32, token_id: u32, balance: Fr) {
         assert!(self.balance_trees.contains_key(&account_id), "set_token_balance");
-        self.balance_trees.get_mut(&account_id).unwrap().set_value(token_id, balance);
+        let tree = self.balance_trees.get_mut(&account_id).unwrap().clone();
+        tree.lock().unwrap().set_value(token_id, balance);
     }
     pub fn has_order(&self, account_id: u32, order_id: u32) -> bool {
         self.order_map.contains_key(&account_id) && self.order_map.get(&account_id).unwrap().contains_key(&order_id)
@@ -269,15 +333,15 @@ impl GlobalState {
         self.trivial_order_path_elements.clone()
     }
     pub fn order_proof(&self, account_id: u32, order_pos: u32) -> MerkleProof {
-        self.order_trees.get(&account_id).unwrap().get_proof(order_pos)
+        self.order_trees.get(&account_id).unwrap().lock().unwrap().get_proof(order_pos)
     }
     pub fn balance_proof(&self, account_id: u32, token_id: u32) -> MerkleProof {
-        self.balance_trees.get(&account_id).unwrap().get_proof(token_id)
+        self.balance_trees.get(&account_id).unwrap().lock().unwrap().get_proof(token_id)
     }
     // get proof if `value` is in the tree without really updating
     //pub fn balance_proof_with(self, account_id: u32, token_id: u32, value: Fr) -> MerkleProof
     pub fn account_proof(&self, account_id: u32) -> MerkleProof {
-        self.account_tree.get_proof(account_id)
+        self.account_tree.lock().unwrap().get_proof(account_id)
     }
     pub fn balance_full_proof(&self, account_id: u32, token_id: u32) -> BalanceProof {
         let balance_proof = self.balance_proof(account_id, token_id);

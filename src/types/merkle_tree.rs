@@ -129,6 +129,12 @@ impl Tree {
         if parallel == 0 {
             parallel = 8; // TODO: a better default
         }
+        if parallel == 1 {
+            for (idx, value) in updates {
+                self.set_value(*idx, *value)
+            }
+            return;
+        }
         // TODO: change updates into something like Into<ParIter> ...
         for chunk in updates.chunks(parallel) {
             let diffs: Vec<Vec<HashCacheItem>> = chunk

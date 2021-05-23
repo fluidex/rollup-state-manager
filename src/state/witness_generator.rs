@@ -1,8 +1,9 @@
 #![allow(clippy::field_reassign_with_default)]
+#![allow(clippy::vec_init_then_push)]
 
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
 
-use super::global::GlobalState;
+use super::global::{AccountUpdates, GlobalState};
 use crate::types::l2::{tx_detail_idx, DepositToOldTx, L2Block, Order, RawTx, SpotTradeTx, TxType, TX_LENGTH};
 use crate::types::merkle_tree::Tree;
 use crate::types::primitives::{bigint_to_fr, fr_add, fr_sub, fr_to_bigint, u32_to_fr, Fr};
@@ -450,15 +451,18 @@ impl WitnessGenerator {
         self.state.update_order_state(acc_id2, order2);
 
         // TODO: parallel the following updates
-        self.state.set_order_leaf_hash_raw(acc_id1, order1_pos, &order1.hash());
-        self.state.set_token_balance_raw(acc_id1, tx.token_id_1to2, acc1_balance_sell_new);
-        self.state.set_token_balance_raw(acc_id1, tx.token_id_2to1, acc1_balance_buy_new);
-        self.state.recalculate_from_account_state(acc_id1);
-
-        self.state.set_order_leaf_hash_raw(acc_id2, order2_pos, &order2.hash());
-        self.state.set_token_balance_raw(acc_id2, tx.token_id_1to2, acc2_balance_buy_new);
-        self.state.set_token_balance_raw(acc_id2, tx.token_id_2to1, acc2_balance_sell_new);
-        self.state.recalculate_from_account_state(acc_id2);
+        // multi thread: genesis 18 blocks (TPS: 211.20428)
+        let acc1_updates = AccountUpdates {
+            account_id: acc_id1,
+            balance_updates: vec![(tx.token_id_1to2, acc1_balance_sell_new), (tx.token_id_2to1, acc1_balance_buy_new)],
+            order_updates: vec![(order1_pos, order1.hash())],
+        };
+        let acc2_updates = AccountUpdates {
+            account_id: acc_id2,
+            balance_updates: vec![(tx.token_id_1to2, acc2_balance_buy_new), (tx.token_id_2to1, acc2_balance_sell_new)],
+            order_updates: vec![(order2_pos, order2.hash())],
+        };
+        self.state.batch_update(vec![acc1_updates, acc2_updates], true);
 
         raw_tx.balance_path3 = self.state.balance_proof(acc_id1, tx.token_id_2to1).path_elements;
         raw_tx.balance_path1 = self.state.balance_proof(acc_id2, tx.token_id_1to2).path_elements;
