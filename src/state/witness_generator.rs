@@ -451,7 +451,7 @@ impl WitnessGenerator {
 
         // TODO: parallel the following updates
         // multi thread: genesis 18 blocks (TPS: 211.20428)
-        let mut handlers = vec![];
+        let mut handlers = vec![..];
         handlers.push(self.state.set_order_leaf_hash_raw(acc_id1, order1_pos, order1.hash()));
         handlers.push(self.state.set_token_balance_raw(acc_id1, tx.token_id_1to2, acc1_balance_sell_new));
         handlers.push(self.state.set_token_balance_raw(acc_id1, tx.token_id_2to1, acc1_balance_buy_new));
@@ -463,7 +463,7 @@ impl WitnessGenerator {
             handler.join().unwrap();
         }
 
-        handlers = vec![];
+        handlers = vec![..];
         handlers.push(self.state.recalculate_from_account_state(acc_id1));
         handlers.push(self.state.recalculate_from_account_state(acc_id2));
         for handler in handlers {
