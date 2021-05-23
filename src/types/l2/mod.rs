@@ -51,6 +51,11 @@ impl Order {
         // https://github.com/Fluidex/circuits/blob/4f952f63aa411529c466de2f6e9f8ceeac9ceb00/src/spot_trade.circom#L42
         self.filled_buy >= self.total_buy || self.filled_sell >= self.total_sell
     }
+    pub fn trade_with(&mut self, sell: &Fr, buy: &Fr) {
+        // TODO: check overflow?
+        self.filled_buy.add_assign(buy);
+        self.filled_sell.add_assign(sell);
+    }
 }
 
 #[derive(Copy, Clone)]

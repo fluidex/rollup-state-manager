@@ -10,13 +10,22 @@ use ff::Field;
 use fnv::FnvHashMap;
 use std::collections::BTreeMap;
 
-pub struct StateProof {
+pub struct BalanceProof {
     pub leaf: Fr,
-    pub root: Fr,
-    pub balance_root: Fr,
-    pub order_root: Fr,
     pub balance_path: Vec<[Fr; 1]>,
+    // in fact we can calculate xx_root using leaf and path
+    pub balance_root: Fr,
+    pub account_hash: Fr,
     pub account_path: Vec<[Fr; 1]>,
+    pub root: Fr,
+}
+pub struct OrderProof {
+    pub leaf: Fr,
+    pub order_path: Vec<[Fr; 1]>,
+    pub order_root: Fr,
+    pub account_hash: Fr,
+    pub account_path: Vec<[Fr; 1]>,
+    pub root: Fr,
 }
 
 // TODO: too many unwrap here
@@ -87,14 +96,18 @@ impl GlobalState {
     pub fn root(&self) -> Fr {
         self.account_tree.get_root()
     }
-    fn recalculate_from_account_state(&mut self, account_id: u32) {
-        self.account_tree
-            .set_value(account_id, self.accounts.get(&account_id).unwrap().hash());
+    pub fn recalculate_from_account_state(&mut self, account_id: u32) {
+        let mut acc = self.accounts.get_mut(&account_id).unwrap();
+        acc.balance_root = self.balance_trees.get(&account_id).unwrap().get_root();
+        acc.order_root = self.order_trees.get(&account_id).unwrap().get_root();
+        self.account_tree.set_value(account_id, acc.hash());
     }
+    // deprecated
     fn recalculate_from_balance_tree(&mut self, account_id: u32) {
         self.accounts.get_mut(&account_id).unwrap().balance_root = self.balance_trees.get(&account_id).unwrap().get_root();
         self.recalculate_from_account_state(account_id);
     }
+    // deprecated
     fn recalculate_from_order_tree(&mut self, account_id: u32) {
         self.accounts.get_mut(&account_id).unwrap().order_root = self.order_trees.get(&account_id).unwrap().get_root();
         self.recalculate_from_account_state(account_id);
@@ -188,48 +201,56 @@ impl GlobalState {
         panic!("Cannot find order pos");
     }
 
-    pub fn place_order_into_tree(&mut self, account_id: u32, order_id: u32) -> Order {
-        if !self.has_order(account_id, order_id) {
-            panic!("invalid order {} {}", account_id, order_id);
-        }
-        match self.order_id_to_pos.get(&(account_id, order_id)) {
-            Some(_pos) => self.get_account_order_by_id(account_id, order_id),
-            None => {
-                let pos = self.get_next_order_pos_for_user(account_id);
-                let old_order = self.get_account_order_by_pos(account_id, pos);
-                self.update_order_leaf(account_id, pos, order_id);
-                self.update_next_order_pos(account_id, pos + 1);
-                old_order
-            }
-        }
-    }
-
-    pub fn update_order_leaf(&mut self, account_id: u32, order_pos: u32, order_id: u32) {
-        assert!(self.order_trees.contains_key(&account_id), "set_account_order");
-        if order_pos >= 2u32.pow(self.order_levels as u32) {
-            panic!("order position {} invalid", order_pos);
-        }
-
-        let order = self.order_map.get(&account_id).unwrap().get(&order_id).unwrap();
-        self.order_trees.get_mut(&account_id).unwrap().set_value(order_pos, order.hash());
-        self.order_id_to_pos.insert((account_id, order_id), order_pos);
-        self.order_pos_to_id.insert((account_id, order_pos), order_id);
-        self.recalculate_from_order_tree(account_id);
-    }
-
     pub fn update_order_state(&mut self, account_id: u32, order: Order) {
         self.order_map
             .get_mut(&account_id)
             .unwrap()
             .insert(fr_to_u32(&order.order_id), order);
     }
+    pub fn find_pos_for_order(&mut self, account_id: u32, order_id: u32) -> (u32, Order) {
+        if !self.has_order(account_id, order_id) {
+            panic!("invalid order {} {}", account_id, order_id);
+        }
+        match self.order_id_to_pos.get(&(account_id, order_id)) {
+            Some(pos) => (*pos, self.get_account_order_by_id(account_id, order_id)),
+            None => {
+                let pos = self.get_next_order_pos_for_user(account_id);
+                let old_order = self.get_account_order_by_pos(account_id, pos);
+                self.link_order_pos_and_id(account_id, pos, order_id);
+                self.update_next_order_pos(account_id, pos + 1);
+                (pos, old_order)
+            }
+        }
+    }
+    pub fn link_order_pos_and_id(&mut self, account_id: u32, order_pos: u32, order_id: u32) {
+        assert!(self.order_trees.contains_key(&account_id), "link_order_pos_and_id");
+
+        if order_pos >= 2u32.pow(self.order_levels as u32) {
+            panic!("order position {} invalid", order_pos);
+        }
+
+        self.order_id_to_pos.insert((account_id, order_id), order_pos);
+        self.order_pos_to_id.insert((account_id, order_pos), order_id);
+    }
+    pub fn set_order_leaf_hash(&mut self, account_id: u32, order_pos: u32, order_hash: &Fr) {
+        self.set_order_leaf_hash_raw(account_id, order_pos, order_hash);
+        self.recalculate_from_order_tree(account_id);
+    }
+    pub fn set_order_leaf_hash_raw(&mut self, account_id: u32, order_pos: u32, order_hash: &Fr) {
+        assert!(self.order_trees.contains_key(&account_id), "set_order_leaf_hash_raw");
+        self.order_trees.get_mut(&account_id).unwrap().set_value(order_pos, *order_hash);
+    }
+
     pub fn get_token_balance(&self, account_id: u32, token_id: u32) -> Fr {
         self.balance_trees.get(&account_id).unwrap().get_leaf(token_id)
     }
     pub fn set_token_balance(&mut self, account_id: u32, token_id: u32, balance: Fr) {
+        self.set_token_balance_raw(account_id, token_id, balance);
+        self.recalculate_from_balance_tree(account_id);
+    }
+    pub fn set_token_balance_raw(&mut self, account_id: u32, token_id: u32, balance: Fr) {
         assert!(self.balance_trees.contains_key(&account_id), "set_token_balance");
         self.balance_trees.get_mut(&account_id).unwrap().set_value(token_id, balance);
-        self.recalculate_from_balance_tree(account_id);
     }
     pub fn has_order(&self, account_id: u32, order_id: u32) -> bool {
         self.order_map.contains_key(&account_id) && self.order_map.get(&account_id).unwrap().contains_key(&order_id)
@@ -253,25 +274,25 @@ impl GlobalState {
     pub fn balance_proof(&self, account_id: u32, token_id: u32) -> MerkleProof {
         self.balance_trees.get(&account_id).unwrap().get_proof(token_id)
     }
+    // get proof if `value` is in the tree without really updating
+    //pub fn balance_proof_with(self, account_id: u32, token_id: u32, value: Fr) -> MerkleProof
     pub fn account_proof(&self, account_id: u32) -> MerkleProof {
         self.account_tree.get_proof(account_id)
     }
-    pub fn state_proof(&self, account_id: u32, token_id: u32) -> StateProof {
+    pub fn balance_full_proof(&self, account_id: u32, token_id: u32) -> BalanceProof {
         let balance_proof = self.balance_proof(account_id, token_id);
         let account_proof = self.account_proof(account_id);
-        let order_root = self.order_trees.get(&account_id).unwrap().get_root();
-        //assert!(accountLeaf == balance_root, "state_proof");
-        StateProof {
+        BalanceProof {
             leaf: balance_proof.leaf,
-            root: account_proof.root,
-            balance_root: balance_proof.root,
-            order_root,
             balance_path: balance_proof.path_elements,
+            balance_root: balance_proof.root,
+            account_hash: account_proof.leaf,
             account_path: account_proof.path_elements,
+            root: account_proof.root,
         }
     }
-    pub fn trivial_state_proof(&self) -> StateProof {
+    pub fn trivial_state_proof(&self) -> BalanceProof {
         // TODO: cache this
-        self.state_proof(0, 0)
+        self.balance_full_proof(0, 0)
     }
 }
