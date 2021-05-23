@@ -4,6 +4,7 @@
 
 use std::collections::HashMap;
 
+use rollup_state_manager::account::Signature;
 use rollup_state_manager::state::WitnessGenerator;
 use rollup_state_manager::types;
 use rollup_state_manager::types::fixnum;
@@ -20,7 +21,7 @@ pub mod test_params {
     pub const NTXS: usize = 2;
 
     pub const BALANCELEVELS: usize = 2;
-    pub const ORDERLEVELS: usize = 7;
+    pub const ORDERLEVELS: usize = 3;
     pub const ACCOUNTLEVELS: usize = 2;
     /*
 
@@ -126,6 +127,8 @@ impl Orders {
                 filled_buy: u32_to_fr(0),
                 total_sell: fixnum::decimal_to_amount(&order_state.total_sell, test_params::prec(order_state.token_sell)).to_fr(),
                 total_buy: fixnum::decimal_to_amount(&order_state.total_buy, test_params::prec(order_state.token_buy)).to_fr(),
+                // TODO: retrieves from account
+                sig: Signature::default(),
             };
             witgen.update_order_state(order_state.account_id, order_to_put);
         } else {
@@ -376,6 +379,8 @@ impl<'c> From<OrderState<'c>> for types::l2::Order {
             filled_buy: fixnum::decimal_to_amount(&origin.filled_buy, test_params::prec(origin.token_buy)).to_fr(),
             total_sell: fixnum::decimal_to_amount(&origin.total_sell, test_params::prec(origin.token_sell)).to_fr(),
             total_buy: fixnum::decimal_to_amount(&origin.total_buy, test_params::prec(origin.token_buy)).to_fr(),
+            // TODO: retrieves from account
+            sig: Signature::default(),
         }
     }
 }

@@ -174,7 +174,6 @@ impl GlobalState {
         self.order_map.insert(account_id, BTreeMap::<u32, Order>::default());
         self.account_tree.lock().unwrap().set_value(account_id, self.default_account_leaf);
         self.next_order_positions.insert(account_id, next_order_id);
-        //println!("add account", account_id);
         account_id
     }
     pub fn get_order_pos_by_id(&self, account_id: u32, order_id: u32) -> u32 {

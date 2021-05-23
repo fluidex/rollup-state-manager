@@ -387,6 +387,15 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::NONCE1] = account1.nonce;
         encoded_tx[tx_detail_idx::NONCE2] = account2.nonce;
 
+        encoded_tx[tx_detail_idx::S1] = order1.sig.s;
+        encoded_tx[tx_detail_idx::R8X1] = order1.sig.r8x;
+        encoded_tx[tx_detail_idx::R8Y1] = order1.sig.r8y;
+        encoded_tx[tx_detail_idx::SIG_L2_HASH1] = order1.sig.hash;
+        encoded_tx[tx_detail_idx::S2] = order2.sig.s;
+        encoded_tx[tx_detail_idx::R8X2] = order2.sig.r8x;
+        encoded_tx[tx_detail_idx::R8Y2] = order2.sig.r8y;
+        encoded_tx[tx_detail_idx::SIG_L2_HASH2] = order2.sig.hash;
+
         encoded_tx[tx_detail_idx::OLD_ORDER1_ID] = old_order1_in_tree.order_id;
         encoded_tx[tx_detail_idx::OLD_ORDER1_TOKEN_SELL] = old_order1_in_tree.tokensell;
         encoded_tx[tx_detail_idx::OLD_ORDER1_FILLED_SELL] = old_order1_in_tree.filled_sell;
@@ -427,6 +436,8 @@ impl WitnessGenerator {
 
         encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = u32_to_fr(1u32);
         encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = u32_to_fr(1u32);
+        encoded_tx[tx_detail_idx::ENABLE_SIG_CHECK1] = u32_to_fr(1u32);
+        encoded_tx[tx_detail_idx::ENABLE_SIG_CHECK2] = u32_to_fr(1u32);
 
         let mut raw_tx = RawTx {
             tx_type: TxType::SpotTrade,

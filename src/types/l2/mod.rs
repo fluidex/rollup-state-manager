@@ -4,6 +4,7 @@ pub use mod_tx_data::*;
 
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/common.ts
 use super::fixnum::Float864;
+use crate::account::Signature;
 pub use crate::types::merkle_tree::MerklePath;
 use crate::types::primitives::{hash, shl, Fr};
 use anyhow::bail;
@@ -11,7 +12,7 @@ use anyhow::Result;
 use ff::Field;
 use std::convert::TryInto;
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Order {
     pub order_id: Fr,
     pub tokenbuy: Fr,
@@ -20,6 +21,7 @@ pub struct Order {
     pub filled_buy: Fr,
     pub total_sell: Fr,
     pub total_buy: Fr,
+    pub sig: Signature,
 }
 
 impl Default for Order {
@@ -32,6 +34,7 @@ impl Default for Order {
             filled_buy: Fr::zero(),
             total_sell: Fr::zero(),
             total_buy: Fr::zero(),
+            sig: Signature::default(),
         }
     }
 }
