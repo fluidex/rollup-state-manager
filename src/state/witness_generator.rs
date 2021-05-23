@@ -1,4 +1,5 @@
 #![allow(clippy::field_reassign_with_default)]
+#![allow(clippy::vec_init_then_push)]
 
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
 
