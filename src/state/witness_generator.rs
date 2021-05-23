@@ -462,7 +462,7 @@ impl WitnessGenerator {
             balance_updates: vec![(tx.token_id_1to2, acc2_balance_buy_new), (tx.token_id_2to1, acc2_balance_sell_new)],
             order_updates: vec![(order2_pos, order2.hash())],
         };
-        self.state.batch_update(vec![acc1_updates, acc2_updates], false);
+        self.state.batch_update(vec![acc1_updates, acc2_updates], true);
 
         raw_tx.balance_path3 = self.state.balance_proof(acc_id1, tx.token_id_2to1).path_elements;
         raw_tx.balance_path1 = self.state.balance_proof(acc_id2, tx.token_id_1to2).path_elements;

@@ -286,6 +286,9 @@ impl GlobalState {
                     order_tree.lock().unwrap().set_value_parallel(&order_updates, order_parallel);
                 }));
             }
+            for handler in handlers {
+                handler.join().unwrap();
+            }
             let mut account_updates = vec![];
             for update in updates {
                 let account_hash = self.recalculate_account_state_hash(update.account_id);
