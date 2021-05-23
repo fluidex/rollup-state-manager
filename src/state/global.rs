@@ -13,7 +13,6 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
-use thread::JoinHandle;
 
 pub struct BalanceProof {
     pub leaf: Fr,
@@ -32,8 +31,15 @@ pub struct OrderProof {
     pub account_path: Vec<[Fr; 1]>,
     pub root: Fr,
 }
+#[derive(Clone)]
+pub struct AccountUpdates {
+    pub account_id: u32,
+    pub balance_updates: Vec<(u32, Fr)>,
+    pub order_updates: Vec<(u32, Fr)>,
+}
 
 // TODO: too many unwrap here
+// TODO: do we really need Arc/Mutex?
 pub struct GlobalState {
     balance_levels: usize,
     order_levels: usize,
@@ -101,25 +107,18 @@ impl GlobalState {
     pub fn root(&self) -> Fr {
         self.account_tree.lock().unwrap().get_root()
     }
-    pub fn recalculate_from_account_state(&mut self, account_id: u32) -> JoinHandle<()> {
+    fn recalculate_account_state_hash(&mut self, account_id: u32) -> Fr {
         let mut acc = self.accounts.get_mut(&account_id).unwrap();
+        // TODO: for balance_root/order_root, we maintain two 'truth' here
+        // not a good idea
         acc.balance_root = self.balance_trees.get(&account_id).unwrap().lock().unwrap().get_root();
         acc.order_root = self.order_trees.get(&account_id).unwrap().lock().unwrap().get_root();
-        let hash = acc.hash();
+        acc.hash()
+    }
+    pub fn flush_account_state(&mut self, account_id: u32) {
+        let hash = self.recalculate_account_state_hash(account_id);
         let tree = self.account_tree.clone();
-        thread::spawn(move || {
-            tree.lock().unwrap().set_value(account_id, hash);
-        })
-    }
-    // deprecated
-    fn recalculate_from_balance_tree(&mut self, account_id: u32) -> JoinHandle<()> {
-        self.accounts.get_mut(&account_id).unwrap().balance_root = self.balance_trees.get(&account_id).unwrap().lock().unwrap().get_root();
-        self.recalculate_from_account_state(account_id)
-    }
-    // deprecated
-    fn recalculate_from_order_tree(&mut self, account_id: u32) -> JoinHandle<()> {
-        self.accounts.get_mut(&account_id).unwrap().order_root = self.order_trees.get(&account_id).unwrap().lock().unwrap().get_root();
-        self.recalculate_from_account_state(account_id)
+        tree.lock().unwrap().set_value(account_id, hash);
     }
     /*
     pub fn setAccountKey(&mut self, account_id: Fr, account: Account) {
@@ -136,15 +135,14 @@ impl GlobalState {
         return self.accounts.get(&account_id).unwrap().eth_addr;
     }
 
-    // TODO: we should change account_id to u32 later?
     pub fn set_account_nonce(&mut self, account_id: u32, nonce: Fr) {
         self.accounts.get_mut(&account_id).unwrap().update_nonce(nonce);
-        self.recalculate_from_account_state(account_id);
+        self.flush_account_state(account_id);
     }
-    // self function should only be used in tests for convenience
+    // this function should only be used in tests for convenience
     pub fn set_account_order_root(&mut self, account_id: u32, order_root: Fr) {
         self.accounts.get_mut(&account_id).unwrap().update_order_root(order_root);
-        self.recalculate_from_account_state(account_id);
+        self.flush_account_state(account_id);
     }
     fn increase_nonce(&mut self, account_id: u32) {
         let mut nonce = self.accounts.get(&account_id).unwrap().nonce;
@@ -200,7 +198,7 @@ impl GlobalState {
         // TODO: better type here...
         let order_id: u32 = fr_to_u32(&order.order_id);
         self.order_id_to_pos.insert((account_id, order_id), order_pos);
-        self.recalculate_from_order_tree(account_id).join().unwrap();
+        self.flush_account_state(account_id);
     }
 
     // find a position range 0..2**n where the slot is either empty or occupied by a close order
@@ -250,30 +248,69 @@ impl GlobalState {
         self.order_pos_to_id.insert((account_id, order_pos), order_id);
     }
     pub fn set_order_leaf_hash(&mut self, account_id: u32, order_pos: u32, order_hash: Fr) {
-        self.set_order_leaf_hash_raw(account_id, order_pos, order_hash).join().unwrap();
-        self.recalculate_from_order_tree(account_id).join().unwrap();
+        self.set_order_leaf_hash_raw(account_id, order_pos, order_hash);
+        self.flush_account_state(account_id);
     }
-    pub fn set_order_leaf_hash_raw(&mut self, account_id: u32, order_pos: u32, order_hash: Fr) -> JoinHandle<()> {
+    pub fn set_order_leaf_hash_raw(&mut self, account_id: u32, order_pos: u32, order_hash: Fr) {
         assert!(self.order_trees.contains_key(&account_id), "set_order_leaf_hash_raw");
         let tree = self.order_trees.get_mut(&account_id).unwrap().clone();
-        thread::spawn(move || {
-            tree.lock().unwrap().set_value(order_pos, order_hash);
-        })
+        tree.lock().unwrap().set_value(order_pos, order_hash);
     }
 
     pub fn get_token_balance(&self, account_id: u32, token_id: u32) -> Fr {
         self.balance_trees.get(&account_id).unwrap().lock().unwrap().get_leaf(token_id)
     }
     pub fn set_token_balance(&mut self, account_id: u32, token_id: u32, balance: Fr) {
-        self.set_token_balance_raw(account_id, token_id, balance).join().unwrap();
-        self.recalculate_from_balance_tree(account_id).join().unwrap();
+        self.set_token_balance_raw(account_id, token_id, balance);
+        self.flush_account_state(account_id)
     }
-    pub fn set_token_balance_raw(&mut self, account_id: u32, token_id: u32, balance: Fr) -> JoinHandle<()> {
+    pub fn batch_update(&mut self, updates: Vec<AccountUpdates>, parallel: bool) {
+        if parallel {
+            let mut handlers = vec![];
+            let balance_parallel = 2;
+            let order_parallel = 1;
+            let account_parallel = 2;
+            for update in updates.clone() {
+                let account_id = update.account_id;
+                assert!(self.balance_trees.contains_key(&account_id), "set_token_balance");
+                let balance_tree = self.balance_trees.get_mut(&account_id).unwrap().clone();
+                let balance_updates = update.balance_updates;
+                handlers.push(thread::spawn(move || {
+                    balance_tree.lock().unwrap().set_value_parallel(&balance_updates, balance_parallel);
+                }));
+                assert!(self.order_trees.contains_key(&account_id), "set_order_leaf_hash_raw");
+                let order_tree = self.order_trees.get_mut(&account_id).unwrap().clone();
+                let order_updates = update.order_updates;
+                handlers.push(thread::spawn(move || {
+                    order_tree.lock().unwrap().set_value_parallel(&order_updates, order_parallel);
+                }));
+            }
+            let mut account_updates = vec![];
+            for update in updates {
+                let account_hash = self.recalculate_account_state_hash(update.account_id);
+                account_updates.push((update.account_id, account_hash));
+            }
+            self.account_tree
+                .lock()
+                .unwrap()
+                .set_value_parallel(&account_updates, account_parallel);
+        } else {
+            for update in updates {
+                let account_id = update.account_id;
+                for balance_update in update.balance_updates {
+                    self.set_token_balance_raw(account_id, balance_update.0, balance_update.1);
+                }
+                for order_update in update.order_updates {
+                    self.set_order_leaf_hash_raw(account_id, order_update.0, order_update.1);
+                }
+                self.flush_account_state(account_id);
+            }
+        }
+    }
+    pub fn set_token_balance_raw(&mut self, account_id: u32, token_id: u32, balance: Fr) {
         assert!(self.balance_trees.contains_key(&account_id), "set_token_balance");
         let tree = self.balance_trees.get_mut(&account_id).unwrap().clone();
-        thread::spawn(move || {
-            tree.lock().unwrap().set_value(token_id, balance);
-        })
+        tree.lock().unwrap().set_value(token_id, balance);
     }
     pub fn has_order(&self, account_id: u32, order_id: u32) -> bool {
         self.order_map.contains_key(&account_id) && self.order_map.get(&account_id).unwrap().contains_key(&order_id)
