@@ -4,7 +4,7 @@ use rollup_state_manager::state::WitnessGenerator;
 use rollup_state_manager::types;
 use rollup_state_manager::types::fixnum;
 use rollup_state_manager::types::l2::Order;
-use rollup_state_manager::types::primitives::u32_to_fr;
+use rollup_state_manager::types::primitives::{fr_to_decimal, u32_to_fr};
 use rust_decimal::Decimal;
 use std::ops::{Deref, DerefMut};
 use std::time::Instant;
@@ -398,22 +398,34 @@ impl<'c> std::cmp::Ord for OrderState<'c> {
 
 #[derive(PartialEq, Debug)]
 struct CommonBalanceState {
+    /*
     bid_user_base: types::primitives::Fr,
     bid_user_quote: types::primitives::Fr,
     ask_user_base: types::primitives::Fr,
     ask_user_quote: types::primitives::Fr,
+    */
+    bid_user_base: Decimal,
+    bid_user_quote: Decimal,
+    ask_user_base: Decimal,
+    ask_user_quote: Decimal,
 }
 
 impl CommonBalanceState {
-    fn parse(origin: &types::matchengine::messages::VerboseBalanceState, id_pair: TokenIdPair) -> Self {
-        let base_id = id_pair.0;
-        let quote_id = id_pair.1;
+    fn parse(origin: &types::matchengine::messages::VerboseBalanceState, _id_pair: TokenIdPair) -> Self {
+        //let base_id = id_pair.0;
+        //let quote_id = id_pair.1;
 
         CommonBalanceState {
+            bid_user_base: origin.bid_user_base,
+            bid_user_quote: origin.bid_user_quote,
+            ask_user_base: origin.ask_user_base,
+            ask_user_quote: origin.ask_user_quote,
+            /*
             bid_user_base: fixnum::decimal_to_amount(&origin.bid_user_base, test_params::prec(base_id)).to_fr(),
             bid_user_quote: fixnum::decimal_to_amount(&origin.bid_user_quote, test_params::prec(quote_id)).to_fr(),
             ask_user_base: fixnum::decimal_to_amount(&origin.ask_user_base, test_params::prec(base_id)).to_fr(),
             ask_user_quote: fixnum::decimal_to_amount(&origin.ask_user_quote, test_params::prec(quote_id)).to_fr(),
+            */
         }
     }
 
@@ -422,10 +434,16 @@ impl CommonBalanceState {
         let quote_id = id_pair.1;
 
         CommonBalanceState {
+            bid_user_base: fr_to_decimal(&witgen.get_token_balance(bid_id, base_id), test_params::prec(base_id)),
+            bid_user_quote: fr_to_decimal(&witgen.get_token_balance(bid_id, quote_id), test_params::prec(quote_id)),
+            ask_user_base: fr_to_decimal(&witgen.get_token_balance(ask_id, base_id), test_params::prec(base_id)),
+            ask_user_quote: fr_to_decimal(&witgen.get_token_balance(ask_id, quote_id), test_params::prec(quote_id)),
+            /*
             bid_user_base: witgen.get_token_balance(bid_id, base_id),
             bid_user_quote: witgen.get_token_balance(bid_id, quote_id),
             ask_user_base: witgen.get_token_balance(ask_id, base_id),
             ask_user_quote: witgen.get_token_balance(ask_id, quote_id),
+            */
         }
     }
 }

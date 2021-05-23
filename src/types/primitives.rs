@@ -2,6 +2,8 @@ use ff::{from_hex, to_hex};
 use ff::{Field, PrimeField, PrimeFieldRepr};
 use lazy_static::lazy_static;
 use num_bigint::BigInt;
+use rust_decimal::Decimal;
+//use std::str::FromStr;
 
 /*
 // if use rescue
@@ -60,12 +62,18 @@ pub fn bigint_to_fr(x: BigInt) -> Fr {
     }
     from_hex(&s).unwrap()
 }
-pub fn fr_to_u32(x: &Fr) -> u32 {
-    fr_to_string(x).parse::<u32>().unwrap()
+pub fn fr_to_u32(f: &Fr) -> u32 {
+    fr_to_string(f).parse::<u32>().unwrap()
+}
+pub fn fr_to_i64(f: &Fr) -> i64 {
+    fr_to_string(f).parse::<i64>().unwrap()
 }
 pub fn fr_to_bigint(elem: &Fr) -> BigInt {
     BigInt::parse_bytes(to_hex(elem).as_bytes(), 16).unwrap()
 }
 pub fn fr_to_string(elem: &Fr) -> String {
     fr_to_bigint(&elem).to_str_radix(10)
+}
+pub fn fr_to_decimal(f: &Fr, scale: u32) -> Decimal {
+    Decimal::new(fr_to_i64(f), scale)
 }
