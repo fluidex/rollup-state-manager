@@ -24,6 +24,7 @@ num-bigint = { version = "0.2.2", features = [ "rand" ] }
 num-traits = "0.2.14"
 #num-bigint = "0.4.0"
 poseidon-rs = { version = "0.0.8" }
+pprof = { version = "0.4", features = ["flamegraph", "protobuf"] }
 rand = "0.8.3"
 rayon = "1.5.0"
 regex = "1"
@@ -42,7 +43,11 @@ path = "tests/export_circuit/gen_testcase.rs"
 
 [[bin]]
 name = "gen_global_state_testcase"
-path = "tests/global_state/main.rs"
+path = "tests/global_state/gen_testcase.rs"
+
+[[bin]]
+name = "bench_global_state"
+path = "tests/global_state/bench.rs"
 
 [features]
 default = [ ]
