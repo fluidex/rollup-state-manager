@@ -1,16 +1,20 @@
-use crate::types::{test_params, Accounts, Orders};
-
 use anyhow::Result;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils::messages::{parse_msg, WrappedMessage};
-use rollup_state_manager::types;
+use rollup_state_manager::types::l2;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use pprof::protos::Message;
+use std::io::Write;
+
+mod types;
+use types::{test_params, Accounts, Orders};
+
 //if we use nightly build, we are able to use bench test ...
-fn bench_global_state(circuit_repo: &Path) -> Result<Vec<types::l2::L2Block>> {
+fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     let test_dir = circuit_repo.join("test").join("testdata");
     let file = File::open(test_dir.join("msgs_float.jsonl"))?;
 
@@ -29,9 +33,9 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<types::l2::L2Block>> {
     //use custom states
     let verbose = false;
     let state = GlobalState::new(
-        10, //test_params::BALANCELEVELS,
-        10, //test_params::ORDERLEVELS,
-        10, //test_params::ACCOUNTLEVELS,
+        20, //test_params::BALANCELEVELS,
+        20, //test_params::ORDERLEVELS,
+        20, //test_params::ACCOUNTLEVELS,
         verbose,
     );
     let mut witgen = WitnessGenerator::new(state, test_params::NTXS, verbose);
@@ -75,7 +79,7 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<types::l2::L2Block>> {
     Ok(witgen.take_blocks())
 }
 
-pub(super) fn run_bench() -> Result<()> {
+fn run_bench() -> Result<()> {
     let circuit_repo = fs::canonicalize(PathBuf::from("../circuits")).expect("invalid circuits repo path");
 
     let timing = Instant::now();
@@ -87,4 +91,24 @@ pub(super) fn run_bench() -> Result<()> {
     );
 
     Ok(())
+}
+
+fn main() {
+    let guard = pprof::ProfilerGuard::new(100).unwrap();
+
+    run_bench().unwrap();
+
+    if let Ok(report) = guard.report().build() {
+        let file = File::create("flamegraph.svg").unwrap();
+        report.flamegraph(file).unwrap();
+
+        let mut file = File::create("profile.pb").unwrap();
+        let profile = report.pprof().unwrap();
+
+        let mut content = Vec::new();
+        profile.encode(&mut content).unwrap();
+        file.write_all(&content).unwrap();
+
+        println!("report: {:?}", &report);
+    };
 }

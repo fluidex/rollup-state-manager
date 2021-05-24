@@ -1,16 +1,22 @@
-use crate::types::*;
+#![allow(dead_code)]
+#![allow(clippy::upper_case_acronyms)]
+#![allow(clippy::large_enum_variant)]
+
 use anyhow::Result;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils;
 use rollup_state_manager::test_utils::messages::{parse_msg, WrappedMessage};
 use rollup_state_manager::test_utils::L2BlockSerde;
-use rollup_state_manager::types;
+use rollup_state_manager::types::l2;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Lines, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<types::l2::L2Block>, test_utils::circuit::CircuitSource)> {
+mod types;
+use types::{test_params, Accounts, Orders};
+
+fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<l2::L2Block>, test_utils::circuit::CircuitSource)> {
     let test_dir = circuit_repo.join("test").join("testdata");
     let file = File::open(test_dir.join("msgs_float.jsonl"))?;
 
@@ -90,7 +96,7 @@ fn write_circuit(circuit_repo: &Path, test_dir: &Path, source: &test_utils::Circ
     Ok(circuit_dir)
 }
 
-fn write_input_output(dir: &Path, block: types::l2::L2Block) -> Result<()> {
+fn write_input_output(dir: &Path, block: l2::L2Block) -> Result<()> {
     fs::create_dir_all(dir)?;
 
     let input_f = File::create(dir.join("input.json"))?;
@@ -103,7 +109,7 @@ fn write_input_output(dir: &Path, block: types::l2::L2Block) -> Result<()> {
     Ok(())
 }
 
-fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<types::l2::L2Block>, source: test_utils::CircuitSource) -> Result<PathBuf> {
+fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<l2::L2Block>, source: test_utils::CircuitSource) -> Result<PathBuf> {
     let test_dir = circuit_repo.join("testdata");
     let circuit_dir = write_circuit(circuit_repo, &test_dir, &source)?;
 
@@ -116,7 +122,7 @@ fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<types::l2::L2Blo
     Ok(circuit_dir)
 }
 
-pub(super) fn run() -> Result<()> {
+pub fn run() -> Result<()> {
     let circuit_repo = fs::canonicalize(PathBuf::from("circuits")).expect("invalid circuits repo path");
 
     let timing = Instant::now();
@@ -132,4 +138,15 @@ pub(super) fn run() -> Result<()> {
     println!("test circuit dir {}", circuit_dir.to_str().unwrap());
 
     Ok(())
+}
+
+/*
+ * have a look at scripts/global_state_test.sh
+ */
+
+fn main() {
+    match run() {
+        Ok(_) => println!("global_state test_case generated"),
+        Err(e) => panic!("{:#?}", e),
+    }
 }

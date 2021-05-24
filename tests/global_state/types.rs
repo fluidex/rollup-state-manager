@@ -1,3 +1,7 @@
+#![allow(dead_code)]
+#![allow(clippy::upper_case_acronyms)]
+#![allow(clippy::large_enum_variant)]
+
 use std::collections::HashMap;
 
 use rollup_state_manager::state::WitnessGenerator;
@@ -18,11 +22,11 @@ pub mod test_params {
     pub const BALANCELEVELS: usize = 2;
     pub const ORDERLEVELS: usize = 7;
     pub const ACCOUNTLEVELS: usize = 2;
-
     /*
-        pub const BALANCELEVELS: usize = 20;
-        pub const ORDERLEVELS: usize = 20;
-        pub const ACCOUNTLEVELS: usize = 20;
+
+          pub const BALANCELEVELS: usize = 20;
+          pub const ORDERLEVELS: usize = 20;
+          pub const ACCOUNTLEVELS: usize = 20;
     */
     pub const MAXORDERNUM: usize = 2usize.pow(ORDERLEVELS as u32);
     pub const MAXACCOUNTNUM: usize = 2usize.pow(ACCOUNTLEVELS as u32);
