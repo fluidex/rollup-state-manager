@@ -52,7 +52,7 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
                 }
                 WrappedMessage::TRADE(trade) => {
                     let trade = accounts.transform_trade(&mut witgen, trade.clone());
-                    orders.handle_trade(&mut witgen, trade);
+                    orders.handle_trade(&mut witgen, &accounts, trade);
                 }
                 _ => unreachable!(),
             }

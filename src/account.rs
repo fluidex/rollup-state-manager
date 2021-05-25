@@ -66,14 +66,18 @@ impl L2Account {
 }
 
 pub struct Account {
+    pub uid: u32,
     pub l2_account: L2Account,
 }
 
 impl Account {
-    pub fn rand() -> Result<Self, String> {
+    pub fn new(uid: u32) -> Result<Self, String> {
         // TODO: Tries to generate a random Account as `ethers.js`.
         let l2_account = L2Account::new(rand_seed())?;
-        Ok(Self { l2_account: l2_account })
+        Ok(Self { uid, l2_account })
+    }
+    pub fn sign_hash(&self, hash: Fr) -> Result<Signature, String> {
+        self.l2_account.sign_hash(hash)
     }
 }
 

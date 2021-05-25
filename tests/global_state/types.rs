@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use rollup_state_manager::account::Signature;
+use rollup_state_manager::account::{Account, Signature};
 use rollup_state_manager::state::WitnessGenerator;
 use rollup_state_manager::types;
 use rollup_state_manager::types::fixnum;
@@ -78,10 +78,13 @@ impl Orders {
     }
 
     fn assert_order_state<'c>(&self, witgen: &WitnessGenerator, ask_order_state: OrderState<'c>, bid_order_state: OrderState<'c>) {
-        let ask_order_local = witgen.get_account_order_by_id(ask_order_state.account_id, ask_order_state.order_id);
+        // TODO: compares the order field sig. The field sig is set to the default value of Signature for now.
+        let mut ask_order_local = witgen.get_account_order_by_id(ask_order_state.account_id, ask_order_state.order_id);
+        ask_order_local.sig = Signature::default();
         assert_eq!(ask_order_local, types::l2::Order::from(ask_order_state));
 
-        let bid_order_local = witgen.get_account_order_by_id(bid_order_state.account_id, bid_order_state.order_id);
+        let mut bid_order_local = witgen.get_account_order_by_id(bid_order_state.account_id, bid_order_state.order_id);
+        bid_order_local.sig = Signature::default();
         assert_eq!(bid_order_local, types::l2::Order::from(bid_order_state));
     }
 
@@ -113,13 +116,14 @@ impl Orders {
         }
     }
 
-    fn check_global_state_knows_order(&self, witgen: &mut WitnessGenerator, order_state: &OrderState) {
+    fn check_global_state_knows_order(&self, witgen: &mut WitnessGenerator, accounts: &Accounts, order_state: &OrderState) {
         let is_new_order =
             order_state.origin.finished_base == Decimal::new(0, 0) && order_state.origin.finished_quote == Decimal::new(0, 0);
+        let account_id = order_state.account_id;
         let order_id = order_state.order_id;
         if is_new_order {
             assert!(!witgen.has_order(order_state.account_id, order_id), "invalid new order");
-            let order_to_put = Order {
+            let mut order_to_put = Order {
                 order_id: u32_to_fr(order_id),
                 tokensell: u32_to_fr(order_state.token_sell),
                 tokenbuy: u32_to_fr(order_state.token_buy),
@@ -127,9 +131,10 @@ impl Orders {
                 filled_buy: u32_to_fr(0),
                 total_sell: fixnum::decimal_to_amount(&order_state.total_sell, test_params::prec(order_state.token_sell)).to_fr(),
                 total_buy: fixnum::decimal_to_amount(&order_state.total_buy, test_params::prec(order_state.token_buy)).to_fr(),
-                // TODO: retrieves from account
                 sig: Signature::default(),
             };
+            let account = accounts.get(&account_id).unwrap();
+            order_to_put.sign_with(account).unwrap();
             witgen.update_order_state(order_state.account_id, order_to_put);
         } else {
             assert!(
@@ -139,7 +144,7 @@ impl Orders {
         }
     }
 
-    pub fn handle_trade(&mut self, witgen: &mut WitnessGenerator, trade: types::matchengine::messages::TradeMessage) {
+    pub fn handle_trade(&mut self, witgen: &mut WitnessGenerator, accounts: &Accounts, trade: types::matchengine::messages::TradeMessage) {
         let token_pair = TokenPair::from(trade.market.as_str());
         let id_pair = TokenIdPair::from(token_pair);
 
@@ -157,8 +162,8 @@ impl Orders {
         let mut put_states = vec![&ask_order_state_before, &bid_order_state_before];
         put_states.sort();
 
-        self.check_global_state_knows_order(witgen, &ask_order_state_before);
-        self.check_global_state_knows_order(witgen, &bid_order_state_before);
+        self.check_global_state_knows_order(witgen, accounts, &ask_order_state_before);
+        self.check_global_state_knows_order(witgen, accounts, &bid_order_state_before);
 
         assert_balance_state(
             &trade.state_before.balance,
@@ -184,31 +189,30 @@ impl Orders {
     }
 }
 
-type AccountsType = HashMap<u32, u32>;
+type AccountsType = HashMap<u32, Account>;
 //index type?
-#[derive(Debug)]
 pub struct Accounts {
-    accountmapping: AccountsType,
+    account_mapping: AccountsType,
     balance_bench: f32,
 }
 
 impl Deref for Accounts {
     type Target = AccountsType;
     fn deref(&self) -> &Self::Target {
-        &self.accountmapping
+        &self.account_mapping
     }
 }
 
 impl DerefMut for Accounts {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.accountmapping
+        &mut self.account_mapping
     }
 }
 
 impl Default for Accounts {
     fn default() -> Self {
         Accounts {
-            accountmapping: AccountsType::new(),
+            account_mapping: AccountsType::new(),
             balance_bench: 0.0,
         }
     }
@@ -218,10 +222,11 @@ impl Default for Accounts {
 impl Accounts {
     fn userid_to_treeindex(&mut self, witgen: &mut WitnessGenerator, account_id: u32) -> u32 {
         match self.get(&account_id) {
-            Some(idx) => *idx,
+            Some(idx) => idx.uid,
             None => {
-                let uid = witgen.create_new_account(1);
-                self.insert(account_id, uid);
+                let account = witgen.create_new_account(1).unwrap();
+                let uid = account.uid;
+                self.insert(account_id, account);
                 if test_params::VERBOSE {
                     println!("global account index {} to user account id {}", uid, account_id);
                 }
@@ -379,7 +384,6 @@ impl<'c> From<OrderState<'c>> for types::l2::Order {
             filled_buy: fixnum::decimal_to_amount(&origin.filled_buy, test_params::prec(origin.token_buy)).to_fr(),
             total_sell: fixnum::decimal_to_amount(&origin.total_sell, test_params::prec(origin.token_sell)).to_fr(),
             total_buy: fixnum::decimal_to_amount(&origin.total_buy, test_params::prec(origin.token_buy)).to_fr(),
-            // TODO: retrieves from account
             sig: Signature::default(),
         }
     }

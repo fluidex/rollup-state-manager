@@ -4,6 +4,7 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
 
 use super::AccountState;
+use crate::account::Account;
 use crate::types::l2::Order;
 use crate::types::merkle_tree::{empty_tree_root, MerkleProof, Tree};
 use crate::types::primitives::{fr_to_u32, Fr};
@@ -157,7 +158,7 @@ impl GlobalState {
     fn get_next_order_pos_for_user(&self, account_id: u32) -> u32 {
         *self.next_order_positions.get(&account_id).unwrap()
     }
-    pub fn create_new_account(&mut self, next_order_id: u32) -> u32 {
+    pub fn create_new_account(&mut self, next_order_id: u32) -> Result<Account, String> {
         let account_id = self.balance_trees.len() as u32;
         if account_id >= 2u32.pow(self.account_levels as u32) {
             panic!("account_id {} overflows for account_levels {}", account_id, self.account_levels);
@@ -174,7 +175,7 @@ impl GlobalState {
         self.order_map.insert(account_id, BTreeMap::<u32, Order>::default());
         self.account_tree.lock().unwrap().set_value(account_id, self.default_account_leaf);
         self.next_order_positions.insert(account_id, next_order_id);
-        account_id
+        Account::new(account_id)
     }
     pub fn get_order_pos_by_id(&self, account_id: u32, order_id: u32) -> u32 {
         *self.order_id_to_pos.get(&(account_id, order_id)).unwrap()

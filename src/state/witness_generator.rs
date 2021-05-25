@@ -4,6 +4,7 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
 
 use super::global::{AccountUpdates, GlobalState};
+use crate::account::Account;
 use crate::types::l2::{tx_detail_idx, DepositToOldTx, L2Block, Order, RawTx, SpotTradeTx, TxType, TX_LENGTH};
 use crate::types::merkle_tree::Tree;
 use crate::types::primitives::{bigint_to_fr, fr_add, fr_sub, fr_to_bigint, u32_to_fr, Fr};
@@ -44,7 +45,7 @@ impl WitnessGenerator {
     pub fn update_order_state(&mut self, account_id: u32, order: Order) {
         self.state.update_order_state(account_id, order)
     }
-    pub fn create_new_account(&mut self, next_order_id: u32) -> u32 {
+    pub fn create_new_account(&mut self, next_order_id: u32) -> Result<Account, String> {
         self.state.create_new_account(next_order_id)
     }
     pub fn get_account_order_by_id(&self, account_id: u32, order_id: u32) -> Order {
