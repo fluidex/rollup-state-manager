@@ -247,12 +247,13 @@ impl Accounts {
     }
 
     pub fn handle_deposit(&mut self, witgen: &mut WitnessGenerator, mut deposit: types::matchengine::messages::BalanceMessage) {
-        //integrate the sanity check here ...
-        deposit.user_id = self.userid_to_treeindex(witgen, deposit.user_id);
-
         assert!(!deposit.change.is_sign_negative(), "only support deposit now");
-
         let token_id = test_params::token_id(&deposit.asset);
+        let account_id = deposit.user_id;
+        let is_old = self.contains_key(&account_id);
+        let user_id = self.userid_to_treeindex(witgen, account_id);
+        let account = self.get(&account_id).unwrap();
+        deposit.user_id = user_id;
 
         let balance_before = deposit.balance - deposit.change;
         assert!(!balance_before.is_sign_negative(), "invalid balance {:?}", deposit);
@@ -265,11 +266,23 @@ impl Accounts {
 
         let timing = Instant::now();
 
-        witgen.deposit_to_old(types::l2::DepositToOldTx {
-            token_id,
-            account_id: deposit.user_id,
-            amount: fixnum::decimal_to_amount(&deposit.change, test_params::prec(token_id)),
-        });
+        let amount = fixnum::decimal_to_amount(&deposit.change, test_params::prec(token_id));
+        if is_old {
+            witgen.deposit_to_old(types::l2::DepositToOldTx {
+                token_id,
+                account_id: user_id,
+                amount,
+            });
+        } else {
+            witgen.deposit_to_new(types::l2::DepositToNewTx {
+                token_id,
+                account_id: user_id,
+                amount,
+                eth_addr: account.eth_addr(),
+                sign: account.sign(),
+                ay: account.ay(),
+            });
+        }
 
         self.balance_bench += timing.elapsed().as_secs_f32();
     }

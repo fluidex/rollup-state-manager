@@ -126,6 +126,16 @@ pub struct DepositToOldTx {
 }
 
 #[derive(Debug)]
+pub struct DepositToNewTx {
+    pub account_id: u32,
+    pub token_id: u32,
+    pub amount: AmountType,
+    pub eth_addr: Fr,
+    pub sign: Fr,
+    pub ay: Fr,
+}
+
+#[derive(Debug)]
 pub struct SpotTradeTx {
     pub order1_account_id: u32,
     pub order2_account_id: u32,

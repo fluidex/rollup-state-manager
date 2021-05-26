@@ -128,11 +128,12 @@ impl GlobalState {
       self.accounts.get(account_id).updateAccountKey(account);
       self.recalculate_from_account_state(account_id);
     }
-    pub fn setAccountL2Addr(&mut self, account_id: Fr, sign, ay, eth_addr) {
-      self.accounts.get(account_id).update_l2_addr(sign, ay, eth_addr);
-      self.recalculate_from_account_state(account_id);
-    }
     */
+    pub fn set_account_l2_addr(&mut self, account_id: u32, sign: Fr, ay: Fr, eth_addr: Fr) {
+        let account = self.accounts.get_mut(&account_id).unwrap();
+        account.update_l2_addr(sign, ay, eth_addr);
+        self.account_tree.lock().unwrap().set_value(account_id, account.hash());
+    }
     pub fn get_l1_addr(&self, account_id: u32) -> Fr {
         return self.accounts.get(&account_id).unwrap().eth_addr;
     }
