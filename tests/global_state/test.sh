@@ -7,7 +7,7 @@ cd $REPO_DIR
 
 # make sure submodule is correctly cloned!!
 git submodule update --init --recursive
-git pull --recurse-submodules
+if [ -z ${CI+x} ]; then git pull --recurse-submodules; fi
 cargo run --release --bin gen_global_state_testcase
 
 cd $REPO_DIR/circuits; npm i
