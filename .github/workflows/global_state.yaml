@@ -56,10 +56,4 @@ jobs:
           node-version: '16'
 
       - name: Test global_state
-        run: |
-          git submodule update --init --recursive
-          cargo run --release --bin gen_global_state_testcase
-          cd circuits
-          npm i
-          npm -g install snarkit
-          snarkit test testdata/Block_2_2_7_2/ --backend=wasm
+        run: bash tests/global_state/test.sh

@@ -48,7 +48,7 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<l2::L2Block>, test_utils::cir
             WrappedMessage::TRADE(trade) => {
                 let trade = accounts.transform_trade(&mut witgen, trade);
                 let trade_id = trade.id;
-                orders.handle_trade(&mut witgen, trade);
+                orders.handle_trade(&mut witgen, &accounts, trade);
                 println!("trade {} test done", trade_id);
             }
             _ => {

@@ -4,6 +4,7 @@ pub use mod_tx_data::*;
 
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/common.ts
 use super::fixnum::Float864;
+use crate::account::{Account, Signature};
 pub use crate::types::merkle_tree::MerklePath;
 use crate::types::primitives::{hash, shl, Fr};
 use anyhow::bail;
@@ -11,7 +12,7 @@ use anyhow::Result;
 use ff::Field;
 use std::convert::TryInto;
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Order {
     pub order_id: Fr,
     pub tokenbuy: Fr,
@@ -20,6 +21,7 @@ pub struct Order {
     pub filled_buy: Fr,
     pub total_sell: Fr,
     pub total_buy: Fr,
+    pub sig: Signature,
 }
 
 impl Default for Order {
@@ -32,6 +34,7 @@ impl Default for Order {
             filled_buy: Fr::zero(),
             total_sell: Fr::zero(),
             total_buy: Fr::zero(),
+            sig: Signature::default(),
         }
     }
 }
@@ -50,6 +53,10 @@ impl Order {
         // TODO: one side fill is enough
         // https://github.com/Fluidex/circuits/blob/4f952f63aa411529c466de2f6e9f8ceeac9ceb00/src/spot_trade.circom#L42
         self.filled_buy >= self.total_buy || self.filled_sell >= self.total_sell
+    }
+    pub fn sign_with(&mut self, account: &Account) -> Result<(), String> {
+        self.sig = account.sign_hash(self.hash())?;
+        Ok(())
     }
     pub fn trade_with(&mut self, sell: &Fr, buy: &Fr) {
         // TODO: check overflow?
@@ -116,6 +123,16 @@ pub struct DepositToOldTx {
     pub account_id: u32,
     pub token_id: u32,
     pub amount: AmountType,
+}
+
+#[derive(Debug)]
+pub struct DepositToNewTx {
+    pub account_id: u32,
+    pub token_id: u32,
+    pub amount: AmountType,
+    pub eth_addr: Fr,
+    pub sign: Fr,
+    pub ay: Fr,
 }
 
 #[derive(Debug)]
