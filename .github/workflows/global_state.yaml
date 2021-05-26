@@ -56,4 +56,4 @@ jobs:
           node-version: '16'
 
       - name: Test global_state
-        run: sh tests/global_state/test.sh
+        run: bash tests/global_state/test.sh
