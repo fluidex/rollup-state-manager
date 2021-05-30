@@ -1,4 +1,4 @@
-// Generated from tpl/ejs/./extra/rs/codec/mod_tx_data.rs.ejs. Don't modify this file manually
+// Generated from tpl/ejs/./extra/rollup-state-manager/src/types/l2/tx_data.rs.ejs. Don't modify this file manually
 pub const TX_LENGTH: usize = 60;
 pub mod tx_detail_idx {
     pub const ENABLE_BALANCE_CHECK1: usize = 0;

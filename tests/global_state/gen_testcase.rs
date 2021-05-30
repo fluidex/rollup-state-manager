@@ -34,19 +34,16 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<l2::L2Block>, test_utils::cir
 
     let mut orders = Orders::default();
     let mut accounts = Accounts::default();
-    /*
-        for _ in 0..test_const::MAXACCOUNTNUM {
-            state.create_new_account(1);
-        }
-    */
 
-    for line in lns {
-        match line.map(parse_msg)?? {
+    let messages: Vec<WrappedMessage> = lns.map(|l| parse_msg(l.unwrap()).unwrap()).collect();
+
+    let timing = Instant::now();
+    for msg in messages {
+        match msg {
             WrappedMessage::BALANCE(balance) => {
                 accounts.handle_deposit(&mut witgen, balance);
             }
             WrappedMessage::TRADE(trade) => {
-                let trade = accounts.transform_trade(&mut witgen, trade);
                 let trade_id = trade.id;
                 orders.handle_trade(&mut witgen, &accounts, trade);
                 println!("trade {} test done", trade_id);
@@ -58,6 +55,12 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<l2::L2Block>, test_utils::cir
     }
 
     witgen.flush_with_nop();
+    let blocks = witgen.take_blocks();
+    println!(
+        "genesis {} blocks (TPS: {})",
+        blocks.len(),
+        (test_params::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
+    );
 
     let component = test_utils::circuit::CircuitSource {
         src: String::from("src/block.circom"),
@@ -70,7 +73,7 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<l2::L2Block>, test_utils::cir
         ),
     };
 
-    Ok((witgen.take_blocks(), component))
+    Ok((blocks, component))
 }
 
 //just grap from export_circuit_test.rs ...
@@ -125,13 +128,7 @@ fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<l2::L2Block>, so
 pub fn run() -> Result<()> {
     let circuit_repo = fs::canonicalize(PathBuf::from("circuits")).expect("invalid circuits repo path");
 
-    let timing = Instant::now();
     let (blocks, components) = replay_msgs(&circuit_repo)?;
-    println!(
-        "genesis {} blocks (TPS: {})",
-        blocks.len(),
-        (test_params::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
-    );
 
     let circuit_dir = export_circuit_and_testdata(&circuit_repo, blocks, components)?;
 

@@ -1,4 +1,6 @@
+#![allow(dead_code)]
 use anyhow::Result;
+use rollup_state_manager::account::{self, Account};
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils::messages::{parse_msg, WrappedMessage};
 use rollup_state_manager::types::l2;
@@ -38,30 +40,63 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
         20, //test_params::ACCOUNTLEVELS,
         verbose,
     );
-    let mut witgen = WitnessGenerator::new(state, test_params::NTXS, verbose);
 
     //amplify the records: in each iter we run records on a group of new accounts
-    let mut timing = Instant::now();
     let mut orders = Orders::default();
     let mut accounts = Accounts::default();
-    for i in 1..51 {
+
+    // TODO: max(user id)
+    let account_num = 10;
+    // we are generating more txs from the given test cases
+    // by clone accounts with same trades
+    let loop_num = 50;
+    let cache_order_sig = false;
+    if cache_order_sig {
+        for j in 0..account_num {
+            let seed = account::rand_seed();
+            for i in 0..loop_num {
+                let account_id = i * account_num + j;
+                // since we cache order_sig by Map<(order_hash, bjj_key), Signature>
+                // we can make cache meet 100% by reusing seed
+                //let seed = if cache_order_sig { seed.clone() } else { account::rand_seed() };
+                let seed = seed.clone();
+                let acc = Account::from_seed(account_id, &seed).unwrap();
+                accounts.set_account(account_id, acc);
+            }
+        }
+        for msg in messages.iter() {
+            if let WrappedMessage::TRADE(trade) = msg {
+                orders.sign_orders(&accounts, trade.clone());
+            }
+        }
+    }
+
+    let mut witgen = WitnessGenerator::new(state, test_params::NTXS, verbose);
+
+    let timing = Instant::now();
+    let mut inner_timing = Instant::now();
+
+    for i in 0..loop_num {
+        let account_offset = i * account_num;
         for msg in messages.iter() {
             match msg {
                 WrappedMessage::BALANCE(balance) => {
-                    accounts.handle_deposit(&mut witgen, balance.clone());
+                    let mut balance = balance.clone();
+                    balance.user_id += account_offset;
+                    accounts.handle_deposit(&mut witgen, balance);
                 }
                 WrappedMessage::TRADE(trade) => {
-                    let trade = accounts.transform_trade(&mut witgen, trade.clone());
+                    let mut trade = trade.clone();
+                    trade.ask_user_id += account_offset;
+                    trade.bid_user_id += account_offset;
                     orders.handle_trade(&mut witgen, &accounts, trade);
                 }
                 _ => unreachable!(),
             }
         }
 
-        accounts.clear();
-
         if i % 10 == 0 {
-            let total = timing.elapsed().as_secs_f32();
+            let total = inner_timing.elapsed().as_secs_f32();
             let (balance_t, _) = accounts.take_bench();
             let (plact_t, spot_t) = orders.take_bench();
             println!(
@@ -72,28 +107,25 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
                 plact_t * 100.0 / total,
                 spot_t * 100.0 / total
             );
-            timing = Instant::now();
+            inner_timing = Instant::now();
         }
     }
-
-    Ok(witgen.take_blocks())
-}
-
-fn run_bench() -> Result<()> {
-    let circuit_repo = fs::canonicalize(PathBuf::from("../circuits")).expect("invalid circuits repo path");
-
-    let timing = Instant::now();
-    let blocks = bench_global_state(&circuit_repo)?;
+    let blocks = witgen.take_blocks();
     println!(
         "bench for {} blocks (TPS: {})",
         blocks.len(),
         (test_params::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
     );
+    Ok(blocks)
+}
 
+fn run_bench() -> Result<()> {
+    let circuit_repo = fs::canonicalize(PathBuf::from("../circuits")).expect("invalid circuits repo path");
+    let _ = bench_global_state(&circuit_repo)?;
     Ok(())
 }
 
-fn main() {
+fn profile_bench() {
     let guard = pprof::ProfilerGuard::new(100).unwrap();
 
     run_bench().unwrap();
@@ -111,4 +143,8 @@ fn main() {
 
         println!("report: {:?}", &report);
     };
+}
+
+fn main() {
+    run_bench().unwrap();
 }

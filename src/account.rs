@@ -75,13 +75,21 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn new(uid: u32) -> Result<Self, String> {
-        // TODO: Tries to generate a random Account as `ethers.js`.
-        let l2_account = L2Account::new(rand_seed())?;
+    pub fn from_seed(uid: u32, seed: &[u8]) -> Result<Self, String> {
+        let l2_account = L2Account::new(seed.to_vec())?;
         Ok(Self { uid, l2_account })
+    }
+    pub fn new(uid: u32) -> Self {
+        // TODO: Tries to generate a random Account as `ethers.js`.
+        // TODO: if the rand seed is invalid, we should retry rather than returning error
+        let seed = rand_seed();
+        Self::from_seed(uid, &seed).unwrap()
     }
     pub fn ay(&self) -> Fr {
         self.l2_account.ay
+    }
+    pub fn bjj_pub_key(&self) -> String {
+        self.l2_account.bjj_pub_key.clone()
     }
     pub fn eth_addr(&self) -> Fr {
         // TODO: Generates and returns ether address.
@@ -95,7 +103,7 @@ impl Account {
     }
 }
 
-fn rand_seed() -> Vec<u8> {
+pub fn rand_seed() -> Vec<u8> {
     let mut rng = rand::thread_rng();
     (0..32).map(|_| rng.gen()).collect()
 }
