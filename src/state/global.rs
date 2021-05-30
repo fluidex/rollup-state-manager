@@ -122,13 +122,6 @@ impl GlobalState {
         let tree = self.account_tree.clone();
         tree.lock().unwrap().set_value(account_id, hash);
     }
-    /*
-    pub fn setAccountKey(&mut self, account_id: Fr, account: Account) {
-      //println!("setAccountKey", account_id);
-      self.accounts.get(account_id).updateAccountKey(account);
-      self.recalculate_from_account_state(account_id);
-    }
-    */
     pub fn set_account_l2_addr(&mut self, account_id: u32, sign: Fr, ay: Fr, eth_addr: Fr) {
         let account = self.accounts.get_mut(&account_id).unwrap();
         account.update_l2_addr(sign, ay, eth_addr);
@@ -147,7 +140,7 @@ impl GlobalState {
         self.accounts.get_mut(&account_id).unwrap().update_order_root(order_root);
         self.flush_account_state(account_id);
     }
-    fn increase_nonce(&mut self, account_id: u32) {
+    pub fn increase_nonce(&mut self, account_id: u32) {
         let mut nonce = self.accounts.get(&account_id).unwrap().nonce;
         nonce.add_assign(&Fr::one());
         //println!("oldNonce", oldNonce);

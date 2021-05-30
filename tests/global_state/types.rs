@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 use rollup_state_manager::account::{Account, Signature};
 use rollup_state_manager::state::WitnessGenerator;
+use rollup_state_manager::test_utils::types::{get_token_id_by_name, prec_token_id};
 use rollup_state_manager::types;
 use rollup_state_manager::types::fixnum;
 use rollup_state_manager::types::l2::Order;
@@ -33,23 +34,6 @@ pub mod test_params {
     pub const MAXACCOUNTNUM: usize = 2usize.pow(ACCOUNTLEVELS as u32);
     pub const MAXTOKENNUM: usize = 2usize.pow(BALANCELEVELS as u32);
     pub const VERBOSE: bool = false;
-
-    // TODO: enum & impl
-    pub fn token_id(token_name: &str) -> u32 {
-        match token_name {
-            "ETH" => 0,
-            "USDT" => 1,
-            _ => unreachable!(),
-        }
-    }
-
-    // TODO: enum & impl
-    pub fn prec(token_id: u32) -> u32 {
-        match token_id {
-            0 | 1 => 6,
-            _ => unreachable!(),
-        }
-    }
 }
 
 type OrdersType = HashMap<u32, (u32, u64)>;
@@ -101,8 +85,8 @@ impl Orders {
                 order2_account_id: trade.bid_user_id,
                 token_id_1to2: id_pair.0,
                 token_id_2to1: id_pair.1,
-                amount_1to2: fixnum::decimal_to_amount(&trade.amount, test_params::prec(id_pair.0)),
-                amount_2to1: fixnum::decimal_to_amount(&trade.quote_amount, test_params::prec(id_pair.1)),
+                amount_1to2: fixnum::decimal_to_amount(&trade.amount, prec_token_id(id_pair.0)),
+                amount_2to1: fixnum::decimal_to_amount(&trade.quote_amount, prec_token_id(id_pair.1)),
                 order1_id: trade.ask_order_id as u32,
                 order2_id: trade.bid_order_id as u32,
             },
@@ -111,8 +95,8 @@ impl Orders {
                 order2_account_id: trade.ask_user_id,
                 token_id_1to2: id_pair.1,
                 token_id_2to1: id_pair.0,
-                amount_1to2: fixnum::decimal_to_amount(&trade.quote_amount, test_params::prec(id_pair.1)),
-                amount_2to1: fixnum::decimal_to_amount(&trade.amount, test_params::prec(id_pair.0)),
+                amount_1to2: fixnum::decimal_to_amount(&trade.quote_amount, prec_token_id(id_pair.1)),
+                amount_2to1: fixnum::decimal_to_amount(&trade.amount, prec_token_id(id_pair.0)),
                 order1_id: trade.bid_order_id as u32,
                 order2_id: trade.ask_order_id as u32,
             },
@@ -125,8 +109,8 @@ impl Orders {
             tokenbuy: u32_to_fr(order_state.token_buy),
             filled_sell: u32_to_fr(0),
             filled_buy: u32_to_fr(0),
-            total_sell: fixnum::decimal_to_amount(&order_state.total_sell, test_params::prec(order_state.token_sell)).to_fr(),
-            total_buy: fixnum::decimal_to_amount(&order_state.total_buy, test_params::prec(order_state.token_buy)).to_fr(),
+            total_sell: fixnum::decimal_to_amount(&order_state.total_sell, prec_token_id(order_state.token_sell)).to_fr(),
+            total_buy: fixnum::decimal_to_amount(&order_state.total_buy, prec_token_id(order_state.token_buy)).to_fr(),
             sig: Signature::default(),
         }
     }
@@ -279,7 +263,7 @@ impl Accounts {
     */
     pub fn handle_deposit(&mut self, witgen: &mut WitnessGenerator, deposit: types::matchengine::messages::BalanceMessage) {
         assert!(!deposit.change.is_sign_negative(), "only support deposit now");
-        let token_id = test_params::token_id(&deposit.asset);
+        let token_id = get_token_id_by_name(&deposit.asset);
         let account_id = deposit.user_id;
         let is_old = witgen.has_account(account_id);
         let account = self.entry(account_id).or_insert_with(|| Account::new(account_id));
@@ -290,12 +274,12 @@ impl Accounts {
         let expected_balance_before = witgen.get_token_balance(deposit.user_id, token_id);
         assert_eq!(
             expected_balance_before,
-            fixnum::decimal_to_amount(&balance_before, test_params::prec(token_id)).to_fr()
+            fixnum::decimal_to_amount(&balance_before, prec_token_id(token_id)).to_fr()
         );
 
         let timing = Instant::now();
 
-        let amount = fixnum::decimal_to_amount(&deposit.change, test_params::prec(token_id));
+        let amount = fixnum::decimal_to_amount(&deposit.change, prec_token_id(token_id));
         if is_old {
             witgen.deposit_to_old(types::l2::DepositToOldTx {
                 token_id,
@@ -369,7 +353,7 @@ impl<'c> From<&'c str> for TokenPair<'c> {
 
 impl<'c> From<TokenPair<'c>> for TokenIdPair {
     fn from(origin: TokenPair<'c>) -> Self {
-        TokenIdPair(test_params::token_id(origin.0), test_params::token_id(origin.1))
+        TokenIdPair(get_token_id_by_name(origin.0), get_token_id_by_name(origin.1))
     }
 }
 
@@ -422,10 +406,10 @@ impl<'c> From<OrderState<'c>> for types::l2::Order {
             //status: types::primitives::u32_to_fr(origin.status),
             tokenbuy: types::primitives::u32_to_fr(origin.token_buy),
             tokensell: types::primitives::u32_to_fr(origin.token_sell),
-            filled_sell: fixnum::decimal_to_amount(&origin.filled_sell, test_params::prec(origin.token_sell)).to_fr(),
-            filled_buy: fixnum::decimal_to_amount(&origin.filled_buy, test_params::prec(origin.token_buy)).to_fr(),
-            total_sell: fixnum::decimal_to_amount(&origin.total_sell, test_params::prec(origin.token_sell)).to_fr(),
-            total_buy: fixnum::decimal_to_amount(&origin.total_buy, test_params::prec(origin.token_buy)).to_fr(),
+            filled_sell: fixnum::decimal_to_amount(&origin.filled_sell, prec_token_id(origin.token_sell)).to_fr(),
+            filled_buy: fixnum::decimal_to_amount(&origin.filled_buy, prec_token_id(origin.token_buy)).to_fr(),
+            total_sell: fixnum::decimal_to_amount(&origin.total_sell, prec_token_id(origin.token_sell)).to_fr(),
+            total_buy: fixnum::decimal_to_amount(&origin.total_buy, prec_token_id(origin.token_buy)).to_fr(),
             sig: Signature::default(),
         }
     }
@@ -476,10 +460,10 @@ impl CommonBalanceState {
             ask_user_base: origin.ask_user_base,
             ask_user_quote: origin.ask_user_quote,
             /*
-            bid_user_base: fixnum::decimal_to_amount(&origin.bid_user_base, test_params::prec(base_id)).to_fr(),
-            bid_user_quote: fixnum::decimal_to_amount(&origin.bid_user_quote, test_params::prec(quote_id)).to_fr(),
-            ask_user_base: fixnum::decimal_to_amount(&origin.ask_user_base, test_params::prec(base_id)).to_fr(),
-            ask_user_quote: fixnum::decimal_to_amount(&origin.ask_user_quote, test_params::prec(quote_id)).to_fr(),
+            bid_user_base: fixnum::decimal_to_amount(&origin.bid_user_base, prec_token_id(base_id)).to_fr(),
+            bid_user_quote: fixnum::decimal_to_amount(&origin.bid_user_quote, prec_token_id(quote_id)).to_fr(),
+            ask_user_base: fixnum::decimal_to_amount(&origin.ask_user_base, prec_token_id(base_id)).to_fr(),
+            ask_user_quote: fixnum::decimal_to_amount(&origin.ask_user_quote, prec_token_id(quote_id)).to_fr(),
             */
         }
     }
@@ -489,10 +473,10 @@ impl CommonBalanceState {
         let quote_id = id_pair.1;
 
         CommonBalanceState {
-            bid_user_base: fr_to_decimal(&witgen.get_token_balance(bid_id, base_id), test_params::prec(base_id)),
-            bid_user_quote: fr_to_decimal(&witgen.get_token_balance(bid_id, quote_id), test_params::prec(quote_id)),
-            ask_user_base: fr_to_decimal(&witgen.get_token_balance(ask_id, base_id), test_params::prec(base_id)),
-            ask_user_quote: fr_to_decimal(&witgen.get_token_balance(ask_id, quote_id), test_params::prec(quote_id)),
+            bid_user_base: fr_to_decimal(&witgen.get_token_balance(bid_id, base_id), prec_token_id(base_id)),
+            bid_user_quote: fr_to_decimal(&witgen.get_token_balance(bid_id, quote_id), prec_token_id(quote_id)),
+            ask_user_base: fr_to_decimal(&witgen.get_token_balance(ask_id, base_id), prec_token_id(base_id)),
+            ask_user_quote: fr_to_decimal(&witgen.get_token_balance(ask_id, quote_id), prec_token_id(quote_id)),
             /*
             bid_user_base: witgen.get_token_balance(bid_id, base_id),
             bid_user_quote: witgen.get_token_balance(bid_id, quote_id),

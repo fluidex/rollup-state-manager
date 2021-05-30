@@ -4,7 +4,7 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
 
 use super::global::{AccountUpdates, GlobalState};
-use crate::types::l2::{tx_detail_idx, DepositToNewTx, DepositToOldTx, L2Block, Order, RawTx, SpotTradeTx, TxType, TX_LENGTH};
+use crate::types::l2::{tx_detail_idx, DepositToNewTx, DepositToOldTx, L2Block, Order, RawTx, SpotTradeTx, TransferTx, TxType, TX_LENGTH};
 use crate::types::merkle_tree::Tree;
 use crate::types::primitives::{bigint_to_fr, fr_add, fr_sub, fr_to_bigint, u32_to_fr, Fr};
 use ff::Field;
@@ -52,6 +52,18 @@ impl WitnessGenerator {
     }
     pub fn get_account_order_by_id(&self, account_id: u32, order_id: u32) -> Order {
         self.state.get_account_order_by_id(account_id, order_id)
+    }
+    pub fn set_account_l2_addr(&mut self, account_id: u32, sign: Fr, ay: Fr, eth_addr: Fr) {
+        self.state.set_account_l2_addr(account_id, sign, ay, eth_addr);
+    }
+    pub fn set_account_nonce(&mut self, account_id: u32, nonce: Fr) {
+        self.state.set_account_nonce(account_id, nonce);
+    }
+    pub fn set_account_order(&mut self, account_id: u32, order_pos: u32, order: Order) {
+        self.state.set_account_order(account_id, order_pos, order);
+    }
+    pub fn set_token_balance(&mut self, account_id: u32, token_id: u32, balance: Fr) {
+        self.state.set_token_balance(account_id, token_id, balance);
     }
     pub fn forge_with_txs(&self, buffered_txs: &[RawTx]) -> L2Block {
         assert!(buffered_txs.len() == self.n_tx, "invalid txs len");
@@ -233,20 +245,13 @@ impl WitnessGenerator {
         raw_tx.root_after = self.state.root();
         self.add_raw_tx(raw_tx);
     }
-    /*
-    fillTransferTx(tx: TranferTx) {
-      let fullTx = {
-        from: tx.from,
-        to: tx.to,
-        token_id: tx.token_id,
-        amount: tx.amount,
-        fromNonce: self.accounts.get(tx.from).nonce,
-        toNonce: self.accounts.get(tx.to).nonce,
-        old_balanceFrom: self.get_token_balance(tx.from, tx.token_id),
-        old_balanceTo: self.get_token_balance(tx.to, tx.token_id),
-      };
-      return fullTx;
+    pub fn fill_transfer_tx(&self, tx: &mut TransferTx) {
+        tx.from_nonce = self.state.get_account(tx.from).nonce;
+        tx.to_nonce = self.state.get_account(tx.to).nonce;
+        tx.old_balance_from = self.state.get_token_balance(tx.from, tx.token_id);
+        tx.old_balance_to = self.state.get_token_balance(tx.to, tx.token_id);
     }
+    /*
     fillWithdraw_tx(tx: Withdraw_tx) {
       let fullTx = {
         account_id: tx.account_id,
@@ -257,68 +262,76 @@ impl WitnessGenerator {
       };
       return fullTx;
     }
-    Transfer(tx: TranferTx) {
-      assert!(self.accounts.get(tx.from).eth_addr != 0n, "TransferTx: empty fromAccount");
-      assert!(self.accounts.get(tx.to).eth_addr != 0n, "Transfer: empty toAccount");
-      let proofFrom = self.state_proof(tx.from, tx.token_id);
-      let fromAccount = self.accounts.get(tx.from);
-      let toAccount = self.accounts.get(tx.to);
+    */
+    pub fn transfer(&mut self, tx: TransferTx) {
+        // assert(this.accounts.get(tx.from).eth_addr != 0, 'TransferTx: empty fromAccount');
+        // assert(this.accounts.get(tx.to).eth_addr != 0, 'Transfer: empty toAccount');
 
-      // first, generate the tx
-      let encoded_tx: Array<Fr> = new Array(Txlen());
-      encoded_tx.fill(0n, 0, Txlen());
+        let proof_from = self.state.balance_full_proof(tx.from, tx.token_id);
+        let from_account = self.state.get_account(tx.from);
+        let to_account = self.state.get_account(tx.to);
 
-      let fromOldBalance = self.get_token_balance(tx.from, tx.token_id);
-      let toOldBalance = self.get_token_balance(tx.to, tx.token_id);
-      assert!(fromOldBalance > tx.amount, "Transfer balance not enough");
-      encoded_tx[tx_detail_idx::ACCOUNT_ID1] = tx.from;
-      encoded_tx[tx_detail_idx::ACCOUNT_ID2] = tx.to;
-      encoded_tx[tx_detail_idx::TOKEN_ID] = tx.token_id;
-      encoded_tx[tx_detail_idx::AMOUNT] = tx.amount;
-      encoded_tx[tx_detail_idx::NONCE1] = fromAccount.nonce;
-      encoded_tx[tx_detail_idx::NONCE2] = toAccount.nonce;
-      encoded_tx[tx_detail_idx::SIGN1] = fromAccount.sign;
-      encoded_tx[tx_detail_idx::SIGN2] = toAccount.sign;
-      encoded_tx[tx_detail_idx::AY1] = fromAccount.ay;
-      encoded_tx[tx_detail_idx::AY2] = toAccount.ay;
-      encoded_tx[tx_detail_idx::ETH_ADDR1] = fromAccount.eth_addr;
-      encoded_tx[tx_detail_idx::ETH_ADDR2] = toAccount.eth_addr;
-      encoded_tx[tx_detail_idx::BALANCE1] = fromOldBalance;
-      encoded_tx[tx_detail_idx::BALANCE2] = toOldBalance;
-      encoded_tx[tx_detail_idx::SIG_L2_HASH] = tx.signature.hash;
-      encoded_tx[tx_detail_idx::S] = tx.signature.S;
-      encoded_tx[tx_detail_idx::R8X] = tx.signature.R8x;
-      encoded_tx[tx_detail_idx::R8Y] = tx.signature.R8y;
+        let from_old_balance = self.get_token_balance(tx.from, tx.token_id);
+        let to_old_balance = self.get_token_balance(tx.to, tx.token_id);
+        // assert(from_old_balance > tx.amount, 'Transfer balance not enough');
 
-      let raw_tx: RawTx = {
-        tx_type: TxType.Transfer,
-        payload: encoded_tx,
-        balance_path0: proofFrom.balance_path,
-        balance_path1: null,
-        balance_path2: proofFrom.balance_path,
-        balance_path3: null,
-        order_path0: self.trivial_order_path_elements(),
-        order_path1: self.trivial_order_path_elements(),
-        order_root0: fromAccount.order_root,
-        order_root1: toAccount.order_root,
-        account_path0: proofFrom.account_path,
-        account_path1: null,
-        root_before: proofFrom.root,
-        root_after: 0n,
-      };
+        let mut encoded_tx = [Fr::zero(); TX_LENGTH];
+        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = u32_to_fr(tx.from);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID2] = u32_to_fr(tx.to);
+        encoded_tx[tx_detail_idx::TOKEN_ID1] = u32_to_fr(tx.token_id);
+        encoded_tx[tx_detail_idx::AMOUNT] = tx.amount.to_fr();
+        encoded_tx[tx_detail_idx::NONCE1] = from_account.nonce;
+        encoded_tx[tx_detail_idx::NONCE2] = to_account.nonce;
+        encoded_tx[tx_detail_idx::SIGN1] = from_account.sign;
+        encoded_tx[tx_detail_idx::SIGN2] = to_account.sign;
+        encoded_tx[tx_detail_idx::AY1] = from_account.ay;
+        encoded_tx[tx_detail_idx::AY2] = to_account.ay;
+        encoded_tx[tx_detail_idx::ETH_ADDR1] = from_account.eth_addr;
+        encoded_tx[tx_detail_idx::ETH_ADDR2] = to_account.eth_addr;
+        encoded_tx[tx_detail_idx::BALANCE1] = from_old_balance;
+        encoded_tx[tx_detail_idx::BALANCE2] = bigint_to_fr(fr_to_bigint(&to_old_balance) + tx.amount.to_bigint());
+        encoded_tx[tx_detail_idx::SIG_L2_HASH1] = tx.sig.hash;
+        encoded_tx[tx_detail_idx::S1] = tx.sig.s;
+        encoded_tx[tx_detail_idx::R8X1] = tx.sig.r8x;
+        encoded_tx[tx_detail_idx::R8Y1] = tx.sig.r8y;
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = u32_to_fr(1);
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = u32_to_fr(1);
+        encoded_tx[tx_detail_idx::ENABLE_SIG_CHECK1] = u32_to_fr(1);
 
-      self.set_token_balance(tx.from, tx.token_id, fromOldBalance - tx.amount);
-      self.increase_nonce(tx.from);
+        self.set_token_balance(
+            tx.from,
+            tx.token_id,
+            bigint_to_fr(fr_to_bigint(&from_old_balance) - tx.amount.to_bigint()),
+        );
+        self.state.increase_nonce(tx.from);
 
-      let proofTo = self.state_proof(tx.to, tx.token_id);
-      raw_tx.balance_path1 = proofTo.balance_path;
-      raw_tx.balance_path3 = proofTo.balance_path;
-      raw_tx.account_path1 = proofTo.account_path;
-      self.set_token_balance(tx.to, tx.token_id, toOldBalance + tx.amount);
+        let proof_to = self.state.balance_full_proof(tx.to, tx.token_id);
+        self.set_token_balance(
+            tx.to,
+            tx.token_id,
+            bigint_to_fr(fr_to_bigint(&to_old_balance) + tx.amount.to_bigint()),
+        );
 
-      raw_tx.root_after = self.root();
-      self.add_raw_tx(raw_tx);
+        let raw_tx = RawTx {
+            tx_type: TxType::Transfer,
+            payload: encoded_tx.to_vec(),
+            balance_path0: proof_from.balance_path.clone(),
+            balance_path1: proof_to.balance_path.clone(),
+            balance_path2: proof_from.balance_path,
+            balance_path3: proof_to.balance_path,
+            order_path0: self.state.trivial_order_path_elements(),
+            order_path1: self.state.trivial_order_path_elements(),
+            order_root0: from_account.order_root,
+            order_root1: to_account.order_root,
+            account_path0: proof_from.account_path,
+            account_path1: proof_to.account_path,
+            root_before: proof_from.root,
+            root_after: self.root(),
+        };
+
+        self.add_raw_tx(raw_tx);
     }
+    /*
     Withdraw(tx: Withdraw_tx) {
       assert!(self.accounts.get(tx.account_id).eth_addr != 0n, "Withdraw");
       let proof = self.state_proof(tx.account_id, tx.token_id);
