@@ -143,7 +143,7 @@ dependencies = [
 [[package]]
 name = "bellman_ce"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/bellman?branch=beta#48441155ec7006bf7bfac553b5fb7d466d7fcd00"
+source = "git+https://github.com/matter-labs/bellman?branch=beta#455480a2db44ecc0423785b295981074800913e6"
 dependencies = [
  "bit-vec",
  "blake2s_simd",
@@ -514,7 +514,7 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=beta#4a706d93628980e036249e3b182b91af8797ce8c"
+source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=beta#942368fcde0fe87451bed82e716ec18cfd725fa2"
 dependencies = [
  "bellman_ce",
  "bit-vec",
