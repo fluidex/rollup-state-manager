@@ -3,7 +3,7 @@ pub use crate::types::merkle_tree::MerklePath;
 use crate::types::primitives::{hash, shl, Fr};
 use ff::Field;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 pub struct AccountState {
     pub nonce: Fr,
     pub sign: Fr,

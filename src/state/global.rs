@@ -4,10 +4,10 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
 
 use super::AccountState;
-use crate::account::Account;
 use crate::types::l2::Order;
 use crate::types::merkle_tree::{empty_tree_root, MerkleProof, Tree};
 use crate::types::primitives::{fr_to_u32, Fr};
+use anyhow::bail;
 use ff::Field;
 use fnv::FnvHashMap;
 use std::collections::BTreeMap;
@@ -154,17 +154,33 @@ impl GlobalState {
         self.set_account_nonce(account_id, nonce);
     }
     pub fn get_account(&self, account_id: u32) -> AccountState {
-        *self.accounts.get(&account_id).unwrap()
+        self.accounts
+            .get(&account_id)
+            .cloned()
+            .unwrap_or_else(|| AccountState::empty(self.default_balance_root, self.default_order_root))
+    }
+    pub fn has_account(&self, account_id: u32) -> bool {
+        !self.get_account(account_id).ay.is_zero()
     }
     fn get_next_order_pos_for_user(&self, account_id: u32) -> u32 {
         *self.next_order_positions.get(&account_id).unwrap()
     }
-    pub fn create_new_account(&mut self, next_order_id: u32) -> Result<Account, String> {
+    pub fn get_next_account_id(&self) -> anyhow::Result<u32> {
+        // TODO: should this function return Err(...) when the tree is full?
+        // TODO: we may need to allow sparse account tree later,
+        // eg, account 1 and account 5 is created, while account 2/3/4 is empty
         let account_id = self.balance_trees.len() as u32;
         if account_id >= 2u32.pow(self.account_levels as u32) {
-            panic!("account_id {} overflows for account_levels {}", account_id, self.account_levels);
+            bail!("account_id {} overflows for account_levels {}", account_id, self.account_levels);
         }
-
+        Ok(account_id)
+    }
+    // TODO: private or public? It is better this function is called automatically
+    // rather than being called manully by the caller
+    pub fn init_account(&mut self, account_id: u32, next_order_id: u32) -> anyhow::Result<u32> {
+        if account_id >= 2u32.pow(self.account_levels as u32) {
+            bail!("account_id {} overflows for account_levels {}", account_id, self.account_levels);
+        }
         let account_state = AccountState::empty(self.default_balance_root, self.default_order_root);
         self.accounts.insert(account_id, account_state);
         self.balance_trees
@@ -176,7 +192,11 @@ impl GlobalState {
         self.order_map.insert(account_id, BTreeMap::<u32, Order>::default());
         self.account_tree.lock().unwrap().set_value(account_id, self.default_account_leaf);
         self.next_order_positions.insert(account_id, next_order_id);
-        Account::new(account_id)
+        Ok(account_id)
+    }
+    pub fn create_new_account(&mut self, next_order_id: u32) -> anyhow::Result<u32> {
+        let account_id = self.get_next_account_id()?;
+        self.init_account(account_id, next_order_id)
     }
     pub fn get_order_pos_by_id(&self, account_id: u32, order_id: u32) -> u32 {
         *self.order_id_to_pos.get(&(account_id, order_id)).unwrap()
@@ -260,6 +280,9 @@ impl GlobalState {
     }
 
     pub fn get_token_balance(&self, account_id: u32, token_id: u32) -> Fr {
+        if !self.has_account(account_id) {
+            return Fr::zero();
+        }
         self.balance_trees.get(&account_id).unwrap().lock().unwrap().get_leaf(token_id)
     }
     pub fn set_token_balance(&mut self, account_id: u32, token_id: u32, balance: Fr) {

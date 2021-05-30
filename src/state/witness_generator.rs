@@ -4,7 +4,6 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
 
 use super::global::{AccountUpdates, GlobalState};
-use crate::account::Account;
 use crate::types::l2::{tx_detail_idx, DepositToNewTx, DepositToOldTx, L2Block, Order, RawTx, SpotTradeTx, TxType, TX_LENGTH};
 use crate::types::merkle_tree::Tree;
 use crate::types::primitives::{bigint_to_fr, fr_add, fr_sub, fr_to_bigint, u32_to_fr, Fr};
@@ -39,13 +38,16 @@ impl WitnessGenerator {
     pub fn has_order(&self, account_id: u32, order_id: u32) -> bool {
         self.state.has_order(account_id, order_id)
     }
+    pub fn has_account(&self, account_id: u32) -> bool {
+        self.state.has_account(account_id)
+    }
     pub fn get_token_balance(&self, account_id: u32, token_id: u32) -> Fr {
         self.state.get_token_balance(account_id, token_id)
     }
     pub fn update_order_state(&mut self, account_id: u32, order: Order) {
         self.state.update_order_state(account_id, order)
     }
-    pub fn create_new_account(&mut self, next_order_id: u32) -> Result<Account, String> {
+    pub fn create_new_account(&mut self, next_order_id: u32) -> anyhow::Result<u32> {
         self.state.create_new_account(next_order_id)
     }
     pub fn get_account_order_by_id(&self, account_id: u32, order_id: u32) -> Order {
@@ -122,7 +124,10 @@ impl WitnessGenerator {
     */
     pub fn deposit_to_new(&mut self, tx: DepositToNewTx) {
         // assert!(self.accounts.get(tx.account_id).eth_addr == 0n, "deposit_to_new");
-
+        if !self.has_account(tx.account_id) {
+            // TODO: return err
+            self.state.init_account(tx.account_id, 1).unwrap();
+        }
         let proof = self.state.balance_full_proof(tx.account_id, tx.token_id);
         let acc = self.state.get_account(tx.account_id);
 
