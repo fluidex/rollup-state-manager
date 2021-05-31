@@ -4,7 +4,9 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
 
 use super::global::{AccountUpdates, GlobalState};
-use crate::types::l2::{tx_detail_idx, DepositToNewTx, DepositToOldTx, L2Block, Order, RawTx, SpotTradeTx, TransferTx, TxType, TX_LENGTH};
+use crate::types::l2::{
+    tx_detail_idx, DepositToNewTx, DepositToOldTx, L2Block, Order, RawTx, SpotTradeTx, TransferTx, TxType, WithdrawTx, TX_LENGTH,
+};
 use crate::types::merkle_tree::Tree;
 use crate::types::primitives::{bigint_to_fr, fr_add, fr_sub, fr_to_bigint, u32_to_fr, Fr};
 use ff::Field;
@@ -251,18 +253,10 @@ impl WitnessGenerator {
         tx.old_balance_from = self.state.get_token_balance(tx.from, tx.token_id);
         tx.old_balance_to = self.state.get_token_balance(tx.to, tx.token_id);
     }
-    /*
-    fillWithdraw_tx(tx: Withdraw_tx) {
-      let fullTx = {
-        account_id: tx.account_id,
-        token_id: tx.token_id,
-        amount: tx.amount,
-        nonce: self.accounts.get(tx.account_id).nonce,
-        old_balance: self.get_token_balance(tx.account_id, tx.token_id),
-      };
-      return fullTx;
+    pub fn fill_withdraw_tx(&self, tx: &mut WithdrawTx) {
+        tx.nonce = self.state.get_account(tx.account_id).nonce;
+        tx.old_balance = self.get_token_balance(tx.account_id, tx.token_id);
     }
-    */
     pub fn transfer(&mut self, tx: TransferTx) {
         // assert(this.accounts.get(tx.from).eth_addr != 0, 'TransferTx: empty fromAccount');
         // assert(this.accounts.get(tx.to).eth_addr != 0, 'Transfer: empty toAccount');
@@ -331,55 +325,74 @@ impl WitnessGenerator {
 
         self.add_raw_tx(raw_tx);
     }
-    /*
-    Withdraw(tx: Withdraw_tx) {
-      assert!(self.accounts.get(tx.account_id).eth_addr != 0n, "Withdraw");
-      let proof = self.state_proof(tx.account_id, tx.token_id);
-      // first, generate the tx
-      let encoded_tx: Array<Fr> = new Array(Txlen());
-      encoded_tx.fill(0n, 0, Txlen());
+    pub fn withdraw(&mut self, tx: WithdrawTx) {
+        // assert(this.accounts.get(tx.accountID).ethAddr != 0n, 'Withdraw');
+        let account_id = tx.account_id;
+        let token_id = tx.token_id;
+        let proof = self.state.balance_full_proof(account_id, token_id);
 
-      let acc = self.accounts.get(tx.account_id);
-      let balanceBefore = self.get_token_balance(tx.account_id, tx.token_id);
-      assert!(balanceBefore > tx.amount, "Withdraw balance");
-      encoded_tx[tx_detail_idx::ACCOUNT_ID1] = tx.account_id;
-      encoded_tx[tx_detail_idx::TOKEN_ID] = tx.token_id;
-      encoded_tx[tx_detail_idx::AMOUNT] = tx.amount;
-      encoded_tx[tx_detail_idx::NONCE1] = acc.nonce;
-      encoded_tx[tx_detail_idx::SIGN1] = acc.sign;
-      encoded_tx[tx_detail_idx::AY1] = acc.ay;
-      encoded_tx[tx_detail_idx::ETH_ADDR1] = acc.eth_addr;
-      encoded_tx[tx_detail_idx::BALANCE1] = balanceBefore;
+        let acc = self.state.get_account(account_id);
+        let old_balance = self.get_token_balance(account_id, token_id);
+        let nonce = acc.nonce;
+        // assert(oldBalance > tx.amount, 'Withdraw balance');
 
-      encoded_tx[tx_detail_idx::SIG_L2_HASH] = tx.signature.hash;
-      encoded_tx[tx_detail_idx::S] = tx.signature.S;
-      encoded_tx[tx_detail_idx::R8X] = tx.signature.R8x;
-      encoded_tx[tx_detail_idx::R8Y] = tx.signature.R8y;
+        // first, generate the tx
+        let mut encoded_tx = [Fr::zero(); TX_LENGTH];
 
-      let raw_tx: RawTx = {
-        tx_type: TxType.Withdraw,
-        payload: encoded_tx,
-        balance_path0: proof.balance_path,
-        balance_path1: proof.balance_path,
-        balance_path2: proof.balance_path,
-        balance_path3: proof.balance_path,
-        order_path0: self.trivial_order_path_elements(),
-        order_path1: self.trivial_order_path_elements(),
-        order_root0: acc.order_root,
-        order_root1: acc.order_root,
-        account_path0: proof.account_path,
-        account_path1: proof.account_path,
-        root_before: proof.root,
-        root_after: 0n,
-      };
+        encoded_tx[tx_detail_idx::AMOUNT] = tx.amount.to_fr();
 
-      self.set_token_balance(tx.account_id, tx.token_id, balanceBefore - tx.amount);
-      self.increase_nonce(tx.account_id);
+        encoded_tx[tx_detail_idx::TOKEN_ID1] = u32_to_fr(token_id);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = u32_to_fr(account_id);
+        encoded_tx[tx_detail_idx::BALANCE1] = old_balance;
+        encoded_tx[tx_detail_idx::NONCE1] = nonce;
+        encoded_tx[tx_detail_idx::ETH_ADDR1] = acc.eth_addr;
+        encoded_tx[tx_detail_idx::SIGN1] = acc.sign;
+        encoded_tx[tx_detail_idx::AY1] = acc.ay;
 
-      raw_tx.root_after = self.root();
-      self.add_raw_tx(raw_tx);
+        encoded_tx[tx_detail_idx::TOKEN_ID2] = u32_to_fr(token_id);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID2] = u32_to_fr(account_id);
+        encoded_tx[tx_detail_idx::BALANCE2] = bigint_to_fr(fr_to_bigint(&old_balance) - fr_to_bigint(&tx.amount.to_fr()));
+        encoded_tx[tx_detail_idx::NONCE2] = bigint_to_fr(fr_to_bigint(&nonce) + 1);
+        encoded_tx[tx_detail_idx::ETH_ADDR2] = acc.eth_addr;
+        encoded_tx[tx_detail_idx::SIGN2] = acc.sign;
+        encoded_tx[tx_detail_idx::AY2] = acc.ay;
+
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = u32_to_fr(1u32);
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = u32_to_fr(1u32);
+        encoded_tx[tx_detail_idx::ENABLE_SIG_CHECK1] = u32_to_fr(1u32);
+
+        encoded_tx[tx_detail_idx::SIG_L2_HASH1] = tx.sig.hash;
+        encoded_tx[tx_detail_idx::S1] = tx.sig.s;
+        encoded_tx[tx_detail_idx::R8X1] = tx.sig.r8x;
+        encoded_tx[tx_detail_idx::R8Y1] = tx.sig.r8y;
+
+        let mut raw_tx = RawTx {
+            tx_type: TxType::Withdraw,
+            payload: encoded_tx.to_vec(),
+            balance_path0: proof.balance_path.clone(),
+            balance_path1: proof.balance_path.clone(),
+            balance_path2: proof.balance_path.clone(),
+            balance_path3: proof.balance_path,
+            order_path0: self.state.trivial_order_path_elements(),
+            order_path1: self.state.trivial_order_path_elements(),
+            order_root0: acc.order_root,
+            order_root1: acc.order_root,
+            account_path0: proof.account_path.clone(),
+            account_path1: proof.account_path,
+            root_before: proof.root,
+            root_after: Fr::zero(),
+        };
+
+        self.state.set_token_balance(
+            account_id,
+            token_id,
+            bigint_to_fr(fr_to_bigint(&old_balance) - fr_to_bigint(&tx.amount.to_fr())),
+        );
+        self.state.increase_nonce(account_id);
+
+        raw_tx.root_after = self.state.root();
+        self.add_raw_tx(raw_tx);
     }
-    */
 
     // case1: old order is empty
     // case2: old order is valid old order with different order id, but we will replace it.

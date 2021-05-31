@@ -4,8 +4,9 @@ use crate::state::witness_generator::WitnessGenerator;
 use crate::test_utils::types::prec_token_id;
 use crate::test_utils::{CircuitTestData, L2BlockSerde};
 use crate::types::fixnum::decimal_to_amount;
-use crate::types::l2::{DepositToNewTx, DepositToOldTx, Order, TransferTx};
-use crate::types::primitives::u32_to_fr;
+use crate::types::l2::{DepositToNewTx, DepositToOldTx, Order, SpotTradeTx, TransferTx, WithdrawTx};
+use crate::types::primitives::{u32_to_fr, Fr};
+use ff::Field;
 use rust_decimal::Decimal;
 use serde_json::json;
 
@@ -29,7 +30,10 @@ impl Block {
     }
 
     pub fn test_data(&self) -> Vec<CircuitTestData> {
-        vec![self.empty_block_case()]
+        let mut cases = self.block_cases();
+        let empty_case = self.empty_block_case();
+        cases.push(empty_case);
+        cases
     }
 
     fn block_cases(&self) -> Vec<CircuitTestData> {
@@ -70,11 +74,13 @@ impl Block {
             tokensell: u32_to_fr(token_id_2to1),
             total_buy: u32_to_fr(1000),
             total_sell: u32_to_fr(10000),
-            filled_buy: u32_to_fr(1),
-            filled_sell: u32_to_fr(10),
+            filled_buy: Fr::zero(),
+            filled_sell: Fr::zero(),
             sig: Signature::default(),
         };
         order2.sign_with(&account2).unwrap();
+        order2.filled_buy = u32_to_fr(1);
+        order2.filled_sell = u32_to_fr(10);
         witgen.set_account_order(account_id2, order_id2, order2);
 
         // start txs
@@ -107,75 +113,73 @@ impl Block {
         transfer_tx.sig = account1.sign_hash(hash).unwrap();
         witgen.transfer(transfer_tx);
 
-        /*
+        let mut withdraw_tx = WithdrawTx::new(
+            account_id0,
+            token_id,
+            decimal_to_amount(&Decimal::new(150, 0), prec_token_id(token_id)),
+        );
+        witgen.fill_withdraw_tx(&mut withdraw_tx);
+        let hash = withdraw_tx.hash();
+        // hash = common.hashWithdraw(fullWithdrawTx);
+        withdraw_tx.sig = account0.sign_hash(hash).unwrap();
+        witgen.withdraw(withdraw_tx);
 
-        function initBlockTestCase() {
+        // trade amount
+        let amount_1to2 = 120;
+        let amount_2to1 = 1200;
+        // ensure balance to trade
+        witgen.deposit_to_old(DepositToOldTx {
+            account_id: account_id1,
+            token_id: token_id_1to2,
+            amount: decimal_to_amount(&Decimal::new(199, 0), prec_token_id(token_id_1to2)),
+        });
+        witgen.deposit_to_old(DepositToOldTx {
+            account_id: account_id2,
+            token_id: token_id_2to1,
+            amount: decimal_to_amount(&Decimal::new(1990, 0), prec_token_id(token_id_2to1)),
+        });
 
+        // order1
+        let order_id1 = 1;
+        let mut order1 = Order {
+            order_id: u32_to_fr(order_id1),
+            tokenbuy: u32_to_fr(token_id_2to1),
+            tokensell: u32_to_fr(token_id_1to2),
+            total_buy: u32_to_fr(10000),
+            total_sell: u32_to_fr(1000),
+            filled_buy: Fr::zero(),
+            filled_sell: Fr::zero(),
+            sig: Signature::default(),
+        };
+        order1.sign_with(&account1).unwrap();
+        // order_id is known to the user, user should sign this order_id
+        // while order_idx(or order_pos) is maintained by the global state keeper. User dont need to know anything about order_pos
+        // const order1_pos = state.nextOrderIds.get(accountID1);
+        // assert(order1_pos === 1n, 'unexpected order pos');
+        witgen.set_account_order(account_id1, order_id1, order1);
 
-          let withdrawTx = {
-            accountID: accountID0,
-            amount: 150n,
-            tokenID: tokenID,
-            signature: null,
-          };
-          let fullWithdrawTx = state.fillWithdrawTx(withdrawTx);
-          hash = common.hashWithdraw(fullWithdrawTx);
-          withdrawTx.signature = account0.signHash(hash);
-          state.Withdraw(withdrawTx);
+        witgen.spot_trade(SpotTradeTx {
+            order1_account_id: account_id1,
+            order2_account_id: account_id2,
+            token_id_1to2,
+            token_id_2to1,
+            amount_1to2: decimal_to_amount(&Decimal::new(amount_1to2, 0), prec_token_id(token_id_1to2)),
+            amount_2to1: decimal_to_amount(&Decimal::new(amount_2to1, 0), prec_token_id(token_id_2to1)),
+            order1_id: order_id1,
+            order2_id: order_id2,
+        });
 
-          // trade amount
-          const amount_1to2 = 120n;
-          const amount_2to1 = 1200n;
-          // ensure balance to trade
-          state.DepositToOld({
-            accountID: accountID1,
-            tokenID: tokenID_1to2,
-            amount: 199n,
-          });
-          state.DepositToOld({
-            accountID: accountID2,
-            tokenID: tokenID_2to1,
-            amount: 1990n,
-          });
-          const order1_id = 1n;
-          const order1: OrderInput = new OrderInput({
-            accountID: accountID1,
-            order_id: order1_id,
-            tokensell: tokenID_1to2,
-            tokenbuy: tokenID_2to1,
-            total_sell: 1000n,
-            total_buy: 10000n,
-          });
-          order1.signWith(account1);
-          // order_id is known to the user, user should sign this order_id
-          // while order_idx(or order_pos) is maintained by the global state keeper. User dont need to know anything about order_pos
-          //const order1_pos = state.nextOrderIds.get(accountID1);
-          //assert(order1_pos === 1n, 'unexpected order pos');
-          state.setAccountOrder(accountID1, OrderState.fromOrderInput(order1));
-
-          let spotTradeTx = {
-            order1_accountID: accountID1,
-            order2_accountID: accountID2,
-            tokenID_1to2: tokenID_1to2,
-            tokenID_2to1: tokenID_2to1,
-            amount_1to2: amount_1to2,
-            amount_2to1: amount_2to1,
-            order1_id: order1_id,
-            order2_id: order2_id,
-          };
-          state.SpotTrade(spotTradeTx);
-
-          for (var i = state.bufferedTxs.length; i < nTxs; i++) {
-            state.Nop();
-          }
-
-          let blocks = state.forgeAllL2Blocks();
-          return blocks;
-        }
-
-        */
-
-        todo!()
+        witgen.flush_with_nop();
+        witgen
+            .forge_all_l2_blocks()
+            .into_iter()
+            .enumerate()
+            .map(|(i, block)| CircuitTestData {
+                name: format!("nonempty_block_{}", i),
+                input: json!(L2BlockSerde::from(block)),
+                output: json!({}),
+            })
+            .collect()
     }
 
     fn empty_block_case(&self) -> CircuitTestData {

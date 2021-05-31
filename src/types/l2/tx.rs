@@ -113,6 +113,37 @@ impl TransferTx {
         hash(&[data, u32_to_fr(self.to), self.to_nonce, self.old_balance_to])
     }
 }
+
+// WithdrawTx can only withdraw to one's own L1 address
+#[derive(Debug)]
+pub struct WithdrawTx {
+    pub account_id: u32,
+    pub token_id: u32,
+    pub amount: AmountType,
+    pub nonce: Fr,
+    pub old_balance: Fr,
+    pub sig: Signature,
+}
+
+impl WithdrawTx {
+    pub fn new(account_id: u32, token_id: u32, amount: AmountType) -> Self {
+        Self {
+            account_id,
+            token_id,
+            amount,
+            nonce: Fr::zero(),
+            old_balance: Fr::zero(),
+            sig: Signature::default(),
+        }
+    }
+
+    pub fn hash(&self) -> Fr {
+        let data = hash(&[u32_to_fr(TxType::Withdraw as u32), u32_to_fr(self.token_id), self.amount.to_fr()]);
+        // do we really need to sign oldBalance?
+        hash(&[data, u32_to_fr(self.account_id), self.nonce, self.old_balance])
+    }
+}
+
 pub const PUBDATA_LEN: usize = 60;
 pub const ACCOUNT_ID_LEN: usize = 4;
 pub const TOKEN_ID_LEN: usize = 2;
