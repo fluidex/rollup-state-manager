@@ -1,12 +1,14 @@
-use crate::types::merkle_tree::MerklePath;
-
+use crate::account::Signature;
 use crate::types::fixnum::Float864;
-use crate::types::primitives::Fr;
+use crate::types::merkle_tree::MerklePath;
+use crate::types::primitives::{hash, u32_to_fr, Fr};
 use anyhow::bail;
 use anyhow::Result;
+use ff::Field;
 use std::convert::TryInto;
 
 #[derive(Copy, Clone)]
+#[repr(u8)]
 pub enum TxType {
     DepositToNew,
     DepositToOld,
@@ -74,6 +76,72 @@ pub struct SpotTradeTx {
     pub amount_2to1: AmountType,
     pub order1_id: u32,
     pub order2_id: u32,
+}
+
+#[derive(Debug)]
+pub struct TransferTx {
+    pub from: u32,
+    pub to: u32,
+    pub token_id: u32,
+    pub amount: AmountType,
+    pub from_nonce: Fr,
+    pub to_nonce: Fr,
+    pub old_balance_from: Fr,
+    pub old_balance_to: Fr,
+    pub sig: Signature,
+}
+
+impl TransferTx {
+    pub fn new(from: u32, to: u32, token_id: u32, amount: AmountType) -> Self {
+        Self {
+            from,
+            to,
+            token_id,
+            amount,
+            from_nonce: Fr::zero(),
+            to_nonce: Fr::zero(),
+            old_balance_from: Fr::zero(),
+            old_balance_to: Fr::zero(),
+            sig: Signature::default(),
+        }
+    }
+
+    pub fn hash(&self) -> Fr {
+        let data = hash(&[u32_to_fr(TxType::Transfer as u32), u32_to_fr(self.token_id), self.amount.to_fr()]);
+        // do we really need to sign oldBalance?
+        let data = hash(&[data, u32_to_fr(self.from), self.from_nonce, self.old_balance_from]);
+        hash(&[data, u32_to_fr(self.to), self.to_nonce, self.old_balance_to])
+    }
+}
+
+// WithdrawTx can only withdraw to one's own L1 address
+#[derive(Debug)]
+pub struct WithdrawTx {
+    pub account_id: u32,
+    pub token_id: u32,
+    pub amount: AmountType,
+    pub nonce: Fr,
+    pub old_balance: Fr,
+    pub sig: Signature,
+}
+
+impl WithdrawTx {
+    pub fn new(account_id: u32, token_id: u32, amount: AmountType) -> Self {
+        Self {
+            account_id,
+            token_id,
+            amount,
+            nonce: Fr::zero(),
+            old_balance: Fr::zero(),
+            sig: Signature::default(),
+        }
+    }
+
+    pub fn hash(&self) -> Fr {
+        let data = hash(&[u32_to_fr(TxType::Withdraw as u32), u32_to_fr(self.token_id), self.amount.to_fr()]);
+        // do we really need to sign oldBalance?
+        hash(&[data, u32_to_fr(self.account_id), self.nonce, self.old_balance])
+    }
 }
 
 pub const PUBDATA_LEN: usize = 60;

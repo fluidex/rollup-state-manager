@@ -6,11 +6,36 @@ use std::path::{Path, PathBuf};
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/binary_merkle_tree.ts
 mod test_case {
     use ff::{Field, PrimeField};
+    use rollup_state_manager::state::Block;
     use rollup_state_manager::test_utils::{fr_to_string, Fr};
     use rollup_state_manager::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
     use rollup_state_manager::types::merkle_tree::Tree;
     use serde_json::json;
 
+    pub fn blocks() -> Vec<CircuitTestCase> {
+        // you can use any number here. bigger nTxs means larger circuit and longer test time
+        let n_txs = 2;
+
+        // circuit-level definitions
+        let account_levels = 2;
+        let balance_levels = 2;
+        let order_levels = 2;
+
+        let verbose = false;
+
+        let main = format!("Block({}, {}, {}, {})", n_txs, balance_levels, order_levels, account_levels);
+        let test_data = Block::new(n_txs, account_levels, balance_levels, order_levels, verbose).test_data();
+        test_data
+            .into_iter()
+            .map(|data| CircuitTestCase {
+                source: CircuitSource {
+                    src: "src/block.circom".to_owned(),
+                    main: main.to_owned(),
+                },
+                data,
+            })
+            .collect()
+    }
     pub fn check_leaf_update() -> CircuitTestCase {
         let leaves: Vec<Fr> = vec![10, 11, 12, 13]
             .iter()
@@ -69,10 +94,18 @@ fn write_test_case(circuit_repo: &Path, test_dir: &Path, t: CircuitTestCase) -> 
     Ok(())
 }
 
+fn write_test_cases(circuit_repo: &Path, test_dir: &Path, test_cases: Vec<CircuitTestCase>) -> anyhow::Result<()> {
+    for t in test_cases {
+        write_test_case(circuit_repo, test_dir, t)?;
+    }
+    Ok(())
+}
+
 fn run() -> anyhow::Result<()> {
     let circuit_repo = fs::canonicalize(PathBuf::from("circuits")).expect("invalid circuits repo path");
     let test_dir = circuit_repo.join("testdata");
-    write_test_case(&circuit_repo, &test_dir, test_case::check_leaf_update())
+    write_test_case(&circuit_repo, &test_dir, test_case::check_leaf_update())?;
+    write_test_cases(&circuit_repo, &test_dir, test_case::blocks())
 }
 
 fn main() {
