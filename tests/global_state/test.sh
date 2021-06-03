@@ -17,4 +17,4 @@ cargo run --release --bin gen_global_state_testcase
 
 cd $REPO_DIR/circuits; npm i
 snarkit --version || npm -g install snarkit
-snarkit test testdata/Block_$(NTXS)_$(BALANCELEVELS)_$(ORDERLEVELS)_$(ACCOUNTLEVELS)/ --force_recompile --backend=wasm
+snarkit test testdata/Block_$NTXS"_"$BALANCELEVELS"_"$ORDERLEVELS"_"$ACCOUNTLEVELS/ --force_recompile --backend=wasm
