@@ -2,8 +2,6 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::large_enum_variant)]
 
-use std::collections::HashMap;
-
 use rollup_state_manager::account::{Account, Signature};
 use rollup_state_manager::state::WitnessGenerator;
 use rollup_state_manager::test_utils::types::{get_token_id_by_name, prec_token_id};
@@ -12,29 +10,9 @@ use rollup_state_manager::types::fixnum;
 use rollup_state_manager::types::l2::{self, OrderInput, OrderSide};
 use rollup_state_manager::types::primitives::{fr_to_decimal, u32_to_fr, Fr};
 use rust_decimal::Decimal;
+use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::time::Instant;
-// TODO: use ENV
-
-// TODO: move most of these to test_utils
-
-pub mod test_params {
-    pub const NTXS: usize = 2;
-
-    pub const BALANCELEVELS: usize = 2;
-    pub const ORDERLEVELS: usize = 3;
-    pub const ACCOUNTLEVELS: usize = 2;
-    /*
-
-          pub const BALANCELEVELS: usize = 20;
-          pub const ORDERLEVELS: usize = 20;
-          pub const ACCOUNTLEVELS: usize = 20;
-    */
-    pub const MAXORDERNUM: usize = 2usize.pow(ORDERLEVELS as u32);
-    pub const MAXACCOUNTNUM: usize = 2usize.pow(ACCOUNTLEVELS as u32);
-    pub const MAXTOKENNUM: usize = 2usize.pow(BALANCELEVELS as u32);
-    pub const VERBOSE: bool = false;
-}
 
 type OrdersType = HashMap<u32, (u32, u64)>;
 //index type?

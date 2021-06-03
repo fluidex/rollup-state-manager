@@ -19,7 +19,7 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn new(n_txs: usize, account_levels: usize, balance_levels: usize, order_levels: usize, verbose: bool) -> Self {
+    pub fn new(n_txs: usize, balance_levels: usize, order_levels: usize, account_levels: usize, verbose: bool) -> Self {
         Self {
             n_txs,
             account_levels,
