@@ -1,10 +1,10 @@
 #!/bin/bash
 set -uex
 
-NTXS=2;
-BALANCELEVELS=2;
-ORDERLEVELS=3;
-ACCOUNTLEVELS=2;
+export NTXS=2;
+export BALANCELEVELS=2;
+export ORDERLEVELS=3;
+export ACCOUNTLEVELS=2;
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 REPO_DIR=$DIR/"../.."
