@@ -1,6 +1,7 @@
 pub mod circuit;
 pub mod messages;
 pub mod types;
+pub mod params;
 
 pub use crate::types::l2;
 pub use crate::types::merkle_tree::MerklePath;

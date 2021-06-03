@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 mod types;
-use types::{test_params, Accounts, Orders};
+use types::{Accounts, Orders};
 
 fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<l2::L2Block>, test_utils::circuit::CircuitSource)> {
     let test_dir = circuit_repo.join("test").join("testdata");
@@ -23,12 +23,12 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<l2::L2Block>, test_utils::cir
     let lns: Lines<BufReader<File>> = BufReader::new(file).lines();
 
     let state = GlobalState::new(
-        test_params::BALANCELEVELS,
-        test_params::ORDERLEVELS,
-        test_params::ACCOUNTLEVELS,
-        test_params::VERBOSE,
+        test_utils::params::BALANCELEVELS,
+        test_utils::params::ORDERLEVELS,
+        test_utils::params::ACCOUNTLEVELS,
+        test_utils::params::VERBOSE,
     );
-    let mut witgen = WitnessGenerator::new(state, test_params::NTXS, test_params::VERBOSE);
+    let mut witgen = WitnessGenerator::new(state, *test_utils::params::NTXS, test_utils::params::VERBOSE);
 
     println!("genesis root {}", witgen.root());
 
@@ -59,17 +59,17 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<l2::L2Block>, test_utils::cir
     println!(
         "genesis {} blocks (TPS: {})",
         blocks.len(),
-        (test_params::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
+        (*test_utils::params::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
     );
 
     let component = test_utils::circuit::CircuitSource {
         src: String::from("src/block.circom"),
         main: format!(
             "Block({}, {}, {}, {})",
-            test_params::NTXS,
-            test_params::BALANCELEVELS,
-            test_params::ORDERLEVELS,
-            test_params::ACCOUNTLEVELS
+            *test_utils::params::NTXS,
+            test_utils::params::BALANCELEVELS,
+            test_utils::params::ORDERLEVELS,
+            test_utils::params::ACCOUNTLEVELS
         ),
     };
 
