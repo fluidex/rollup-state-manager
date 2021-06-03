@@ -34,14 +34,11 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     println!("prepare bench: {} records", messages.len());
 
     GlobalState::print_config();
-    // TODO: use ENV
-    //use custom states
-    let verbose = false;
     let state = GlobalState::new(
-        20, //test_utils::params::BALANCELEVELS,
-        20, //test_utils::params::ORDERLEVELS,
-        20, //test_utils::params::ACCOUNTLEVELS,
-        verbose,
+        *test_utils::params::BALANCELEVELS,
+        *test_utils::params::ORDERLEVELS,
+        *test_utils::params::ACCOUNTLEVELS,
+        *test_utils::params::VERBOSE,
     );
 
     //amplify the records: in each iter we run records on a group of new accounts
@@ -74,7 +71,7 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
         }
     }
 
-    let mut witgen = WitnessGenerator::new(state, *test_utils::params::NTXS, verbose);
+    let mut witgen = WitnessGenerator::new(state, *test_utils::params::NTXS, *test_utils::params::VERBOSE);
 
     let timing = Instant::now();
     let mut inner_timing = Instant::now();
