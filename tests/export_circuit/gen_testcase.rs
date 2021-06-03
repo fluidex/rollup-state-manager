@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/binary_merkle_tree.ts
 mod test_case {
     use ff::{Field, PrimeField};
-    use rollup_state_manager::state::Block;
+    use rollup_state_manager::state::block::Block;
     use rollup_state_manager::test_utils::{fr_to_string, Fr};
     use rollup_state_manager::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
     use rollup_state_manager::types::merkle_tree::Tree;

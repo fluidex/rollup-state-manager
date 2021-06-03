@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use ff::{from_hex, to_hex};
 use ff::{Field, PrimeField, PrimeFieldRepr};
 use lazy_static::lazy_static;
@@ -62,6 +63,23 @@ pub fn bigint_to_fr(x: BigInt) -> Fr {
     }
     from_hex(&s).unwrap()
 }
+pub fn vec_to_fr(arr: &[u8]) -> Result<Fr> {
+    if arr.len() > 32 {
+        anyhow::bail!("invalid vec len for fr");
+    }
+    let mut repr = <Fr as PrimeField>::Repr::default();
+
+    // prepad 0
+    let mut buf = arr.to_vec();
+    let required_length = repr.as_ref().len() * 8;
+    buf.reverse();
+    buf.resize(required_length, 0);
+    buf.reverse();
+
+    repr.read_be(&buf[..])?;
+    Ok(Fr::from_repr(repr)?)
+}
+
 pub fn fr_to_u32(f: &Fr) -> u32 {
     fr_to_string(f).parse::<u32>().unwrap()
 }
@@ -76,4 +94,21 @@ pub fn fr_to_string(elem: &Fr) -> String {
 }
 pub fn fr_to_decimal(f: &Fr, scale: u32) -> Decimal {
     Decimal::new(fr_to_i64(f), scale)
+}
+// big endian
+pub fn fr_to_vec(f: &Fr) -> Vec<u8> {
+    let repr = f.into_repr();
+    let required_length = repr.as_ref().len() * 8;
+    let mut buf: Vec<u8> = Vec::with_capacity(required_length);
+    repr.write_be(&mut buf).unwrap();
+    buf
+}
+pub fn fr_to_bool(f: &Fr) -> Result<bool> {
+    if f.is_zero() {
+        Ok(false)
+    } else if f == &Fr::one() {
+        Ok(true)
+    } else {
+        Err(anyhow!("invalid fr"))
+    }
 }
