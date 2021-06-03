@@ -2,7 +2,10 @@
 use anyhow::Result;
 use rollup_state_manager::account::{self, Account};
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
-use rollup_state_manager::test_utils::messages::{parse_msg, WrappedMessage};
+use rollup_state_manager::test_utils::{
+    self,
+    messages::{parse_msg, WrappedMessage},
+};
 use rollup_state_manager::types::l2;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
@@ -13,7 +16,7 @@ use pprof::protos::Message;
 use std::io::Write;
 
 mod types;
-use types::{test_params, Accounts, Orders};
+use types::{Accounts, Orders};
 
 //if we use nightly build, we are able to use bench test ...
 fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
@@ -31,14 +34,11 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     println!("prepare bench: {} records", messages.len());
 
     GlobalState::print_config();
-    // TODO: use ENV
-    //use custom states
-    let verbose = false;
     let state = GlobalState::new(
-        20, //test_params::BALANCELEVELS,
-        20, //test_params::ORDERLEVELS,
-        20, //test_params::ACCOUNTLEVELS,
-        verbose,
+        *test_utils::params::BALANCELEVELS,
+        *test_utils::params::ORDERLEVELS,
+        *test_utils::params::ACCOUNTLEVELS,
+        *test_utils::params::VERBOSE,
     );
 
     //amplify the records: in each iter we run records on a group of new accounts
@@ -71,7 +71,7 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
         }
     }
 
-    let mut witgen = WitnessGenerator::new(state, test_params::NTXS, verbose);
+    let mut witgen = WitnessGenerator::new(state, *test_utils::params::NTXS, *test_utils::params::VERBOSE);
 
     let timing = Instant::now();
     let mut inner_timing = Instant::now();
@@ -114,7 +114,7 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     println!(
         "bench for {} blocks (TPS: {})",
         blocks.len(),
-        (test_params::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
+        (*test_utils::params::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
     );
     Ok(blocks)
 }
