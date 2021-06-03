@@ -50,7 +50,7 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     // we are generating more txs from the given test cases
     // by clone accounts with same trades
     let loop_num = 50;
-    let cache_order_sig = false;
+    let cache_order_sig = true;
     if cache_order_sig {
         for j in 0..account_num {
             let seed = account::rand_seed();

@@ -4,7 +4,7 @@ use crate::state::witness_generator::WitnessGenerator;
 use crate::test_utils::types::prec_token_id;
 use crate::test_utils::{CircuitTestData, L2BlockSerde};
 use crate::types::fixnum::decimal_to_amount;
-use crate::types::l2::{DepositToNewTx, DepositToOldTx, Order, SpotTradeTx, TransferTx, WithdrawTx};
+use crate::types::l2::{self, DepositToNewTx, DepositToOldTx, Order, SpotTradeTx, TransferTx, WithdrawTx};
 use crate::types::primitives::{u32_to_fr, Fr};
 use ff::Field;
 use rust_decimal::Decimal;
@@ -69,7 +69,7 @@ impl Block {
         // order2
         let order_id2 = 1;
         let mut order2 = Order {
-            order_id: u32_to_fr(order_id2),
+            order_id: (order_id2),
             tokenbuy: u32_to_fr(token_id_1to2),
             tokensell: u32_to_fr(token_id_2to1),
             total_buy: decimal_to_amount(&Decimal::new(1000, 0), prec_token_id(token_id_1to2)).to_fr(),
@@ -77,6 +77,8 @@ impl Block {
             filled_buy: Fr::zero(),
             filled_sell: Fr::zero(),
             sig: Signature::default(),
+            account_id: 0,
+            side: l2::order::OrderSide::Buy,
         };
         order2.sign_with(&account2).unwrap();
         order2.filled_buy = u32_to_fr(1);
@@ -142,7 +144,7 @@ impl Block {
         // order1
         let order_id1 = 1;
         let mut order1 = Order {
-            order_id: u32_to_fr(order_id1),
+            order_id: (order_id1),
             tokenbuy: u32_to_fr(token_id_2to1),
             tokensell: u32_to_fr(token_id_1to2),
             total_buy: decimal_to_amount(&Decimal::new(10000, 0), prec_token_id(token_id_2to1)).to_fr(),
@@ -150,6 +152,8 @@ impl Block {
             filled_buy: Fr::zero(),
             filled_sell: Fr::zero(),
             sig: Signature::default(),
+            account_id: 0,
+            side: l2::order::OrderSide::Buy,
         };
         order1.sign_with(&account1).unwrap();
         // order_id is known to the user, user should sign this order_id

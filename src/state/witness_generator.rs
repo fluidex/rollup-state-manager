@@ -1,17 +1,15 @@
 #![allow(clippy::field_reassign_with_default)]
 #![allow(clippy::vec_init_then_push)]
 
-// from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
-
 use super::global::{AccountUpdates, GlobalState};
 use crate::types::l2::{
-    tx_detail_idx, DepositToNewTx, DepositToOldTx, L2Block, Order, RawTx, SpotTradeTx, TransferTx, TxType, WithdrawTx, TX_LENGTH,
+    tx_detail_idx, DepositToNewTx, DepositToOldTx, FullSpotTradeTx, L2Block, Order, RawTx, SpotTradeTx, TransferTx, TxType, WithdrawTx,
+    TX_LENGTH,
 };
 use crate::types::merkle_tree::Tree;
-use crate::types::primitives::{bigint_to_fr, fr_add, fr_sub, fr_to_bigint, u32_to_fr, Fr};
+use crate::types::primitives::{fr_add, fr_sub, u32_to_fr, Fr};
 use ff::Field;
 
-// TODO: change to snake_case
 // TODO: too many unwrap here
 pub struct WitnessGenerator {
     state: GlobalState,
@@ -34,6 +32,8 @@ impl WitnessGenerator {
             verbose,
         }
     }
+
+    /////////////////// forward method call to self.state //////////////////////////////////
     pub fn root(&self) -> Fr {
         self.state.root()
     }
@@ -67,6 +67,7 @@ impl WitnessGenerator {
     pub fn set_token_balance(&mut self, account_id: u32, token_id: u32, balance: Fr) {
         self.state.set_token_balance(account_id, token_id, balance);
     }
+
     pub fn forge_with_txs(&self, buffered_txs: &[RawTx]) -> L2Block {
         assert!(buffered_txs.len() == self.n_tx, "invalid txs len");
         let txs_type = buffered_txs.iter().map(|tx| tx.tx_type).collect();
@@ -133,9 +134,6 @@ impl WitnessGenerator {
     pub fn take_blocks(self) -> Vec<L2Block> {
         self.buffered_blocks
     }
-    /*
-      }
-    */
     pub fn deposit_to_new(&mut self, tx: DepositToNewTx) {
         // assert!(self.accounts.get(tx.account_id).eth_addr == 0n, "deposit_to_new");
         if !self.has_account(tx.account_id) {
@@ -165,8 +163,8 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::SIGN2] = tx.sign;
         encoded_tx[tx_detail_idx::AY2] = tx.ay;
 
-        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = u32_to_fr(1u32);
-        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = u32_to_fr(1u32);
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = Fr::one();
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = Fr::one();
 
         let mut raw_tx = RawTx {
             tx_type: TxType::DepositToNew,
@@ -214,14 +212,14 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::TOKEN_ID2] = u32_to_fr(tx.token_id);
         encoded_tx[tx_detail_idx::ACCOUNT_ID2] = u32_to_fr(tx.account_id);
         // TODO: rewrite this
-        encoded_tx[tx_detail_idx::BALANCE2] = bigint_to_fr(fr_to_bigint(&old_balance) + fr_to_bigint(&tx.amount.to_fr()));
+        encoded_tx[tx_detail_idx::BALANCE2] = fr_add(&old_balance, &tx.amount.to_fr());
         encoded_tx[tx_detail_idx::NONCE2] = nonce;
         encoded_tx[tx_detail_idx::ETH_ADDR2] = acc.eth_addr;
         encoded_tx[tx_detail_idx::SIGN2] = acc.sign;
         encoded_tx[tx_detail_idx::AY2] = acc.ay;
 
-        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = u32_to_fr(1u32);
-        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = u32_to_fr(1u32);
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = Fr::one();
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = Fr::one();
 
         let mut raw_tx = RawTx {
             tx_type: TxType::DepositToOld,
@@ -267,6 +265,8 @@ impl WitnessGenerator {
 
         let from_old_balance = self.get_token_balance(tx.from, tx.token_id);
         let to_old_balance = self.get_token_balance(tx.to, tx.token_id);
+        let from_new_balance = fr_sub(&from_old_balance, &tx.amount.to_fr());
+        let to_new_balance = fr_add(&to_old_balance, &tx.amount.to_fr());
         // assert(from_old_balance > tx.amount, 'Transfer balance not enough');
 
         let mut encoded_tx = [Fr::zero(); TX_LENGTH];
@@ -283,28 +283,21 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::ETH_ADDR1] = from_account.eth_addr;
         encoded_tx[tx_detail_idx::ETH_ADDR2] = to_account.eth_addr;
         encoded_tx[tx_detail_idx::BALANCE1] = from_old_balance;
-        encoded_tx[tx_detail_idx::BALANCE2] = bigint_to_fr(fr_to_bigint(&to_old_balance) + tx.amount.to_bigint());
+        encoded_tx[tx_detail_idx::BALANCE2] = to_new_balance;
+
         encoded_tx[tx_detail_idx::SIG_L2_HASH1] = tx.sig.hash;
         encoded_tx[tx_detail_idx::S1] = tx.sig.s;
         encoded_tx[tx_detail_idx::R8X1] = tx.sig.r8x;
         encoded_tx[tx_detail_idx::R8Y1] = tx.sig.r8y;
-        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = u32_to_fr(1);
-        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = u32_to_fr(1);
-        encoded_tx[tx_detail_idx::ENABLE_SIG_CHECK1] = u32_to_fr(1);
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = Fr::one();
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = Fr::one();
+        encoded_tx[tx_detail_idx::ENABLE_SIG_CHECK1] = Fr::one();
 
-        self.set_token_balance(
-            tx.from,
-            tx.token_id,
-            bigint_to_fr(fr_to_bigint(&from_old_balance) - tx.amount.to_bigint()),
-        );
+        self.set_token_balance(tx.from, tx.token_id, from_new_balance);
         self.state.increase_nonce(tx.from);
 
         let proof_to = self.state.balance_full_proof(tx.to, tx.token_id);
-        self.set_token_balance(
-            tx.to,
-            tx.token_id,
-            bigint_to_fr(fr_to_bigint(&to_old_balance) + tx.amount.to_bigint()),
-        );
+        self.set_token_balance(tx.to, tx.token_id, to_new_balance);
 
         let raw_tx = RawTx {
             tx_type: TxType::Transfer,
@@ -333,6 +326,7 @@ impl WitnessGenerator {
 
         let acc = self.state.get_account(account_id);
         let old_balance = self.get_token_balance(account_id, token_id);
+        let new_balance = fr_sub(&old_balance, &tx.amount.to_fr());
         let nonce = acc.nonce;
         // assert(oldBalance > tx.amount, 'Withdraw balance');
 
@@ -351,15 +345,15 @@ impl WitnessGenerator {
 
         encoded_tx[tx_detail_idx::TOKEN_ID2] = u32_to_fr(token_id);
         encoded_tx[tx_detail_idx::ACCOUNT_ID2] = u32_to_fr(account_id);
-        encoded_tx[tx_detail_idx::BALANCE2] = bigint_to_fr(fr_to_bigint(&old_balance) - fr_to_bigint(&tx.amount.to_fr()));
-        encoded_tx[tx_detail_idx::NONCE2] = bigint_to_fr(fr_to_bigint(&nonce) + 1);
+        encoded_tx[tx_detail_idx::BALANCE2] = new_balance;
+        encoded_tx[tx_detail_idx::NONCE2] = fr_add(&nonce, &Fr::one());
         encoded_tx[tx_detail_idx::ETH_ADDR2] = acc.eth_addr;
         encoded_tx[tx_detail_idx::SIGN2] = acc.sign;
         encoded_tx[tx_detail_idx::AY2] = acc.ay;
 
-        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = u32_to_fr(1u32);
-        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = u32_to_fr(1u32);
-        encoded_tx[tx_detail_idx::ENABLE_SIG_CHECK1] = u32_to_fr(1u32);
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = Fr::one();
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = Fr::one();
+        encoded_tx[tx_detail_idx::ENABLE_SIG_CHECK1] = Fr::one();
 
         encoded_tx[tx_detail_idx::SIG_L2_HASH1] = tx.sig.hash;
         encoded_tx[tx_detail_idx::S1] = tx.sig.s;
@@ -383,17 +377,26 @@ impl WitnessGenerator {
             root_after: Fr::zero(),
         };
 
-        self.state.set_token_balance(
-            account_id,
-            token_id,
-            bigint_to_fr(fr_to_bigint(&old_balance) - fr_to_bigint(&tx.amount.to_fr())),
-        );
+        self.state.set_token_balance(account_id, token_id, new_balance);
         self.state.increase_nonce(account_id);
 
         raw_tx.root_after = self.state.root();
         self.add_raw_tx(raw_tx);
     }
-
+    // we keep full_spot_trade and spot_trade both now
+    pub fn full_spot_trade(&mut self, tx: FullSpotTradeTx) {
+        if !self.has_order(tx.maker_order.account_id, tx.maker_order.order_id) {
+            assert_eq!(tx.maker_order.filled_buy, Fr::zero());
+            assert_eq!(tx.maker_order.filled_sell, Fr::zero());
+            self.state.update_order_state(tx.maker_order.account_id, tx.maker_order);
+        }
+        if !self.has_order(tx.taker_order.account_id, tx.taker_order.order_id) {
+            assert_eq!(tx.taker_order.filled_buy, Fr::zero());
+            assert_eq!(tx.taker_order.filled_sell, Fr::zero());
+            self.state.update_order_state(tx.taker_order.account_id, tx.taker_order);
+        }
+        self.spot_trade(tx.trade);
+    }
     // case1: old order is empty
     // case2: old order is valid old order with different order id, but we will replace it.
     // case3: old order has same order id, we will modify it
@@ -446,7 +449,7 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::R8Y2] = order2.sig.r8y;
         encoded_tx[tx_detail_idx::SIG_L2_HASH2] = order2.sig.hash;
 
-        encoded_tx[tx_detail_idx::OLD_ORDER1_ID] = old_order1_in_tree.order_id;
+        encoded_tx[tx_detail_idx::OLD_ORDER1_ID] = u32_to_fr(old_order1_in_tree.order_id);
         encoded_tx[tx_detail_idx::OLD_ORDER1_TOKEN_SELL] = old_order1_in_tree.tokensell;
         encoded_tx[tx_detail_idx::OLD_ORDER1_FILLED_SELL] = old_order1_in_tree.filled_sell;
         encoded_tx[tx_detail_idx::OLD_ORDER1_AMOUNT_SELL] = old_order1_in_tree.total_sell;
@@ -454,7 +457,7 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::OLD_ORDER1_FILLED_BUY] = old_order1_in_tree.filled_buy;
         encoded_tx[tx_detail_idx::OLD_ORDER1_AMOUNT_BUY] = old_order1_in_tree.total_buy;
 
-        encoded_tx[tx_detail_idx::OLD_ORDER2_ID] = old_order2_in_tree.order_id;
+        encoded_tx[tx_detail_idx::OLD_ORDER2_ID] = u32_to_fr(old_order2_in_tree.order_id);
         encoded_tx[tx_detail_idx::OLD_ORDER2_TOKEN_SELL] = old_order2_in_tree.tokensell;
         encoded_tx[tx_detail_idx::OLD_ORDER2_FILLED_SELL] = old_order2_in_tree.filled_sell;
         encoded_tx[tx_detail_idx::OLD_ORDER2_AMOUNT_SELL] = old_order2_in_tree.total_sell;
@@ -484,10 +487,10 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::BALANCE3] = acc2_balance_sell;
         encoded_tx[tx_detail_idx::BALANCE4] = acc1_balance_buy_new;
 
-        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = u32_to_fr(1u32);
-        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = u32_to_fr(1u32);
-        encoded_tx[tx_detail_idx::ENABLE_SIG_CHECK1] = u32_to_fr(1u32);
-        encoded_tx[tx_detail_idx::ENABLE_SIG_CHECK2] = u32_to_fr(1u32);
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = Fr::one();
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = Fr::one();
+        encoded_tx[tx_detail_idx::ENABLE_SIG_CHECK1] = Fr::one();
+        encoded_tx[tx_detail_idx::ENABLE_SIG_CHECK2] = Fr::one();
 
         let mut raw_tx = RawTx {
             tx_type: TxType::SpotTrade,
@@ -511,8 +514,6 @@ impl WitnessGenerator {
         order2.trade_with(&tx.amount_2to1.to_fr(), &tx.amount_1to2.to_fr());
         self.state.update_order_state(acc_id2, order2);
 
-        // TODO: parallel the following updates
-        // multi thread: genesis 18 blocks (TPS: 211.20428)
         let acc1_updates = AccountUpdates {
             account_id: acc_id1,
             balance_updates: vec![(tx.token_id_1to2, acc1_balance_sell_new), (tx.token_id_2to1, acc1_balance_buy_new)],
@@ -530,7 +531,7 @@ impl WitnessGenerator {
         raw_tx.account_path1 = self.state.account_proof(acc_id2).path_elements;
         raw_tx.order_root1 = self.state.get_account(acc_id2).order_root;
 
-        encoded_tx[tx_detail_idx::NEW_ORDER1_ID] = order1.order_id;
+        encoded_tx[tx_detail_idx::NEW_ORDER1_ID] = u32_to_fr(order1.order_id);
         encoded_tx[tx_detail_idx::NEW_ORDER1_TOKEN_SELL] = order1.tokensell;
         encoded_tx[tx_detail_idx::NEW_ORDER1_FILLED_SELL] = order1.filled_sell;
         encoded_tx[tx_detail_idx::NEW_ORDER1_AMOUNT_SELL] = order1.total_sell;
@@ -538,7 +539,7 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::NEW_ORDER1_FILLED_BUY] = order1.filled_buy;
         encoded_tx[tx_detail_idx::NEW_ORDER1_AMOUNT_BUY] = order1.total_buy;
 
-        encoded_tx[tx_detail_idx::NEW_ORDER2_ID] = order2.order_id;
+        encoded_tx[tx_detail_idx::NEW_ORDER2_ID] = u32_to_fr(order2.order_id);
 
         encoded_tx[tx_detail_idx::NEW_ORDER2_TOKEN_SELL] = order2.tokensell;
         encoded_tx[tx_detail_idx::NEW_ORDER2_FILLED_SELL] = order2.filled_sell;

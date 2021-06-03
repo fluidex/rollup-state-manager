@@ -1,12 +1,10 @@
 #![allow(clippy::field_reassign_with_default)]
 #![allow(clippy::vec_init_then_push)]
 
-// from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
-
 use super::AccountState;
 use crate::types::l2::Order;
 use crate::types::merkle_tree::{empty_tree_root, MerkleProof, Tree};
-use crate::types::primitives::{fr_to_u32, Fr};
+use crate::types::primitives::Fr;
 use anyhow::bail;
 use ff::Field;
 use fnv::FnvHashMap;
@@ -210,8 +208,7 @@ impl GlobalState {
             .unwrap()
             .set_value(order_pos, order.hash());
         self.order_map.get_mut(&account_id).unwrap().insert(order_pos, order);
-        // TODO: better type here...
-        let order_id: u32 = fr_to_u32(&order.order_id);
+        let order_id: u32 = order.order_id;
         self.order_id_to_pos.insert((account_id, order_id), order_pos);
         self.flush_account_state(account_id);
     }
@@ -232,10 +229,7 @@ impl GlobalState {
     }
 
     pub fn update_order_state(&mut self, account_id: u32, order: Order) {
-        self.order_map
-            .get_mut(&account_id)
-            .unwrap()
-            .insert(fr_to_u32(&order.order_id), order);
+        self.order_map.get_mut(&account_id).unwrap().insert(order.order_id, order);
     }
     pub fn find_pos_for_order(&mut self, account_id: u32, order_id: u32) -> (u32, Order) {
         if !self.has_order(account_id, order_id) {
