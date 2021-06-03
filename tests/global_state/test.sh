@@ -5,6 +5,7 @@ export NTXS=2;
 export BALANCELEVELS=2;
 export ORDERLEVELS=3;
 export ACCOUNTLEVELS=2;
+export VERBOSE=false;
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 REPO_DIR=$DIR/"../.."

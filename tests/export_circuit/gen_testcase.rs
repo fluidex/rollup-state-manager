@@ -7,24 +7,27 @@ use std::path::{Path, PathBuf};
 mod test_case {
     use ff::{Field, PrimeField};
     use rollup_state_manager::state::Block;
-    use rollup_state_manager::test_utils::{fr_to_string, Fr};
+    use rollup_state_manager::test_utils::{self, fr_to_string, Fr};
     use rollup_state_manager::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
     use rollup_state_manager::types::merkle_tree::Tree;
     use serde_json::json;
 
     pub fn blocks() -> Vec<CircuitTestCase> {
-        // you can use any number here. bigger nTxs means larger circuit and longer test time
-        let n_txs = 2;
-
-        // circuit-level definitions
-        let account_levels = 2;
-        let balance_levels = 2;
-        let order_levels = 2;
-
-        let verbose = false;
-
-        let main = format!("Block({}, {}, {}, {})", n_txs, balance_levels, order_levels, account_levels);
-        let test_data = Block::new(n_txs, account_levels, balance_levels, order_levels, verbose).test_data();
+        let main = format!(
+            "Block({}, {}, {}, {})",
+            *test_utils::params::NTXS,
+            *test_utils::params::BALANCELEVELS,
+            *test_utils::params::ORDERLEVELS,
+            *test_utils::params::ACCOUNTLEVELS
+        );
+        let test_data = Block::new(
+            *test_utils::params::NTXS,
+            *test_utils::params::BALANCELEVELS,
+            *test_utils::params::ORDERLEVELS,
+            *test_utils::params::ACCOUNTLEVELS,
+            *test_utils::params::VERBOSE,
+        )
+        .test_data();
         test_data
             .into_iter()
             .map(|data| CircuitTestCase {
