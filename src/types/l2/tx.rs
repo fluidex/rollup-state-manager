@@ -1,3 +1,4 @@
+use super::order;
 use crate::account::Signature;
 use crate::types::fixnum::Float864;
 use crate::types::merkle_tree::MerklePath;
@@ -76,6 +77,13 @@ pub struct SpotTradeTx {
     pub amount_2to1: AmountType,
     pub order1_id: u32,
     pub order2_id: u32,
+}
+
+#[derive(Debug)]
+pub struct FullSpotTradeTx {
+    pub trade: SpotTradeTx,
+    pub maker_order: order::Order,
+    pub taker_order: order::Order,
 }
 
 #[derive(Debug)]

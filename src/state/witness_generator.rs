@@ -3,7 +3,8 @@
 
 use super::global::{AccountUpdates, GlobalState};
 use crate::types::l2::{
-    tx_detail_idx, DepositToNewTx, DepositToOldTx, L2Block, Order, RawTx, SpotTradeTx, TransferTx, TxType, WithdrawTx, TX_LENGTH,
+    tx_detail_idx, DepositToNewTx, DepositToOldTx, FullSpotTradeTx, L2Block, Order, RawTx, SpotTradeTx, TransferTx, TxType, WithdrawTx,
+    TX_LENGTH,
 };
 use crate::types::merkle_tree::Tree;
 use crate::types::primitives::{fr_add, fr_sub, u32_to_fr, Fr};
@@ -382,7 +383,20 @@ impl WitnessGenerator {
         raw_tx.root_after = self.state.root();
         self.add_raw_tx(raw_tx);
     }
-
+    // we keep full_spot_trade and spot_trade both now
+    pub fn full_spot_trade(&mut self, tx: FullSpotTradeTx) {
+        if !self.has_order(tx.maker_order.account_id, tx.maker_order.order_id) {
+            assert_eq!(tx.maker_order.filled_buy, Fr::zero());
+            assert_eq!(tx.maker_order.filled_sell, Fr::zero());
+            self.state.update_order_state(tx.maker_order.account_id, tx.maker_order);
+        }
+        if !self.has_order(tx.taker_order.account_id, tx.taker_order.order_id) {
+            assert_eq!(tx.taker_order.filled_buy, Fr::zero());
+            assert_eq!(tx.taker_order.filled_sell, Fr::zero());
+            self.state.update_order_state(tx.taker_order.account_id, tx.taker_order);
+        }
+        self.spot_trade(tx.trade);
+    }
     // case1: old order is empty
     // case2: old order is valid old order with different order id, but we will replace it.
     // case3: old order has same order id, we will modify it
@@ -435,7 +449,7 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::R8Y2] = order2.sig.r8y;
         encoded_tx[tx_detail_idx::SIG_L2_HASH2] = order2.sig.hash;
 
-        encoded_tx[tx_detail_idx::OLD_ORDER1_ID] = old_order1_in_tree.order_id;
+        encoded_tx[tx_detail_idx::OLD_ORDER1_ID] = u32_to_fr(old_order1_in_tree.order_id);
         encoded_tx[tx_detail_idx::OLD_ORDER1_TOKEN_SELL] = old_order1_in_tree.tokensell;
         encoded_tx[tx_detail_idx::OLD_ORDER1_FILLED_SELL] = old_order1_in_tree.filled_sell;
         encoded_tx[tx_detail_idx::OLD_ORDER1_AMOUNT_SELL] = old_order1_in_tree.total_sell;
@@ -443,7 +457,7 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::OLD_ORDER1_FILLED_BUY] = old_order1_in_tree.filled_buy;
         encoded_tx[tx_detail_idx::OLD_ORDER1_AMOUNT_BUY] = old_order1_in_tree.total_buy;
 
-        encoded_tx[tx_detail_idx::OLD_ORDER2_ID] = old_order2_in_tree.order_id;
+        encoded_tx[tx_detail_idx::OLD_ORDER2_ID] = u32_to_fr(old_order2_in_tree.order_id);
         encoded_tx[tx_detail_idx::OLD_ORDER2_TOKEN_SELL] = old_order2_in_tree.tokensell;
         encoded_tx[tx_detail_idx::OLD_ORDER2_FILLED_SELL] = old_order2_in_tree.filled_sell;
         encoded_tx[tx_detail_idx::OLD_ORDER2_AMOUNT_SELL] = old_order2_in_tree.total_sell;
@@ -517,7 +531,7 @@ impl WitnessGenerator {
         raw_tx.account_path1 = self.state.account_proof(acc_id2).path_elements;
         raw_tx.order_root1 = self.state.get_account(acc_id2).order_root;
 
-        encoded_tx[tx_detail_idx::NEW_ORDER1_ID] = order1.order_id;
+        encoded_tx[tx_detail_idx::NEW_ORDER1_ID] = u32_to_fr(order1.order_id);
         encoded_tx[tx_detail_idx::NEW_ORDER1_TOKEN_SELL] = order1.tokensell;
         encoded_tx[tx_detail_idx::NEW_ORDER1_FILLED_SELL] = order1.filled_sell;
         encoded_tx[tx_detail_idx::NEW_ORDER1_AMOUNT_SELL] = order1.total_sell;
@@ -525,7 +539,7 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::NEW_ORDER1_FILLED_BUY] = order1.filled_buy;
         encoded_tx[tx_detail_idx::NEW_ORDER1_AMOUNT_BUY] = order1.total_buy;
 
-        encoded_tx[tx_detail_idx::NEW_ORDER2_ID] = order2.order_id;
+        encoded_tx[tx_detail_idx::NEW_ORDER2_ID] = u32_to_fr(order2.order_id);
 
         encoded_tx[tx_detail_idx::NEW_ORDER2_TOKEN_SELL] = order2.tokensell;
         encoded_tx[tx_detail_idx::NEW_ORDER2_FILLED_SELL] = order2.filled_sell;

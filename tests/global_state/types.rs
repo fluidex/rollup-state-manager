@@ -9,7 +9,7 @@ use rollup_state_manager::state::WitnessGenerator;
 use rollup_state_manager::test_utils::types::{get_token_id_by_name, prec_token_id};
 use rollup_state_manager::types;
 use rollup_state_manager::types::fixnum;
-use rollup_state_manager::types::l2::Order;
+use rollup_state_manager::types::l2::{self, OrderInput, OrderSide};
 use rollup_state_manager::types::primitives::{fr_to_decimal, u32_to_fr, Fr};
 use rust_decimal::Decimal;
 use std::ops::{Deref, DerefMut};
@@ -102,23 +102,30 @@ impl Orders {
             },
         }
     }
-    fn parse_order(order_state: &OrderState) -> Order {
-        Order {
-            order_id: u32_to_fr(order_state.order_id),
+    fn parse_order(order_state: &OrderState) -> OrderInput {
+        OrderInput {
+            order_id: (order_state.order_id),
             tokensell: u32_to_fr(order_state.token_sell),
             tokenbuy: u32_to_fr(order_state.token_buy),
-            filled_sell: u32_to_fr(0),
-            filled_buy: u32_to_fr(0),
+            //filled_sell: u32_to_fr(0),
+            //filled_buy: u32_to_fr(0),
             total_sell: fixnum::decimal_to_amount(&order_state.total_sell, prec_token_id(order_state.token_sell)).to_fr(),
             total_buy: fixnum::decimal_to_amount(&order_state.total_buy, prec_token_id(order_state.token_buy)).to_fr(),
             sig: Signature::default(),
+            account_id: order_state.account_id,
+            side: if order_state.side.to_lowercase() == "buy" || order_state.side.to_lowercase() == "bid" {
+                OrderSide::Buy
+            } else {
+                OrderSide::Sell
+            },
         }
     }
-    fn sign_order_using_cache(&mut self, accounts: &Accounts, order_state: &OrderState) -> Order {
+    fn sign_order_using_cache(&mut self, accounts: &Accounts, order_state: &OrderState) -> OrderInput {
         let account_id = order_state.account_id;
         let mut order_to_put = Self::parse_order(order_state);
         let order_hash = order_to_put.hash();
         let account = accounts.get(&account_id).unwrap();
+        //println!("hash {} {} {} {}", account_id, order_state.order_id, order_hash, account.bjj_pub_key());
         let sig = *self.order_sig_cache.entry((order_hash, account.bjj_pub_key())).or_insert_with(|| {
             //println!("sign order");
             account.sign_hash(order_hash).unwrap()
@@ -135,7 +142,8 @@ impl Orders {
         if is_new_order {
             assert!(!witgen.has_order(order_state.account_id, order_id), "invalid new order");
             let order_to_put = self.sign_order_using_cache(accounts, order_state);
-            witgen.update_order_state(order_state.account_id, order_to_put);
+            let order_state = l2::order::Order::from_order_input(&order_to_put);
+            witgen.update_order_state(order_state.account_id, order_state);
         } else {
             assert!(
                 witgen.has_order(order_state.account_id, order_id),
@@ -171,8 +179,14 @@ impl Orders {
         let mut put_states = vec![&ask_order_state_before, &bid_order_state_before];
         put_states.sort();
 
-        self.check_global_state_knows_order(witgen, accounts, &ask_order_state_before);
-        self.check_global_state_knows_order(witgen, accounts, &bid_order_state_before);
+        let test_use_full_spot_trade: bool = true;
+
+        if test_use_full_spot_trade {
+            // pass
+        } else {
+            self.check_global_state_knows_order(witgen, accounts, &ask_order_state_before);
+            self.check_global_state_knows_order(witgen, accounts, &bid_order_state_before);
+        }
 
         assert_balance_state(
             &trade.state_before.balance,
@@ -181,10 +195,31 @@ impl Orders {
             ask_order_state_before.account_id,
             id_pair,
         );
-        self.assert_order_state(witgen, ask_order_state_before, bid_order_state_before);
 
         let timing = Instant::now();
-        witgen.spot_trade(self.trade_into_spot_tx(&trade));
+        let trade_tx = self.trade_into_spot_tx(&trade);
+        if test_use_full_spot_trade {
+            let ask_order = self.sign_order_using_cache(accounts, &ask_order_state_before);
+            let bid_order = self.sign_order_using_cache(accounts, &bid_order_state_before);
+
+            let full_trade_tx = match trade.ask_role {
+                types::matchengine::messages::MarketRole::MAKER => types::l2::FullSpotTradeTx {
+                    trade: trade_tx,
+                    maker_order: l2::order::Order::from_order_input(&ask_order),
+                    taker_order: l2::order::Order::from_order_input(&bid_order),
+                },
+                types::matchengine::messages::MarketRole::TAKER => types::l2::FullSpotTradeTx {
+                    trade: trade_tx,
+                    maker_order: l2::order::Order::from_order_input(&bid_order),
+                    taker_order: l2::order::Order::from_order_input(&ask_order),
+                },
+            };
+            //self.assert_order_state(witgen, ask_order_state_before, bid_order_state_before);
+            witgen.full_spot_trade(full_trade_tx);
+        } else {
+            self.assert_order_state(witgen, ask_order_state_before, bid_order_state_before);
+            witgen.spot_trade(trade_tx);
+        }
         self.spot_bench += timing.elapsed().as_secs_f32();
 
         assert_balance_state(
@@ -230,6 +265,7 @@ impl Default for Accounts {
 //make ad-hoc transform in account_id
 impl Accounts {
     pub fn set_account(&mut self, account_id: u32, account: Account) {
+        //println!("set account {} {}", account_id, account. bjj_pub_key());
         self.insert(account_id, account);
     }
     /*
@@ -402,7 +438,7 @@ impl<'c> OrderState<'c> {
 impl<'c> From<OrderState<'c>> for types::l2::Order {
     fn from(origin: OrderState<'c>) -> Self {
         types::l2::Order {
-            order_id: types::primitives::u32_to_fr(origin.order_id),
+            order_id: (origin.order_id),
             //status: types::primitives::u32_to_fr(origin.status),
             tokenbuy: types::primitives::u32_to_fr(origin.token_buy),
             tokensell: types::primitives::u32_to_fr(origin.token_sell),
@@ -411,6 +447,12 @@ impl<'c> From<OrderState<'c>> for types::l2::Order {
             total_sell: fixnum::decimal_to_amount(&origin.total_sell, prec_token_id(origin.token_sell)).to_fr(),
             total_buy: fixnum::decimal_to_amount(&origin.total_buy, prec_token_id(origin.token_buy)).to_fr(),
             sig: Signature::default(),
+            account_id: origin.account_id,
+            side: if origin.side.to_lowercase() == "buy" || origin.side.to_lowercase() == "bid" {
+                OrderSide::Buy
+            } else {
+                OrderSide::Sell
+            },
         }
     }
 }
