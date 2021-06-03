@@ -23,5 +23,5 @@ lazy_static! {
     pub static ref VERBOSE: bool = std::env::var("VERBOSE")
         .unwrap_or_else(|_| false.to_string())
         .parse::<bool>()
-        .unwrap_or_else(|_| false);
+        .unwrap_or(false);
 }
