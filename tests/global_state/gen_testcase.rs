@@ -23,12 +23,12 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<l2::L2Block>, test_utils::cir
     let lns: Lines<BufReader<File>> = BufReader::new(file).lines();
 
     let state = GlobalState::new(
-        test_utils::params::BALANCELEVELS,
-        test_utils::params::ORDERLEVELS,
-        test_utils::params::ACCOUNTLEVELS,
-        test_utils::params::VERBOSE,
+        *test_utils::params::BALANCELEVELS,
+        *test_utils::params::ORDERLEVELS,
+        *test_utils::params::ACCOUNTLEVELS,
+        *test_utils::params::VERBOSE,
     );
-    let mut witgen = WitnessGenerator::new(state, *test_utils::params::NTXS, test_utils::params::VERBOSE);
+    let mut witgen = WitnessGenerator::new(state, *test_utils::params::NTXS, *test_utils::params::VERBOSE);
 
     println!("genesis root {}", witgen.root());
 
@@ -67,9 +67,9 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<l2::L2Block>, test_utils::cir
         main: format!(
             "Block({}, {}, {}, {})",
             *test_utils::params::NTXS,
-            test_utils::params::BALANCELEVELS,
-            test_utils::params::ORDERLEVELS,
-            test_utils::params::ACCOUNTLEVELS
+            *test_utils::params::BALANCELEVELS,
+            *test_utils::params::ORDERLEVELS,
+            *test_utils::params::ACCOUNTLEVELS
         ),
     };
 

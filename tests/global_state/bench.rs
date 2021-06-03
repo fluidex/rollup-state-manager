@@ -4,7 +4,7 @@ use rollup_state_manager::account::{self, Account};
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils::{
     self,
-    messages::{parse_msg, WrappedMessage}
+    messages::{parse_msg, WrappedMessage},
 };
 use rollup_state_manager::types::l2;
 use std::fs::{self, File};
