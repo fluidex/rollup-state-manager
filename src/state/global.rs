@@ -4,7 +4,7 @@
 use super::AccountState;
 use crate::types::l2::Order;
 use crate::types::merkle_tree::{empty_tree_root, MerkleProof, Tree};
-use crate::types::primitives::{Fr};
+use crate::types::primitives::Fr;
 use anyhow::bail;
 use ff::Field;
 use fnv::FnvHashMap;
