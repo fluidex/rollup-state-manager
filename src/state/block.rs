@@ -1,4 +1,4 @@
-use crate::account::{rand_seed, Account, Signature};
+use crate::account::{Account, Signature};
 use crate::state::global::GlobalState;
 use crate::state::witness_generator::WitnessGenerator;
 use crate::test_utils::types::prec_token_id;
@@ -48,9 +48,9 @@ impl Block {
         let account_id1 = witgen.create_new_account(1).unwrap();
         let account_id2 = witgen.create_new_account(1).unwrap();
 
-        let account0 = Account::from_seed(account_id0, &rand_seed()).unwrap();
-        let account1 = Account::from_seed(account_id1, &rand_seed()).unwrap();
-        let account2 = Account::from_seed(account_id2, &rand_seed()).unwrap();
+        let account0 = Account::new(account_id0);
+        let account1 = Account::new(account_id1);
+        let account2 = Account::new(account_id2);
 
         // mock existing account1 data
         witgen.set_account_l2_addr(account_id1, account1.sign(), account1.ay(), account1.eth_addr());
