@@ -108,9 +108,10 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn new(uid: u32) -> Result<Self, String> {
+    pub fn new(uid: u32) -> Self {
         let mnemonic = random_mnemonic::<English>();
-        Self::from_mnemonic::<English>(uid, &mnemonic)
+        // TODO: retry if error.
+        Self::from_mnemonic::<English>(uid, &mnemonic).unwrap()
     }
     pub fn from_mnemonic<W: Wordlist>(uid: u32, mnemonic: &Mnemonic<W>) -> Result<Self, String> {
         let path = DerivationPath::from_str(&format!("{}{}", DEFAULT_DERIVATION_PATH_PREFIX, 0)).unwrap();
@@ -158,15 +159,6 @@ impl Account {
             eth_addr,
             l2_account,
         })
-    }
-    pub fn from_seed(uid: u32, seed: &[u8]) -> Result<Self, String> {
-        // TODO: if the rand seed is invalid, we should retry rather than returning error
-        let l2_account = L2Account::new(seed.to_vec())?;
-        Ok(Self { uid, l2_account })
-    }
-    pub fn new(uid: u32) -> Self {
-        let seed = rand_seed();
-        Self::from_seed(uid, &seed).unwrap()
     }
     pub fn ay(&self) -> Fr {
         self.l2_account.ay

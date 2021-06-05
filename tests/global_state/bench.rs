@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use anyhow::Result;
-use rollup_state_manager::account::{self, Account};
+use rollup_state_manager::account::Account;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils::{
     self,
@@ -53,14 +53,14 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     let cache_order_sig = true;
     if cache_order_sig {
         for j in 0..account_num {
-            let seed = account::rand_seed();
+            // let seed = account::rand_seed();
             for i in 0..loop_num {
                 let account_id = i * account_num + j;
                 // since we cache order_sig by Map<(order_hash, bjj_key), Signature>
                 // we can make cache meet 100% by reusing seed
                 //let seed = if cache_order_sig { seed.clone() } else { account::rand_seed() };
-                let seed = seed.clone();
-                let acc = Account::from_seed(account_id, &seed).unwrap();
+                // let seed = seed.clone();
+                let acc = Account::new(account_id);
                 accounts.set_account(account_id, acc);
             }
         }
