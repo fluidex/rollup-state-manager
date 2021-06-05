@@ -29,6 +29,7 @@ use ethers::{
     signers::to_eip155_v,
     utils::{hash_message, keccak256, secret_key_to_address},
 };
+use ff::from_hex;
 use ff::Field;
 use num_bigint::BigInt;
 use rand::Rng;
@@ -167,8 +168,7 @@ impl Account {
         self.l2_account.bjj_pub_key.clone()
     }
     pub fn eth_addr(&self) -> Fr {
-        // TODO: Convert H160 address to Fr
-        Fr::zero()
+        from_hex(&hex::encode(self.eth_addr.as_bytes())).unwrap()
     }
     pub fn sign(&self) -> Fr {
         self.l2_account.sign
