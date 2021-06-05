@@ -183,7 +183,7 @@ pub fn rand_seed() -> Vec<u8> {
     (0..32).map(|_| rng.gen()).collect()
 }
 
-fn random_mnemonic<W: Wordlist>() -> Mnemonic<W> {
+pub fn random_mnemonic<W: Wordlist>() -> Mnemonic<W> {
     let mut rng = ethers::core::rand::thread_rng();
     Mnemonic::<W>::new_with_count::<ThreadRng>(&mut rng, 24).unwrap()
 }
@@ -225,7 +225,7 @@ fn compute_address_from_public_key(verify_key: &VerifyingKey) -> Address {
 
 /// Signs the message with the signing key and returns the ethers core signature.
 /// Copied from https://github.com/gakonst/ethers-rs/blob/01cc80769c291fc80f5b1e9173b7b580ae6b6413/ethers-signers/src/wallet/mod.rs#L71
-fn sign_msg_with_signing_key(priv_key: &SigningKey, msg: &String) -> EthersSignature {
+fn sign_msg_with_signing_key(priv_key: &SigningKey, msg: &str) -> EthersSignature {
     let msg_hash = hash_message(msg);
     let digest = Sha256Proxy::from(msg_hash);
     let recoverable_sig: RecoverableSignature = priv_key.sign_digest(digest);
