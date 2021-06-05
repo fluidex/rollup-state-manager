@@ -1,13 +1,11 @@
 #![allow(clippy::field_reassign_with_default)]
 #![allow(clippy::vec_init_then_push)]
 
-// from https://github1s.com/Fluidex/circuits/blob/HEAD/test/global_state.ts
-
 use super::AccountState;
-use crate::account::Account;
 use crate::types::l2::Order;
 use crate::types::merkle_tree::{empty_tree_root, MerkleProof, Tree};
-use crate::types::primitives::{fr_to_u32, Fr};
+use crate::types::primitives::Fr;
+use anyhow::bail;
 use ff::Field;
 use fnv::FnvHashMap;
 use std::collections::BTreeMap;
@@ -122,13 +120,6 @@ impl GlobalState {
         let tree = self.account_tree.clone();
         tree.lock().unwrap().set_value(account_id, hash);
     }
-    /*
-    pub fn setAccountKey(&mut self, account_id: Fr, account: Account) {
-      //println!("setAccountKey", account_id);
-      self.accounts.get(account_id).updateAccountKey(account);
-      self.recalculate_from_account_state(account_id);
-    }
-    */
     pub fn set_account_l2_addr(&mut self, account_id: u32, sign: Fr, ay: Fr, eth_addr: Fr) {
         let account = self.accounts.get_mut(&account_id).unwrap();
         account.update_l2_addr(sign, ay, eth_addr);
@@ -147,24 +138,40 @@ impl GlobalState {
         self.accounts.get_mut(&account_id).unwrap().update_order_root(order_root);
         self.flush_account_state(account_id);
     }
-    fn increase_nonce(&mut self, account_id: u32) {
+    pub fn increase_nonce(&mut self, account_id: u32) {
         let mut nonce = self.accounts.get(&account_id).unwrap().nonce;
         nonce.add_assign(&Fr::one());
         //println!("oldNonce", oldNonce);
         self.set_account_nonce(account_id, nonce);
     }
     pub fn get_account(&self, account_id: u32) -> AccountState {
-        *self.accounts.get(&account_id).unwrap()
+        self.accounts
+            .get(&account_id)
+            .cloned()
+            .unwrap_or_else(|| AccountState::empty(self.default_balance_root, self.default_order_root))
+    }
+    pub fn has_account(&self, account_id: u32) -> bool {
+        !self.get_account(account_id).ay.is_zero()
     }
     fn get_next_order_pos_for_user(&self, account_id: u32) -> u32 {
         *self.next_order_positions.get(&account_id).unwrap()
     }
-    pub fn create_new_account(&mut self, next_order_id: u32) -> Result<Account, String> {
+    pub fn get_next_account_id(&self) -> anyhow::Result<u32> {
+        // TODO: should this function return Err(...) when the tree is full?
+        // TODO: we may need to allow sparse account tree later,
+        // eg, account 1 and account 5 is created, while account 2/3/4 is empty
         let account_id = self.balance_trees.len() as u32;
         if account_id >= 2u32.pow(self.account_levels as u32) {
-            panic!("account_id {} overflows for account_levels {}", account_id, self.account_levels);
+            bail!("account_id {} overflows for account_levels {}", account_id, self.account_levels);
         }
-
+        Ok(account_id)
+    }
+    // TODO: private or public? It is better this function is called automatically
+    // rather than being called manully by the caller
+    pub fn init_account(&mut self, account_id: u32, next_order_id: u32) -> anyhow::Result<u32> {
+        if account_id >= 2u32.pow(self.account_levels as u32) {
+            bail!("account_id {} overflows for account_levels {}", account_id, self.account_levels);
+        }
         let account_state = AccountState::empty(self.default_balance_root, self.default_order_root);
         self.accounts.insert(account_id, account_state);
         self.balance_trees
@@ -176,7 +183,11 @@ impl GlobalState {
         self.order_map.insert(account_id, BTreeMap::<u32, Order>::default());
         self.account_tree.lock().unwrap().set_value(account_id, self.default_account_leaf);
         self.next_order_positions.insert(account_id, next_order_id);
-        Account::new(account_id)
+        Ok(account_id)
+    }
+    pub fn create_new_account(&mut self, next_order_id: u32) -> anyhow::Result<u32> {
+        let account_id = self.get_next_account_id()?;
+        self.init_account(account_id, next_order_id)
     }
     pub fn get_order_pos_by_id(&self, account_id: u32, order_id: u32) -> u32 {
         *self.order_id_to_pos.get(&(account_id, order_id)).unwrap()
@@ -197,8 +208,7 @@ impl GlobalState {
             .unwrap()
             .set_value(order_pos, order.hash());
         self.order_map.get_mut(&account_id).unwrap().insert(order_pos, order);
-        // TODO: better type here...
-        let order_id: u32 = fr_to_u32(&order.order_id);
+        let order_id: u32 = order.order_id;
         self.order_id_to_pos.insert((account_id, order_id), order_pos);
         self.flush_account_state(account_id);
     }
@@ -219,10 +229,7 @@ impl GlobalState {
     }
 
     pub fn update_order_state(&mut self, account_id: u32, order: Order) {
-        self.order_map
-            .get_mut(&account_id)
-            .unwrap()
-            .insert(fr_to_u32(&order.order_id), order);
+        self.order_map.get_mut(&account_id).unwrap().insert(order.order_id, order);
     }
     pub fn find_pos_for_order(&mut self, account_id: u32, order_id: u32) -> (u32, Order) {
         if !self.has_order(account_id, order_id) {
@@ -260,6 +267,9 @@ impl GlobalState {
     }
 
     pub fn get_token_balance(&self, account_id: u32, token_id: u32) -> Fr {
+        if !self.has_account(account_id) {
+            return Fr::zero();
+        }
         self.balance_trees.get(&account_id).unwrap().lock().unwrap().get_leaf(token_id)
     }
     pub fn set_token_balance(&mut self, account_id: u32, token_id: u32, balance: Fr) {

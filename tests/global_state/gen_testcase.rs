@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 mod types;
-use types::{test_params, Accounts, Orders};
+use types::{Accounts, Orders};
 
 fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<l2::L2Block>, test_utils::circuit::CircuitSource)> {
     let test_dir = circuit_repo.join("test").join("testdata");
@@ -23,30 +23,27 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<l2::L2Block>, test_utils::cir
     let lns: Lines<BufReader<File>> = BufReader::new(file).lines();
 
     let state = GlobalState::new(
-        test_params::BALANCELEVELS,
-        test_params::ORDERLEVELS,
-        test_params::ACCOUNTLEVELS,
-        test_params::VERBOSE,
+        *test_utils::params::BALANCELEVELS,
+        *test_utils::params::ORDERLEVELS,
+        *test_utils::params::ACCOUNTLEVELS,
+        *test_utils::params::VERBOSE,
     );
-    let mut witgen = WitnessGenerator::new(state, test_params::NTXS, test_params::VERBOSE);
+    let mut witgen = WitnessGenerator::new(state, *test_utils::params::NTXS, *test_utils::params::VERBOSE);
 
     println!("genesis root {}", witgen.root());
 
     let mut orders = Orders::default();
     let mut accounts = Accounts::default();
-    /*
-        for _ in 0..test_const::MAXACCOUNTNUM {
-            state.create_new_account(1);
-        }
-    */
 
-    for line in lns {
-        match line.map(parse_msg)?? {
+    let messages: Vec<WrappedMessage> = lns.map(|l| parse_msg(l.unwrap()).unwrap()).collect();
+
+    let timing = Instant::now();
+    for msg in messages {
+        match msg {
             WrappedMessage::BALANCE(balance) => {
                 accounts.handle_deposit(&mut witgen, balance);
             }
             WrappedMessage::TRADE(trade) => {
-                let trade = accounts.transform_trade(&mut witgen, trade);
                 let trade_id = trade.id;
                 orders.handle_trade(&mut witgen, &accounts, trade);
                 println!("trade {} test done", trade_id);
@@ -58,19 +55,25 @@ fn replay_msgs(circuit_repo: &Path) -> Result<(Vec<l2::L2Block>, test_utils::cir
     }
 
     witgen.flush_with_nop();
+    let blocks = witgen.take_blocks();
+    println!(
+        "genesis {} blocks (TPS: {})",
+        blocks.len(),
+        (*test_utils::params::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
+    );
 
     let component = test_utils::circuit::CircuitSource {
         src: String::from("src/block.circom"),
         main: format!(
             "Block({}, {}, {}, {})",
-            test_params::NTXS,
-            test_params::BALANCELEVELS,
-            test_params::ORDERLEVELS,
-            test_params::ACCOUNTLEVELS
+            *test_utils::params::NTXS,
+            *test_utils::params::BALANCELEVELS,
+            *test_utils::params::ORDERLEVELS,
+            *test_utils::params::ACCOUNTLEVELS
         ),
     };
 
-    Ok((witgen.take_blocks(), component))
+    Ok((blocks, component))
 }
 
 //just grap from export_circuit_test.rs ...
@@ -125,13 +128,7 @@ fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<l2::L2Block>, so
 pub fn run() -> Result<()> {
     let circuit_repo = fs::canonicalize(PathBuf::from("circuits")).expect("invalid circuits repo path");
 
-    let timing = Instant::now();
     let (blocks, components) = replay_msgs(&circuit_repo)?;
-    println!(
-        "genesis {} blocks (TPS: {})",
-        blocks.len(),
-        (test_params::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
-    );
 
     let circuit_dir = export_circuit_and_testdata(&circuit_repo, blocks, components)?;
 

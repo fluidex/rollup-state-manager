@@ -3,7 +3,7 @@ pub use crate::types::merkle_tree::MerklePath;
 use crate::types::primitives::{hash, shl, Fr};
 use ff::Field;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 pub struct AccountState {
     pub nonce: Fr,
     pub sign: Fr,
@@ -45,15 +45,6 @@ impl AccountState {
         let inputs = &[data, self.balance_root, self.ay, self.eth_addr, self.order_root];
         hash(inputs)
     }
-
-    /*
-    pub fn updateAccountKey(account) {
-      const sign = BigInt(account.sign);
-      const ay = Scalar.fromString(account.ay, 16);
-      const eth_addr = Scalar.fromString(account.eth_addr.replace('0x', ''), 16);
-      self.update_l2_addr(sign, ay, eth_addr);
-    }
-    */
     // TODO: remove eth_addr
     pub fn update_l2_addr(&mut self, sign: Fr, ay: Fr, eth_addr: Fr) {
         self.sign = sign;

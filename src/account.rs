@@ -159,8 +159,20 @@ impl Account {
             l2_account,
         })
     }
+    pub fn from_seed(uid: u32, seed: &[u8]) -> Result<Self, String> {
+        // TODO: if the rand seed is invalid, we should retry rather than returning error
+        let l2_account = L2Account::new(seed.to_vec())?;
+        Ok(Self { uid, l2_account })
+    }
+    pub fn new(uid: u32) -> Self {
+        let seed = rand_seed();
+        Self::from_seed(uid, &seed).unwrap()
+    }
     pub fn ay(&self) -> Fr {
         self.l2_account.ay
+    }
+    pub fn bjj_pub_key(&self) -> String {
+        self.l2_account.bjj_pub_key.clone()
     }
     pub fn eth_addr(&self) -> Fr {
         // TODO: Convert H160 address to Fr
@@ -174,7 +186,7 @@ impl Account {
     }
 }
 
-fn rand_seed() -> Vec<u8> {
+pub fn rand_seed() -> Vec<u8> {
     let mut rng = rand::thread_rng();
     (0..32).map(|_| rng.gen()).collect()
 }

@@ -2,55 +2,17 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::large_enum_variant)]
 
-use std::collections::HashMap;
-
 use rollup_state_manager::account::{Account, Signature};
 use rollup_state_manager::state::WitnessGenerator;
+use rollup_state_manager::test_utils::types::{get_token_id_by_name, prec_token_id};
 use rollup_state_manager::types;
 use rollup_state_manager::types::fixnum;
-use rollup_state_manager::types::l2::Order;
-use rollup_state_manager::types::primitives::{fr_to_decimal, u32_to_fr};
+use rollup_state_manager::types::l2::{self, OrderInput, OrderSide};
+use rollup_state_manager::types::primitives::{fr_to_decimal, u32_to_fr, Fr};
 use rust_decimal::Decimal;
+use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::time::Instant;
-// TODO: use ENV
-
-// TODO: move most of these to test_utils
-
-pub mod test_params {
-    pub const NTXS: usize = 2;
-
-    pub const BALANCELEVELS: usize = 2;
-    pub const ORDERLEVELS: usize = 3;
-    pub const ACCOUNTLEVELS: usize = 2;
-    /*
-
-          pub const BALANCELEVELS: usize = 20;
-          pub const ORDERLEVELS: usize = 20;
-          pub const ACCOUNTLEVELS: usize = 20;
-    */
-    pub const MAXORDERNUM: usize = 2usize.pow(ORDERLEVELS as u32);
-    pub const MAXACCOUNTNUM: usize = 2usize.pow(ACCOUNTLEVELS as u32);
-    pub const MAXTOKENNUM: usize = 2usize.pow(BALANCELEVELS as u32);
-    pub const VERBOSE: bool = false;
-
-    // TODO: enum & impl
-    pub fn token_id(token_name: &str) -> u32 {
-        match token_name {
-            "ETH" => 0,
-            "USDT" => 1,
-            _ => unreachable!(),
-        }
-    }
-
-    // TODO: enum & impl
-    pub fn prec(token_id: u32) -> u32 {
-        match token_id {
-            0 | 1 => 6,
-            _ => unreachable!(),
-        }
-    }
-}
 
 type OrdersType = HashMap<u32, (u32, u64)>;
 //index type?
@@ -58,6 +20,8 @@ type OrdersType = HashMap<u32, (u32, u64)>;
 pub struct Orders {
     place_bench: f32,
     spot_bench: f32,
+    // (order_hash, bjj_key) -> sig
+    order_sig_cache: HashMap<(Fr, String), Signature>,
 }
 
 impl Default for Orders {
@@ -65,6 +29,7 @@ impl Default for Orders {
         Orders {
             place_bench: 0.0,
             spot_bench: 0.0,
+            order_sig_cache: Default::default(),
         }
     }
 }
@@ -98,8 +63,8 @@ impl Orders {
                 order2_account_id: trade.bid_user_id,
                 token_id_1to2: id_pair.0,
                 token_id_2to1: id_pair.1,
-                amount_1to2: fixnum::decimal_to_amount(&trade.amount, test_params::prec(id_pair.0)),
-                amount_2to1: fixnum::decimal_to_amount(&trade.quote_amount, test_params::prec(id_pair.1)),
+                amount_1to2: fixnum::decimal_to_amount(&trade.amount, prec_token_id(id_pair.0)),
+                amount_2to1: fixnum::decimal_to_amount(&trade.quote_amount, prec_token_id(id_pair.1)),
                 order1_id: trade.ask_order_id as u32,
                 order2_id: trade.bid_order_id as u32,
             },
@@ -108,40 +73,70 @@ impl Orders {
                 order2_account_id: trade.ask_user_id,
                 token_id_1to2: id_pair.1,
                 token_id_2to1: id_pair.0,
-                amount_1to2: fixnum::decimal_to_amount(&trade.quote_amount, test_params::prec(id_pair.1)),
-                amount_2to1: fixnum::decimal_to_amount(&trade.amount, test_params::prec(id_pair.0)),
+                amount_1to2: fixnum::decimal_to_amount(&trade.quote_amount, prec_token_id(id_pair.1)),
+                amount_2to1: fixnum::decimal_to_amount(&trade.amount, prec_token_id(id_pair.0)),
                 order1_id: trade.bid_order_id as u32,
                 order2_id: trade.ask_order_id as u32,
             },
         }
     }
+    fn parse_order(order_state: &OrderState) -> OrderInput {
+        OrderInput {
+            order_id: (order_state.order_id),
+            tokensell: u32_to_fr(order_state.token_sell),
+            tokenbuy: u32_to_fr(order_state.token_buy),
+            //filled_sell: u32_to_fr(0),
+            //filled_buy: u32_to_fr(0),
+            total_sell: fixnum::decimal_to_amount(&order_state.total_sell, prec_token_id(order_state.token_sell)).to_fr(),
+            total_buy: fixnum::decimal_to_amount(&order_state.total_buy, prec_token_id(order_state.token_buy)).to_fr(),
+            sig: Signature::default(),
+            account_id: order_state.account_id,
+            side: if order_state.side.to_lowercase() == "buy" || order_state.side.to_lowercase() == "bid" {
+                OrderSide::Buy
+            } else {
+                OrderSide::Sell
+            },
+        }
+    }
+    fn sign_order_using_cache(&mut self, accounts: &Accounts, order_state: &OrderState) -> OrderInput {
+        let account_id = order_state.account_id;
+        let mut order_to_put = Self::parse_order(order_state);
+        let order_hash = order_to_put.hash();
+        let account = accounts.get(&account_id).unwrap();
+        //println!("hash {} {} {} {}", account_id, order_state.order_id, order_hash, account.bjj_pub_key());
+        let sig = *self.order_sig_cache.entry((order_hash, account.bjj_pub_key())).or_insert_with(|| {
+            //println!("sign order");
+            account.sign_hash(order_hash).unwrap()
+        });
+        order_to_put.sig = sig;
+        order_to_put
+    }
 
-    fn check_global_state_knows_order(&self, witgen: &mut WitnessGenerator, accounts: &Accounts, order_state: &OrderState) {
+    fn check_global_state_knows_order(&mut self, witgen: &mut WitnessGenerator, accounts: &Accounts, order_state: &OrderState) {
         let is_new_order =
             order_state.origin.finished_base == Decimal::new(0, 0) && order_state.origin.finished_quote == Decimal::new(0, 0);
-        let account_id = order_state.account_id;
+        //let account_id = order_state.account_id;
         let order_id = order_state.order_id;
         if is_new_order {
             assert!(!witgen.has_order(order_state.account_id, order_id), "invalid new order");
-            let mut order_to_put = Order {
-                order_id: u32_to_fr(order_id),
-                tokensell: u32_to_fr(order_state.token_sell),
-                tokenbuy: u32_to_fr(order_state.token_buy),
-                filled_sell: u32_to_fr(0),
-                filled_buy: u32_to_fr(0),
-                total_sell: fixnum::decimal_to_amount(&order_state.total_sell, test_params::prec(order_state.token_sell)).to_fr(),
-                total_buy: fixnum::decimal_to_amount(&order_state.total_buy, test_params::prec(order_state.token_buy)).to_fr(),
-                sig: Signature::default(),
-            };
-            let account = accounts.get(&account_id).unwrap();
-            order_to_put.sign_with(account).unwrap();
-            witgen.update_order_state(order_state.account_id, order_to_put);
+            let order_to_put = self.sign_order_using_cache(accounts, order_state);
+            let order_state = l2::order::Order::from_order_input(&order_to_put);
+            witgen.update_order_state(order_state.account_id, order_state);
         } else {
             assert!(
                 witgen.has_order(order_state.account_id, order_id),
                 "invalid old order, too many open orders?"
             );
         }
+    }
+
+    pub fn sign_orders(&mut self, accounts: &Accounts, trade: types::matchengine::messages::TradeMessage) {
+        let token_pair = TokenPair::from(trade.market.as_str());
+        let id_pair = TokenIdPair::from(token_pair);
+        let ask_order_state_before: OrderState = OrderState::parse(&trade.state_before.ask_order_state, id_pair, token_pair, "ASK", &trade);
+        let bid_order_state_before: OrderState = OrderState::parse(&trade.state_before.bid_order_state, id_pair, token_pair, "BID", &trade);
+        self.sign_order_using_cache(accounts, &ask_order_state_before);
+        self.sign_order_using_cache(accounts, &bid_order_state_before);
     }
 
     pub fn handle_trade(&mut self, witgen: &mut WitnessGenerator, accounts: &Accounts, trade: types::matchengine::messages::TradeMessage) {
@@ -162,8 +157,14 @@ impl Orders {
         let mut put_states = vec![&ask_order_state_before, &bid_order_state_before];
         put_states.sort();
 
-        self.check_global_state_knows_order(witgen, accounts, &ask_order_state_before);
-        self.check_global_state_knows_order(witgen, accounts, &bid_order_state_before);
+        let test_use_full_spot_trade: bool = true;
+
+        if test_use_full_spot_trade {
+            // pass
+        } else {
+            self.check_global_state_knows_order(witgen, accounts, &ask_order_state_before);
+            self.check_global_state_knows_order(witgen, accounts, &bid_order_state_before);
+        }
 
         assert_balance_state(
             &trade.state_before.balance,
@@ -172,10 +173,31 @@ impl Orders {
             ask_order_state_before.account_id,
             id_pair,
         );
-        self.assert_order_state(witgen, ask_order_state_before, bid_order_state_before);
 
         let timing = Instant::now();
-        witgen.spot_trade(self.trade_into_spot_tx(&trade));
+        let trade_tx = self.trade_into_spot_tx(&trade);
+        if test_use_full_spot_trade {
+            let ask_order = self.sign_order_using_cache(accounts, &ask_order_state_before);
+            let bid_order = self.sign_order_using_cache(accounts, &bid_order_state_before);
+
+            let full_trade_tx = match trade.ask_role {
+                types::matchengine::messages::MarketRole::MAKER => types::l2::FullSpotTradeTx {
+                    trade: trade_tx,
+                    maker_order: l2::order::Order::from_order_input(&ask_order),
+                    taker_order: l2::order::Order::from_order_input(&bid_order),
+                },
+                types::matchengine::messages::MarketRole::TAKER => types::l2::FullSpotTradeTx {
+                    trade: trade_tx,
+                    maker_order: l2::order::Order::from_order_input(&bid_order),
+                    taker_order: l2::order::Order::from_order_input(&ask_order),
+                },
+            };
+            //self.assert_order_state(witgen, ask_order_state_before, bid_order_state_before);
+            witgen.full_spot_trade(full_trade_tx);
+        } else {
+            self.assert_order_state(witgen, ask_order_state_before, bid_order_state_before);
+            witgen.spot_trade(trade_tx);
+        }
         self.spot_bench += timing.elapsed().as_secs_f32();
 
         assert_balance_state(
@@ -220,40 +242,45 @@ impl Default for Accounts {
 
 //make ad-hoc transform in account_id
 impl Accounts {
-    fn userid_to_treeindex(&mut self, witgen: &mut WitnessGenerator, account_id: u32) -> u32 {
-        match self.get(&account_id) {
-            Some(idx) => idx.uid,
-            None => {
-                let account = witgen.create_new_account(1).unwrap();
-                let uid = account.uid;
-                self.insert(account_id, account);
-                if test_params::VERBOSE {
-                    println!("global account index {} to user account id {}", uid, account_id);
+    pub fn set_account(&mut self, account_id: u32, account: Account) {
+        //println!("set account {} {}", account_id, account. bjj_pub_key());
+        self.insert(account_id, account);
+    }
+    /*
+        fn userid_to_treeindex(&mut self, witgen: &mut WitnessGenerator, account_id: u32) -> u32 {
+            account_id
+
+            match self.get(&account_id) {
+                Some(idx) => idx.uid,
+                None => {
+                    let account = witgen.create_new_account(1).unwrap();
+                    let uid = account.uid;
+                    self.insert(account_id, account);
+                    if test_params::VERBOSE {
+                        println!("global account index {} to user account id {}", uid, account_id);
+                    }
+                    uid
                 }
-                uid
             }
         }
-    }
 
-    pub fn transform_trade(
-        &mut self,
-        witgen: &mut WitnessGenerator,
-        mut trade: types::matchengine::messages::TradeMessage,
-    ) -> types::matchengine::messages::TradeMessage {
-        trade.ask_user_id = self.userid_to_treeindex(witgen, trade.ask_user_id);
-        trade.bid_user_id = self.userid_to_treeindex(witgen, trade.bid_user_id);
+        pub fn transform_trade(
+            &mut self,
+            witgen: &mut WitnessGenerator,
+            mut trade: types::matchengine::messages::TradeMessage,
+        ) -> types::matchengine::messages::TradeMessage {
+            trade.ask_user_id = self.userid_to_treeindex(witgen, trade.ask_user_id);
+            trade.bid_user_id = self.userid_to_treeindex(witgen, trade.bid_user_id);
 
-        trade
-    }
-
-    pub fn handle_deposit(&mut self, witgen: &mut WitnessGenerator, mut deposit: types::matchengine::messages::BalanceMessage) {
+            trade
+        }
+    */
+    pub fn handle_deposit(&mut self, witgen: &mut WitnessGenerator, deposit: types::matchengine::messages::BalanceMessage) {
         assert!(!deposit.change.is_sign_negative(), "only support deposit now");
-        let token_id = test_params::token_id(&deposit.asset);
+        let token_id = get_token_id_by_name(&deposit.asset);
         let account_id = deposit.user_id;
-        let is_old = self.contains_key(&account_id);
-        let user_id = self.userid_to_treeindex(witgen, account_id);
-        let account = self.get(&account_id).unwrap();
-        deposit.user_id = user_id;
+        let is_old = witgen.has_account(account_id);
+        let account = self.entry(account_id).or_insert_with(|| Account::new(account_id));
 
         let balance_before = deposit.balance - deposit.change;
         assert!(!balance_before.is_sign_negative(), "invalid balance {:?}", deposit);
@@ -261,22 +288,22 @@ impl Accounts {
         let expected_balance_before = witgen.get_token_balance(deposit.user_id, token_id);
         assert_eq!(
             expected_balance_before,
-            fixnum::decimal_to_amount(&balance_before, test_params::prec(token_id)).to_fr()
+            fixnum::decimal_to_amount(&balance_before, prec_token_id(token_id)).to_fr()
         );
 
         let timing = Instant::now();
 
-        let amount = fixnum::decimal_to_amount(&deposit.change, test_params::prec(token_id));
+        let amount = fixnum::decimal_to_amount(&deposit.change, prec_token_id(token_id));
         if is_old {
             witgen.deposit_to_old(types::l2::DepositToOldTx {
                 token_id,
-                account_id: user_id,
+                account_id,
                 amount,
             });
         } else {
             witgen.deposit_to_new(types::l2::DepositToNewTx {
                 token_id,
-                account_id: user_id,
+                account_id,
                 amount,
                 eth_addr: account.eth_addr(),
                 sign: account.sign(),
@@ -340,7 +367,7 @@ impl<'c> From<&'c str> for TokenPair<'c> {
 
 impl<'c> From<TokenPair<'c>> for TokenIdPair {
     fn from(origin: TokenPair<'c>) -> Self {
-        TokenIdPair(test_params::token_id(origin.0), test_params::token_id(origin.1))
+        TokenIdPair(get_token_id_by_name(origin.0), get_token_id_by_name(origin.1))
     }
 }
 
@@ -389,15 +416,21 @@ impl<'c> OrderState<'c> {
 impl<'c> From<OrderState<'c>> for types::l2::Order {
     fn from(origin: OrderState<'c>) -> Self {
         types::l2::Order {
-            order_id: types::primitives::u32_to_fr(origin.order_id),
+            order_id: (origin.order_id),
             //status: types::primitives::u32_to_fr(origin.status),
             tokenbuy: types::primitives::u32_to_fr(origin.token_buy),
             tokensell: types::primitives::u32_to_fr(origin.token_sell),
-            filled_sell: fixnum::decimal_to_amount(&origin.filled_sell, test_params::prec(origin.token_sell)).to_fr(),
-            filled_buy: fixnum::decimal_to_amount(&origin.filled_buy, test_params::prec(origin.token_buy)).to_fr(),
-            total_sell: fixnum::decimal_to_amount(&origin.total_sell, test_params::prec(origin.token_sell)).to_fr(),
-            total_buy: fixnum::decimal_to_amount(&origin.total_buy, test_params::prec(origin.token_buy)).to_fr(),
+            filled_sell: fixnum::decimal_to_amount(&origin.filled_sell, prec_token_id(origin.token_sell)).to_fr(),
+            filled_buy: fixnum::decimal_to_amount(&origin.filled_buy, prec_token_id(origin.token_buy)).to_fr(),
+            total_sell: fixnum::decimal_to_amount(&origin.total_sell, prec_token_id(origin.token_sell)).to_fr(),
+            total_buy: fixnum::decimal_to_amount(&origin.total_buy, prec_token_id(origin.token_buy)).to_fr(),
             sig: Signature::default(),
+            account_id: origin.account_id,
+            side: if origin.side.to_lowercase() == "buy" || origin.side.to_lowercase() == "bid" {
+                OrderSide::Buy
+            } else {
+                OrderSide::Sell
+            },
         }
     }
 }
@@ -447,10 +480,10 @@ impl CommonBalanceState {
             ask_user_base: origin.ask_user_base,
             ask_user_quote: origin.ask_user_quote,
             /*
-            bid_user_base: fixnum::decimal_to_amount(&origin.bid_user_base, test_params::prec(base_id)).to_fr(),
-            bid_user_quote: fixnum::decimal_to_amount(&origin.bid_user_quote, test_params::prec(quote_id)).to_fr(),
-            ask_user_base: fixnum::decimal_to_amount(&origin.ask_user_base, test_params::prec(base_id)).to_fr(),
-            ask_user_quote: fixnum::decimal_to_amount(&origin.ask_user_quote, test_params::prec(quote_id)).to_fr(),
+            bid_user_base: fixnum::decimal_to_amount(&origin.bid_user_base, prec_token_id(base_id)).to_fr(),
+            bid_user_quote: fixnum::decimal_to_amount(&origin.bid_user_quote, prec_token_id(quote_id)).to_fr(),
+            ask_user_base: fixnum::decimal_to_amount(&origin.ask_user_base, prec_token_id(base_id)).to_fr(),
+            ask_user_quote: fixnum::decimal_to_amount(&origin.ask_user_quote, prec_token_id(quote_id)).to_fr(),
             */
         }
     }
@@ -460,10 +493,10 @@ impl CommonBalanceState {
         let quote_id = id_pair.1;
 
         CommonBalanceState {
-            bid_user_base: fr_to_decimal(&witgen.get_token_balance(bid_id, base_id), test_params::prec(base_id)),
-            bid_user_quote: fr_to_decimal(&witgen.get_token_balance(bid_id, quote_id), test_params::prec(quote_id)),
-            ask_user_base: fr_to_decimal(&witgen.get_token_balance(ask_id, base_id), test_params::prec(base_id)),
-            ask_user_quote: fr_to_decimal(&witgen.get_token_balance(ask_id, quote_id), test_params::prec(quote_id)),
+            bid_user_base: fr_to_decimal(&witgen.get_token_balance(bid_id, base_id), prec_token_id(base_id)),
+            bid_user_quote: fr_to_decimal(&witgen.get_token_balance(bid_id, quote_id), prec_token_id(quote_id)),
+            ask_user_base: fr_to_decimal(&witgen.get_token_balance(ask_id, base_id), prec_token_id(base_id)),
+            ask_user_quote: fr_to_decimal(&witgen.get_token_balance(ask_id, quote_id), prec_token_id(quote_id)),
             /*
             bid_user_base: witgen.get_token_balance(bid_id, base_id),
             bid_user_quote: witgen.get_token_balance(bid_id, quote_id),
