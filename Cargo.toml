@@ -7,11 +7,13 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.39"
 arrayref = "0.3.6"
+coins-bip32 = "0.2.2"
 babyjubjub-rs = { version = "0.0.8", features = [ "aarch64" ], default-features = false }
 #babyjubjub-rs = { version = "0.0.8"}
 config_rs = { package = "config", version = "0.10.1" }
 dotenv = "0.15.0"
 env_logger = "0.5"
+ethers = { git = "https://github.com/gakonst/ethers-rs" }
 ff = { package = "ff_ce", version = "0.11", features = [ "derive" ] }
 fnv = "1.0.7"
 franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch = "beta" }
@@ -32,6 +34,7 @@ rust_decimal = { version = "1.10.3", features = [ "serde_json" ] }
 serde = { version = "1.0.124", features = [ "derive" ] }
 serde_derive = "1.0.90"
 serde_json = "1.0.64"
+sha2 = "0.9.5"
 
 [[bin]]
 name = "rollup_state_manager"
