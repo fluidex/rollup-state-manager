@@ -295,20 +295,27 @@ impl Accounts {
 
         let amount = fixnum::decimal_to_amount(&deposit.change, prec_token_id(token_id));
         if is_old {
-            witgen.deposit_to_old(types::l2::DepositToOldTx {
-                token_id,
-                account_id,
-                amount,
-            });
+            witgen
+                .deposit(types::l2::DepositTx {
+                    token_id,
+                    account_id,
+                    amount,
+                    l2key: None,
+                })
+                .unwrap();
         } else {
-            witgen.deposit_to_new(types::l2::DepositToNewTx {
-                token_id,
-                account_id,
-                amount,
-                eth_addr: account.eth_addr(),
-                sign: account.sign(),
-                ay: account.ay(),
-            });
+            witgen
+                .deposit(types::l2::DepositTx {
+                    token_id,
+                    account_id,
+                    amount,
+                    l2key: Some(types::l2::L2Key {
+                        eth_addr: account.eth_addr(),
+                        sign: account.sign(),
+                        ay: account.ay(),
+                    }),
+                })
+                .unwrap();
         }
 
         self.balance_bench += timing.elapsed().as_secs_f32();

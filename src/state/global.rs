@@ -3,7 +3,7 @@
 
 use super::AccountState;
 use crate::types::l2::Order;
-use crate::types::merkle_tree::{empty_tree_root, MerkleProof, Tree};
+use crate::types::merkle_tree::{MerkleProof, Tree};
 use crate::types::primitives::Fr;
 use anyhow::bail;
 use ff::Field;
@@ -60,10 +60,14 @@ pub struct GlobalState {
     default_order_leaf: Fr,
     default_order_root: Fr,
     default_account_leaf: Fr,
+    // TODO: id or pos?
+    default_next_order_id: u32,
     next_order_positions: FnvHashMap<u32, u32>,
     max_order_num_per_user: u32,
 
     // some precalculated items
+    empty_order_tree: Tree,
+    empty_balance_tree: Tree,
     trivial_order_path_elements: Vec<[Fr; 1]>,
 
     verbose: bool,
@@ -75,13 +79,16 @@ impl GlobalState {
     }
 
     pub fn new(balance_levels: usize, order_levels: usize, account_levels: usize, verbose: bool) -> Self {
-        let default_balance_root = empty_tree_root(balance_levels, Fr::zero());
+        let empty_balance_tree = Tree::new(balance_levels, Fr::zero());
+        let default_balance_root = empty_balance_tree.get_root();
+
         let default_order_leaf = Order::default().hash();
-        let dummy_order_tree = Tree::new(order_levels, default_order_leaf);
-        let default_order_root = dummy_order_tree.get_root();
+        let empty_order_tree = Tree::new(order_levels, default_order_leaf);
+        let default_order_root = empty_order_tree.get_root();
+        let trivial_order_path_elements = empty_order_tree.get_proof(0).path_elements;
+
         let default_account_leaf = AccountState::empty(default_balance_root, default_order_root).hash();
-        let max_order_num_per_user = dummy_order_tree.max_leaf_num();
-        let trivial_order_path_elements = Tree::new(order_levels, Fr::zero()).get_proof(0).path_elements;
+        let max_order_num_per_user = empty_order_tree.max_leaf_num();
         Self {
             balance_levels,
             order_levels,
@@ -91,6 +98,7 @@ impl GlobalState {
             default_order_root,
             // default_account_leaf depends on default_order_root and default_balance_root
             default_account_leaf,
+            default_next_order_id: 1,
             account_tree: Arc::new(Mutex::new(Tree::new(account_levels, default_account_leaf))), // Tree<account_hash>
             balance_trees: FnvHashMap::default(),                                                // FnvHashMap[account_id]balance_tree
             order_trees: FnvHashMap::default(),                                                  // FnvHashMap[account_id]order_tree
@@ -100,6 +108,8 @@ impl GlobalState {
             accounts: FnvHashMap::default(), // FnvHashMap[account_id]acount_state
             next_order_positions: FnvHashMap::default(),
             max_order_num_per_user,
+            empty_balance_tree,
+            empty_order_tree,
             trivial_order_path_elements,
             verbose,
         }
@@ -128,7 +138,9 @@ impl GlobalState {
     pub fn get_l1_addr(&self, account_id: u32) -> Fr {
         return self.accounts.get(&account_id).unwrap().eth_addr;
     }
-
+    pub fn get_account_nonce(&self, account_id: u32) -> Fr {
+        self.get_account(account_id).nonce
+    }
     pub fn set_account_nonce(&mut self, account_id: u32, nonce: Fr) {
         self.accounts.get_mut(&account_id).unwrap().update_nonce(nonce);
         self.flush_account_state(account_id);
@@ -169,6 +181,9 @@ impl GlobalState {
     // TODO: private or public? It is better this function is called automatically
     // rather than being called manully by the caller
     pub fn init_account(&mut self, account_id: u32, next_order_id: u32) -> anyhow::Result<u32> {
+        if self.accounts.contains_key(&account_id) {
+            return Ok(account_id);
+        }
         if account_id >= 2u32.pow(self.account_levels as u32) {
             bail!("account_id {} overflows for account_levels {}", account_id, self.account_levels);
         }
@@ -273,6 +288,9 @@ impl GlobalState {
         self.balance_trees.get(&account_id).unwrap().lock().unwrap().get_leaf(token_id)
     }
     pub fn set_token_balance(&mut self, account_id: u32, token_id: u32, balance: Fr) {
+        if !self.accounts.contains_key(&account_id) {
+            self.init_account(account_id, self.default_next_order_id).unwrap();
+        }
         self.set_token_balance_raw(account_id, token_id, balance);
         self.flush_account_state(account_id)
     }
@@ -347,7 +365,11 @@ impl GlobalState {
         self.order_trees.get(&account_id).unwrap().lock().unwrap().get_proof(order_pos)
     }
     pub fn balance_proof(&self, account_id: u32, token_id: u32) -> MerkleProof {
-        self.balance_trees.get(&account_id).unwrap().lock().unwrap().get_proof(token_id)
+        if self.balance_trees.contains_key(&account_id) {
+            self.balance_trees.get(&account_id).unwrap().lock().unwrap().get_proof(token_id)
+        } else {
+            self.empty_balance_tree.get_proof(token_id)
+        }
     }
     // get proof if `value` is in the tree without really updating
     //pub fn balance_proof_with(self, account_id: u32, token_id: u32, value: Fr) -> MerkleProof
@@ -355,8 +377,8 @@ impl GlobalState {
         self.account_tree.lock().unwrap().get_proof(account_id)
     }
     pub fn balance_full_proof(&self, account_id: u32, token_id: u32) -> BalanceProof {
-        let balance_proof = self.balance_proof(account_id, token_id);
         let account_proof = self.account_proof(account_id);
+        let balance_proof = self.balance_proof(account_id, token_id);
         BalanceProof {
             leaf: balance_proof.leaf,
             balance_path: balance_proof.path_elements,
