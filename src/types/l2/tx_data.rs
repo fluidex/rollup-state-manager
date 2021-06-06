@@ -1,5 +1,5 @@
 // Generated from tpl/ejs/./extra/rollup-state-manager/src/types/l2/tx_data.rs.ejs. Don't modify this file manually
-pub const TX_LENGTH: usize = 60;
+pub const TX_LENGTH: usize = 61;
 pub mod tx_detail_idx {
     pub const ENABLE_BALANCE_CHECK1: usize = 0;
     pub const ACCOUNT_ID1: usize = 1;
@@ -61,4 +61,5 @@ pub mod tx_detail_idx {
     pub const NEW_ORDER2_TOKEN_BUY: usize = 57;
     pub const NEW_ORDER2_FILLED_BUY: usize = 58;
     pub const NEW_ORDER2_AMOUNT_BUY: usize = 59;
+    pub const DST_IS_NEW: usize = 60;
 }

@@ -89,6 +89,7 @@ impl L2Account {
         })
     }
 
+    // TODO: sign and verify involves a lot of unnecessary computing
     pub fn sign_hash(&self, hash: Fr) -> Result<Signature, String> {
         let b = self.priv_key.sign(fr_to_bigint(&hash))?.compress();
         let r_b8_bytes: [u8; 32] = *array_ref!(b[..32], 0, 32);
@@ -97,6 +98,25 @@ impl L2Account {
         match r_b8 {
             Result::Err(err) => Err(err),
             Result::Ok(Point { x: r8x, y: r8y }) => Ok(Signature { hash, s, r8x, r8y }),
+        }
+    }
+    pub fn verify(&self, sig: Signature) -> bool {
+        let msg = fr_to_bigint(&sig.hash);
+        let r_b8 = Point { x: sig.r8x, y: sig.r8y };
+
+        let mut b: Vec<u8> = Vec::new();
+        b.append(&mut r_b8.compress().to_vec());
+        let (_, s_bytes) = fr_to_bigint(&sig.s).to_bytes_le();
+        let mut s_32bytes: [u8; 32] = [0; 32];
+        let len = std::cmp::min(s_bytes.len(), s_32bytes.len());
+        s_32bytes[..len].copy_from_slice(&s_bytes[..len]);
+        b.append(&mut s_32bytes.to_vec());
+        let mut buf: [u8; 64] = [0; 64];
+        buf[..].copy_from_slice(&b[..]);
+
+        match babyjubjub_rs::decompress_signature(&buf) {
+            Err(_) => false,
+            Ok(sig) => babyjubjub_rs::verify(self.pub_key.clone(), sig, msg),
         }
     }
 }
@@ -365,6 +385,7 @@ mod tests {
             fr_to_bigint(&sig.s).to_string(),
             "2104729104368328243963691045555606467740179640947024714099030450797354625308"
         );
+        assert_eq!(acc.verify(sig), true);
 
         // mnemonic => L1 account & eth addr & L2 account
         // https://github.com/Fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/account_test.ts#L7

@@ -45,13 +45,12 @@ impl From<&[Fr; 1]> for MerkleLeafStr {
 impl Serialize for l2::TxType {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_i32(match self {
-            l2::TxType::DepositToNew => 0,
-            l2::TxType::DepositToOld => 1,
+            l2::TxType::Nop => 0,
+            l2::TxType::Deposit => 1,
             l2::TxType::Transfer => 2,
             l2::TxType::Withdraw => 3,
             l2::TxType::PlaceOrder => 4,
             l2::TxType::SpotTrade => 5,
-            l2::TxType::Nop => 6,
         })
     }
 }
