@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use crate::types::primitives::{bigint_to_fr, fr_to_bigint, u32_to_fr, Fr};
 use anyhow::Result;
 use arrayref::array_ref;
@@ -31,8 +29,10 @@ use ethers::{
 };
 use ff::from_hex;
 use ff::Field;
+use lazy_static::lazy_static;
 use num_bigint::BigInt;
 use rand::Rng;
+use std::str::FromStr;
 
 /// Derault derivation path.
 /// Copied from https://github.com/gakonst/ethers-rs/blob/01cc80769c291fc80f5b1e9173b7b580ae6b6413/ethers-signers/src/wallet/mnemonic.rs#L16
@@ -126,8 +126,7 @@ impl Account {
         let public_key = priv_key.verify_key();
         let eth_addr = secret_key_to_address(priv_key);
 
-        let msg = get_create_l2_account_msg(None);
-        let signature = sign_msg_with_signing_key(priv_key, &msg);
+        let signature = sign_msg_with_signing_key(priv_key, &*CREATE_L2_ACCOUNT_MSG);
         let seed = &signature.to_vec()[0..32];
         let l2_account = L2Account::new(seed.to_vec())?;
         Ok(Self {
@@ -138,7 +137,7 @@ impl Account {
         })
     }
     pub fn from_signature(uid: u32, signature: &EthersSignature) -> Result<Self, String> {
-        let msg_hash = hash_message(get_create_l2_account_msg(None));
+        let msg_hash = hash_message(&*CREATE_L2_ACCOUNT_MSG);
         let recoverable_sig = match convert_signature(&signature) {
             Ok(sig) => sig,
             Err(_err) => return Err("signature convertion error".to_string()),
@@ -188,9 +187,12 @@ pub fn random_mnemonic<W: Wordlist>() -> Mnemonic<W> {
     Mnemonic::<W>::new_with_count::<ThreadRng>(&mut rng, 24).unwrap()
 }
 
-fn get_create_l2_account_msg(chain_id_optional: Option<u32>) -> String {
-    let chain_id = chain_id_optional.unwrap_or(1);
-    format!("FLUIDEX_L2_ACCOUNT\nChain ID: {}.", chain_id)
+lazy_static! {
+    static ref CHAIN_ID: u32 = std::env::var("CHAIN_ID")
+        .unwrap_or_else(|_| "1".to_string())
+        .parse::<u32>()
+        .unwrap_or(1);
+    pub static ref CREATE_L2_ACCOUNT_MSG: String = format!("FLUIDEX_L2_ACCOUNT\nChain ID: {}.", *CHAIN_ID);
 }
 
 /// Converts ethers core signature to recoverable signature
