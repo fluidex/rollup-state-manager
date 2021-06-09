@@ -1,7 +1,7 @@
 use crate::types::primitives::{bigint_to_fr, fr_to_bigint, u32_to_fr, Fr};
 use anyhow::Result;
 use arrayref::array_ref;
-use babyjubjub_rs::{decompress_point, Point, PrivateKey};
+use babyjubjub_rs::{self, decompress_point, Point, PrivateKey};
 use coins_bip32::{path::DerivationPath, prelude::DigestSigner};
 use ethers::{
     core::k256::ecdsa::recoverable::Signature as RecoverableSignature, core::k256::ecdsa::Signature as K256Signature,
@@ -66,6 +66,11 @@ pub struct L2Account {
     pub bjj_pub_key: String,
 }
 
+struct SignatureBJJ {
+    r_b8: Point,
+    s: BigInt,
+}
+
 impl L2Account {
     pub fn new(seed: Vec<u8>) -> Result<Self, String> {
         let priv_key = PrivateKey::import(seed)?;
@@ -90,7 +95,7 @@ impl L2Account {
     }
 
     // TODO: sign and verify involves a lot of unnecessary computing
-    pub fn sign_hash(&self, hash: Fr) -> Result<Signature, String> {
+    pub fn sign_hash_safe(&self, hash: Fr) -> Result<Signature, String> {
         let b = self.priv_key.sign(fr_to_bigint(&hash))?.compress();
         let r_b8_bytes: [u8; 32] = *array_ref!(b[..32], 0, 32);
         let s = bigint_to_fr(BigInt::from_bytes_le(num_bigint::Sign::Plus, &b[32..]));
@@ -100,7 +105,8 @@ impl L2Account {
             Result::Ok(Point { x: r8x, y: r8y }) => Ok(Signature { hash, s, r8x, r8y }),
         }
     }
-    pub fn verify(&self, sig: Signature) -> bool {
+
+    pub fn verify_safe(&self, sig: Signature) -> bool {
         let msg = fr_to_bigint(&sig.hash);
         let r_b8 = Point { x: sig.r8x, y: sig.r8y };
 
@@ -118,6 +124,28 @@ impl L2Account {
             Err(_) => false,
             Ok(sig) => babyjubjub_rs::verify(self.pub_key.clone(), sig, msg),
         }
+    }
+
+    pub fn sign_hash(&self, hash: Fr) -> Result<Signature, String> {
+        let sig_orig: babyjubjub_rs::Signature = self.priv_key.sign(fr_to_bigint(&hash))?;
+        let sig: SignatureBJJ = unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_orig) };
+        let s = bigint_to_fr(sig.s);
+        Ok(Signature {
+            hash,
+            s,
+            r8x: sig.r_b8.x,
+            r8y: sig.r_b8.y,
+        })
+    }
+    pub fn verify(&self, sig: Signature) -> bool {
+        let msg = fr_to_bigint(&sig.hash);
+        let r_b8 = Point { x: sig.r8x, y: sig.r8y };
+        let sig_bjj = SignatureBJJ {
+            r_b8,
+            s: fr_to_bigint(&sig.s),
+        };
+        let sig_final = unsafe { std::mem::transmute::<SignatureBJJ, babyjubjub_rs::Signature>(sig_bjj) };
+        babyjubjub_rs::verify(self.pub_key.clone(), sig_final, msg)
     }
 }
 
