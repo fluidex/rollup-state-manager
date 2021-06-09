@@ -128,13 +128,35 @@ fn bench_order_sign() {
     for _ in 0..99 {
         order.hash();
     }
-    // order hash takes 7.18ms, debug mode
+    // safe version:
+    //   order hash takes 7.18ms, debug mode
+    //   order hash takes 0.43ms, release mode
+    // unsafe version:
+    //   order hash takes 7.18ms, debug mode
+    //   order hash takes 0.43ms, release mode
     println!("order hash takes {}ms", t1.elapsed().as_millis() as f64 / 100.0);
     let acc = Account::new(0);
     let t2 = Instant::now();
+    let hash = order.hash();
     for _ in 0..99 {
-        order.sign_with(&acc).unwrap();
+        //order.sign_with(&acc).unwrap();
+        order.sig = acc.sign_hash(hash).unwrap();
     }
-    // order sign takes 53.45ms, debug mode
+    // safe version:
+    //   order sign takes 53.45ms, debug mode
+    //   order sign takes 2.42ms, release mode
+    // unsafe version:
+    //   order sign takes 12.59ms, debug mode
+    //   order sign takes 0.4ms, release mode
     println!("order sign takes {}ms", t2.elapsed().as_millis() as f64 / 100.0);
+    let t3 = Instant::now();
+    for _ in 0..99 {
+        assert_eq!(true, acc.l2_account.verify(order.sig));
+    }
+    // safe version:
+    //   order sig verify takes 2.17ms, release mode
+    // unsafe version:
+    //   order sig verify takes 12.59ms, debug mode
+    //   order sig verify takes 0.36ms, release mode
+    println!("order sig verify takes {}ms", t3.elapsed().as_millis() as f64 / 100.0);
 }
