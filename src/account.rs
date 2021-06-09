@@ -105,7 +105,7 @@ impl L2Account {
             Result::Ok(Point { x: r8x, y: r8y }) => Ok(Signature { hash, s, r8x, r8y }),
         }
     }
-    
+
     pub fn verify_safe(&self, sig: Signature) -> bool {
         let msg = fr_to_bigint(&sig.hash);
         let r_b8 = Point { x: sig.r8x, y: sig.r8y };
