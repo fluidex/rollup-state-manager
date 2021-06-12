@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![allow(unreachable_patterns)]
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::large_enum_variant)]
 #![allow(clippy::unnecessary_wraps)]
@@ -20,7 +21,7 @@ mod types;
 fn replay_msgs(
     msg_receiver: crossbeam_channel::Receiver<WrappedMessage>,
     block_sender: crossbeam_channel::Sender<L2Block>,
-) -> Option<std::thread::JoinHandle<()>> {
+) -> Option<std::thread::JoinHandle<anyhow::Result<()>>> {
     Some(std::thread::spawn(move || {
         let state = GlobalState::new(
             *test_utils::params::BALANCELEVELS,
@@ -38,12 +39,15 @@ fn replay_msgs(
         for msg in msg_receiver.iter() {
             match msg {
                 WrappedMessage::BALANCE(balance) => {
-                    processor.handle_deposit(&mut witgen, balance);
+                    processor.handle_balance_msg(&mut witgen, balance);
                 }
                 WrappedMessage::TRADE(trade) => {
                     let trade_id = trade.id;
-                    processor.handle_trade(&mut witgen, trade);
+                    processor.handle_trade_msg(&mut witgen, trade);
                     println!("trade {} test done", trade_id);
+                }
+                WrappedMessage::ORDER(order) => {
+                    processor.handle_order_msg(&mut witgen, order);
                 }
                 _ => {
                     //other msg is omitted
@@ -57,14 +61,13 @@ fn replay_msgs(
             block_num,
             (*test_utils::params::NTXS * block_num) as f32 / timing.elapsed().as_secs_f32()
         );
+        Ok(())
     }))
 }
 
-pub fn run() -> Result<()> {
+pub fn run(src: &str) -> Result<()> {
     let circuit_repo = fs::canonicalize(PathBuf::from("circuits")).expect("invalid circuits repo path");
-
-    let test_dir = circuit_repo.join("test").join("testdata");
-    let filepath = test_dir.join("msgs_float.jsonl");
+    let filepath = PathBuf::from(src);
     let (msg_sender, msg_receiver) = crossbeam_channel::unbounded();
     let (blk_sender, blk_receiver) = crossbeam_channel::unbounded();
 
@@ -74,8 +77,8 @@ pub fn run() -> Result<()> {
 
     let blocks: Vec<_> = blk_receiver.try_iter().collect();
 
-    loader_thread.map(|h| h.join());
-    replay_thread.map(|h| h.join());
+    loader_thread.map(|h| h.join().expect("loader thread failed"));
+    replay_thread.map(|h| h.join().expect("replay thread failed"));
 
     let component = test_utils::circuit::CircuitSource {
         src: String::from("src/block.circom"),
@@ -100,7 +103,10 @@ pub fn run() -> Result<()> {
  */
 
 fn main() {
-    match run() {
+    let default_test_file = "circuits/test/testdata/msgs_float.jsonl";
+    //let default_test_file = "tests/global_state/testdata/data001.txt";
+    let test_file = std::env::args().nth(1).unwrap_or(default_test_file.into());
+    match run(&test_file) {
         Ok(_) => println!("global_state test_case generated"),
         Err(e) => panic!("{:#?}", e),
     }

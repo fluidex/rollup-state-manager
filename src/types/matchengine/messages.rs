@@ -2,6 +2,8 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
+// TODO: reuse related types def in dingir-exchange
+
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum MarketRole {
     MAKER = 1,
@@ -20,7 +22,7 @@ pub enum OrderType {
     MARKET,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub enum OrderEventType {
     PUT = 1,
     UPDATE = 2,
@@ -101,8 +103,8 @@ pub struct TradeMessage {
     pub bid_order_id: u64,
     pub bid_role: MarketRole,
     pub bid_fee: Decimal,
-    pub state_before: VerboseTradeState,
-    pub state_after: VerboseTradeState,
+    pub state_before: Option<VerboseTradeState>,
+    pub state_after: Option<VerboseTradeState>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

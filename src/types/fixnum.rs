@@ -77,7 +77,7 @@ impl Float864 {
         let exp = ten.powi(prec as u64);
         let mut n = d * exp;
         if n != n.floor() {
-            bail!("decimal precision error");
+            bail!("decimal precision error {} {}", d, prec);
         }
         let mut exponent = 0;
         loop {

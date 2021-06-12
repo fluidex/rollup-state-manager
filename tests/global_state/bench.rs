@@ -1,7 +1,6 @@
 #![allow(dead_code)]
+#![allow(unreachable_patterns)]
 use anyhow::Result;
-use ethers::prelude::coins_bip39::English;
-use rollup_state_manager::account::{self, Account};
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils::{
     self,
@@ -20,16 +19,17 @@ mod msg_preprocessor;
 mod types;
 
 //if we use nightly build, we are able to use bench test ...
-fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
-    let test_dir = circuit_repo.join("test").join("testdata");
-    let file = File::open(test_dir.join("msgs_float.jsonl"))?;
-
+fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
+    //let test_dir = circuit_repo.join("test").join("testdata");
+    //let file = File::open(test_dir.join("msgs_float.jsonl"))?;
+    let filepath = "tests/global_state/testdata/data001.txt";
+    let file = File::open(filepath)?;
     let messages: Vec<WrappedMessage> = BufReader::new(file)
         .lines()
         .map(Result::unwrap)
         .map(parse_msg)
         .map(Result::unwrap)
-        .filter(|msg| matches!(msg, WrappedMessage::BALANCE(_) | WrappedMessage::TRADE(_)))
+        .filter(|msg| matches!(msg, WrappedMessage::BALANCE(_) | WrappedMessage::ORDER(_)))
         .collect();
 
     println!("prepare bench: {} records", messages.len());
@@ -50,6 +50,7 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     // we are generating more txs from the given test cases
     // by clone accounts with same trades
     let loop_num = 50;
+    /*
     let cache_order_sig = false;
     if cache_order_sig {
         for j in 0..account_num {
@@ -72,6 +73,7 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
             }
         }
     }
+    */
     let (sender, receiver) = crossbeam_channel::unbounded();
 
     let mut witgen = WitnessGenerator::new(state, *test_utils::params::NTXS, sender, *test_utils::params::VERBOSE);
@@ -86,13 +88,18 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
                 WrappedMessage::BALANCE(balance) => {
                     let mut balance = balance.clone();
                     balance.user_id += account_offset;
-                    processor.handle_deposit(&mut witgen, balance);
+                    processor.handle_balance_msg(&mut witgen, balance);
                 }
                 WrappedMessage::TRADE(trade) => {
                     let mut trade = trade.clone();
                     trade.ask_user_id += account_offset;
                     trade.bid_user_id += account_offset;
-                    processor.handle_trade(&mut witgen, trade);
+                    processor.handle_trade_msg(&mut witgen, trade);
+                }
+                WrappedMessage::ORDER(order) => {
+                    let mut order = order.clone();
+                    order.order.user += account_offset;
+                    processor.handle_order_msg(&mut witgen, order);
                 }
                 _ => unreachable!(),
             }

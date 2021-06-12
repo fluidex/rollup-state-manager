@@ -19,11 +19,11 @@ pub fn parse_msg(line: String) -> Result<WrappedMessage> {
                 Ok(WrappedMessage::BALANCE(data))
             }
             "OrderMessage" => {
-                let data = serde_json::from_value(val).map_err(|e| anyhow!("wrong balance: {}", e))?;
+                let data = serde_json::from_value(val).map_err(|e| anyhow!("wrong order: {}", e))?;
                 Ok(WrappedMessage::ORDER(data))
             }
             "TradeMessage" => {
-                let data = serde_json::from_value(val).map_err(|e| anyhow!("wrong balance: {}", e))?;
+                let data = serde_json::from_value(val).map_err(|e| anyhow!("wrong trade: {}", e))?;
                 Ok(WrappedMessage::TRADE(data))
             }
             other => Err(anyhow!("unrecognized type field {}", other)),
