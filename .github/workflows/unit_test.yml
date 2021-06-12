@@ -54,7 +54,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --release --
+          # args: --release -- # debug mode for fast compile
 
 #      - name: Run "cargo bench"
 #        uses: actions-rs/cargo@v1
