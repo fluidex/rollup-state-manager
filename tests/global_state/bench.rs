@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 #![allow(unreachable_patterns)]
 use anyhow::Result;
+use ethers::prelude::coins_bip39::English;
+use rollup_state_manager::account::{self, Account};
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils::{
     self,
@@ -15,14 +17,15 @@ use std::time::Instant;
 use pprof::protos::Message;
 use std::io::Write;
 
-mod msg_preprocessor;
+mod msg_processor;
 mod types;
 
 //if we use nightly build, we are able to use bench test ...
 fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     //let test_dir = circuit_repo.join("test").join("testdata");
     //let file = File::open(test_dir.join("msgs_float.jsonl"))?;
-    let filepath = "tests/global_state/testdata/data001.txt";
+    let filepath = "circuits/test/testdata/msgs_float.jsonl";
+    //let filepath = "tests/global_state/testdata/data001.txt";
     let file = File::open(filepath)?;
     let messages: Vec<WrappedMessage> = BufReader::new(file)
         .lines()
@@ -43,15 +46,15 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     );
 
     //amplify the records: in each iter we run records on a group of new accounts
-    let mut processor = msg_preprocessor::Preprocessor::default();
+    let mut processor = msg_processor::Processor::default();
 
     // TODO: max(user id)
     let account_num = 10;
     // we are generating more txs from the given test cases
     // by clone accounts with same trades
     let loop_num = 50;
-    /*
-    let cache_order_sig = false;
+
+    let cache_order_sig = true;
     if cache_order_sig {
         for j in 0..account_num {
             // let seed = account::rand_seed();
@@ -73,7 +76,7 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
             }
         }
     }
-    */
+
     let (sender, receiver) = crossbeam_channel::unbounded();
 
     let mut witgen = WitnessGenerator::new(state, *test_utils::params::NTXS, sender, *test_utils::params::VERBOSE);

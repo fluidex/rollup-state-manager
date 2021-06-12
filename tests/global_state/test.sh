@@ -3,8 +3,8 @@ set -uex
 
 export NTXS=2;
 export BALANCELEVELS=2;
-export ORDERLEVELS=5;
-export ACCOUNTLEVELS=5;
+export ORDERLEVELS=3;
+export ACCOUNTLEVELS=2;
 export VERBOSE=false;
 
 export RUST_BACKTRACE=full
@@ -14,7 +14,7 @@ REPO_DIR=$DIR/"../.."
 cd $REPO_DIR
 
 if [ -z ${CI+x} ]; then 
-	cargo run --bin gen_global_state_testcase tests/global_state/testdata/data001.txt
+	cargo run --bin gen_global_state_testcase #tests/global_state/testdata/data001.txt
 	#cargo run --bin --release gen_global_state_testcase
 else
 	# make sure submodule is correctly cloned!!

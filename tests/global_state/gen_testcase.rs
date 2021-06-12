@@ -15,7 +15,7 @@ use std::time::Instant;
 
 mod export_circuit;
 mod msg_loader;
-mod msg_preprocessor;
+mod msg_processor;
 mod types;
 
 fn replay_msgs(
@@ -33,7 +33,7 @@ fn replay_msgs(
 
         println!("genesis root {}", witgen.root());
 
-        let mut processor = msg_preprocessor::Preprocessor::default();
+        let mut processor = msg_processor::Processor::default();
 
         let timing = Instant::now();
         for msg in msg_receiver.iter() {
@@ -105,7 +105,7 @@ pub fn run(src: &str) -> Result<()> {
 fn main() {
     let default_test_file = "circuits/test/testdata/msgs_float.jsonl";
     //let default_test_file = "tests/global_state/testdata/data001.txt";
-    let test_file = std::env::args().nth(1).unwrap_or(default_test_file.into());
+    let test_file = std::env::args().nth(1).unwrap_or_else(|| default_test_file.into());
     match run(&test_file) {
         Ok(_) => println!("global_state test_case generated"),
         Err(e) => panic!("{:#?}", e),

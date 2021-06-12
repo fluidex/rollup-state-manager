@@ -2,31 +2,22 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::large_enum_variant)]
 
+use num::Zero;
 use rollup_state_manager::account::Signature;
 use rollup_state_manager::state::WitnessGenerator;
 use rollup_state_manager::test_utils::types::{get_token_id_by_name, prec_token_id};
 use rollup_state_manager::types;
 use rollup_state_manager::types::fixnum;
-use rollup_state_manager::types::l2::OrderSide;
-use rollup_state_manager::types::primitives::fr_to_decimal;
+use rollup_state_manager::types::l2::{self, OrderSide};
+use rollup_state_manager::types::primitives::{fr_to_decimal, u32_to_fr};
 use rust_decimal::Decimal;
 
 #[derive(Clone, Copy)]
 pub struct TokenIdPair(pub u32, pub u32);
-/*
-impl TokenIdPair {
-    fn swap(&mut self) {
-        let tmp = self.1;
-        self.1 = self.0;
-        self.0 = tmp;
-    }
-}
-*/
 #[derive(Clone, Copy)]
 pub struct TokenPair<'c>(pub &'c str, pub &'c str);
 
-pub struct OrderState<'c> {
-    pub origin: &'c types::matchengine::messages::VerboseOrderState,
+pub struct OrderState {
     pub side: &'static str,
     pub token_sell: u32,
     pub token_buy: u32,
@@ -38,12 +29,6 @@ pub struct OrderState<'c> {
     pub order_id: u32,
     pub account_id: u32,
     pub role: types::matchengine::messages::MarketRole,
-}
-
-struct OrderStateTag {
-    id: u64,
-    account_id: u32,
-    role: types::matchengine::messages::MarketRole,
 }
 
 impl<'c> From<&'c str> for TokenPair<'c> {
@@ -61,17 +46,56 @@ impl<'c> From<TokenPair<'c>> for TokenIdPair {
     }
 }
 
-impl<'c> OrderState<'c> {
+pub fn trade_to_order_state(
+    state: &types::matchengine::messages::VerboseTradeState,
+    trade: &types::matchengine::messages::TradeMessage,
+) -> (OrderState, OrderState) {
+    // ASK, BID
+    let ask = &state.ask_order_state;
+    let bid = &state.bid_order_state;
+    let id_pair = TokenIdPair::from(TokenPair::from(trade.market.as_str()));
+    (
+        OrderState {
+            side: "ASK",
+            token_sell: id_pair.0,
+            token_buy: id_pair.1,
+            total_sell: ask.amount,
+            total_buy: ask.amount * ask.price,
+            filled_sell: ask.finished_base,
+            filled_buy: ask.finished_quote,
+            order_id: trade.ask_order_id as u32,
+            account_id: trade.ask_user_id,
+            role: trade.ask_role,
+        },
+        OrderState {
+            side: "BID",
+            token_sell: id_pair.1,
+            token_buy: id_pair.0,
+            total_sell: bid.amount * bid.price,
+            total_buy: bid.amount,
+            filled_sell: bid.finished_quote,
+            filled_buy: bid.finished_base,
+            order_id: trade.bid_order_id as u32,
+            account_id: trade.bid_user_id,
+            role: trade.bid_role,
+        },
+    )
+}
+
+impl OrderState {
+    pub fn is_empty(&self) -> bool {
+        // they should be both zero or both non-zero
+        self.filled_buy.is_zero() && self.filled_sell.is_zero()
+    }
     pub fn parse(
-        origin: &'c types::matchengine::messages::VerboseOrderState,
+        origin: &types::matchengine::messages::VerboseOrderState,
         id_pair: TokenIdPair,
-        _token_pair: TokenPair<'c>,
         side: &'static str,
         trade: &types::matchengine::messages::TradeMessage,
     ) -> Self {
         match side {
             "ASK" => OrderState {
-                origin,
+                //origin,
                 side,
                 //status: 0,
                 token_sell: id_pair.0,
@@ -85,7 +109,7 @@ impl<'c> OrderState<'c> {
                 role: trade.ask_role,
             },
             "BID" => OrderState {
-                origin,
+                //origin,
                 side,
                 //status: 0,
                 token_sell: id_pair.1,
@@ -103,10 +127,10 @@ impl<'c> OrderState<'c> {
     }
 }
 
-impl<'c> From<OrderState<'c>> for types::l2::Order {
-    fn from(origin: OrderState<'c>) -> Self {
+impl From<OrderState> for types::l2::Order {
+    fn from(origin: OrderState) -> Self {
         types::l2::Order {
-            order_id: (origin.order_id),
+            order_id: origin.order_id,
             //status: types::primitives::u32_to_fr(origin.status),
             tokenbuy: types::primitives::u32_to_fr(origin.token_buy),
             tokensell: types::primitives::u32_to_fr(origin.token_sell),
@@ -125,21 +149,40 @@ impl<'c> From<OrderState<'c>> for types::l2::Order {
     }
 }
 
-impl<'c> std::cmp::PartialOrd for OrderState<'c> {
+impl From<OrderState> for types::l2::OrderInput {
+    fn from(order_state: OrderState) -> Self {
+        types::l2::OrderInput {
+            order_id: order_state.order_id,
+            tokensell: u32_to_fr(order_state.token_sell),
+            tokenbuy: u32_to_fr(order_state.token_buy),
+            total_sell: fixnum::decimal_to_amount(&order_state.total_sell, prec_token_id(order_state.token_sell)).to_fr(),
+            total_buy: fixnum::decimal_to_amount(&order_state.total_buy, prec_token_id(order_state.token_buy)).to_fr(),
+            sig: Signature::default(),
+            account_id: order_state.account_id,
+            side: if order_state.side.to_lowercase() == "buy" || order_state.side.to_lowercase() == "bid" {
+                OrderSide::Buy
+            } else {
+                OrderSide::Sell
+            },
+        }
+    }
+}
+
+impl std::cmp::PartialOrd for OrderState {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<'c> std::cmp::PartialEq for OrderState<'c> {
+impl std::cmp::PartialEq for OrderState {
     fn eq(&self, other: &Self) -> bool {
         self.order_id == other.order_id
     }
 }
 
-impl<'c> std::cmp::Eq for OrderState<'c> {}
+impl std::cmp::Eq for OrderState {}
 
-impl<'c> std::cmp::Ord for OrderState<'c> {
+impl std::cmp::Ord for OrderState {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.order_id.cmp(&other.order_id)
     }
@@ -147,12 +190,6 @@ impl<'c> std::cmp::Ord for OrderState<'c> {
 
 #[derive(PartialEq, Debug)]
 struct CommonBalanceState {
-    /*
-    bid_user_base: types::primitives::Fr,
-    bid_user_quote: types::primitives::Fr,
-    ask_user_base: types::primitives::Fr,
-    ask_user_quote: types::primitives::Fr,
-    */
     bid_user_base: Decimal,
     bid_user_quote: Decimal,
     ask_user_base: Decimal,
@@ -161,20 +198,11 @@ struct CommonBalanceState {
 
 impl CommonBalanceState {
     fn parse(origin: &types::matchengine::messages::VerboseBalanceState, _id_pair: TokenIdPair) -> Self {
-        //let base_id = id_pair.0;
-        //let quote_id = id_pair.1;
-
         CommonBalanceState {
             bid_user_base: origin.bid_user_base,
             bid_user_quote: origin.bid_user_quote,
             ask_user_base: origin.ask_user_base,
             ask_user_quote: origin.ask_user_quote,
-            /*
-            bid_user_base: fixnum::decimal_to_amount(&origin.bid_user_base, prec_token_id(base_id)).to_fr(),
-            bid_user_quote: fixnum::decimal_to_amount(&origin.bid_user_quote, prec_token_id(quote_id)).to_fr(),
-            ask_user_base: fixnum::decimal_to_amount(&origin.ask_user_base, prec_token_id(base_id)).to_fr(),
-            ask_user_quote: fixnum::decimal_to_amount(&origin.ask_user_quote, prec_token_id(quote_id)).to_fr(),
-            */
         }
     }
 
@@ -187,12 +215,6 @@ impl CommonBalanceState {
             bid_user_quote: fr_to_decimal(&witgen.get_token_balance(bid_id, quote_id), prec_token_id(quote_id)),
             ask_user_base: fr_to_decimal(&witgen.get_token_balance(ask_id, base_id), prec_token_id(base_id)),
             ask_user_quote: fr_to_decimal(&witgen.get_token_balance(ask_id, quote_id), prec_token_id(quote_id)),
-            /*
-            bid_user_base: witgen.get_token_balance(bid_id, base_id),
-            bid_user_quote: witgen.get_token_balance(bid_id, quote_id),
-            ask_user_base: witgen.get_token_balance(ask_id, base_id),
-            ask_user_quote: witgen.get_token_balance(ask_id, quote_id),
-            */
         }
     }
 }
@@ -207,4 +229,15 @@ pub fn assert_balance_state(
     let local_balance = CommonBalanceState::build_local(witgen, bid_id, ask_id, id_pair);
     let parsed_state = CommonBalanceState::parse(balance_state, id_pair);
     assert_eq!(local_balance, parsed_state);
+}
+
+pub fn assert_order_state(witgen: &WitnessGenerator, order_state: OrderState) {
+    if witgen.has_order(order_state.account_id, order_state.order_id) {
+        let mut order_local = witgen.get_account_order_by_id(order_state.account_id, order_state.order_id);
+        // TODO: compares the order field sig. The field sig is set to the default value of Signature for now.
+        order_local.sig = Signature::default();
+        assert_eq!(order_local, l2::Order::from(order_state));
+    } else {
+        // the only possible path reaching here, is that the order has not been put into witgen
+    }
 }
