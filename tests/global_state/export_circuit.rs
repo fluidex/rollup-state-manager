@@ -48,11 +48,13 @@ pub fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<l2::L2Block>
     let test_dir = circuit_repo.join("testdata");
     let circuit_dir = write_circuit(circuit_repo, &test_dir, &source)?;
 
-    for (blki, blk) in blocks.into_iter().enumerate() {
+    for (blki, blk) in blocks.iter().enumerate() {
         let dir = circuit_dir.join(format!("{:04}", blki));
-        write_input_output(&dir, blk)?;
+        write_input_output(&dir, blk.clone())?;
         //println!("{}", serde_json::to_string_pretty(&types::L2BlockSerde::from(blk)).unwrap());
     }
+
+    println!("write {} test cases to {:?}", blocks.len(), circuit_dir.to_str());
 
     Ok(circuit_dir)
 }

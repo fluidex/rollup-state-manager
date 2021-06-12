@@ -219,7 +219,7 @@ impl Processor {
         let mut order_input = *order_input;
         self.check_order_sig(&mut order_input);
         self.order_cache.insert((order_input.account_id, order_input.order_id), order_input);
-        println!("store order {} {}", order_input.account_id, order_input.order_id);
+        //println!("store order {} {}", order_input.account_id, order_input.order_id);
     }
     fn check_state(&self, witgen: &WitnessGenerator, trade_state: &Option<messages::VerboseTradeState>, trade: &messages::TradeMessage) {
         let token_pair = TokenPair::from(trade.market.as_str());

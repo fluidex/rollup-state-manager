@@ -75,7 +75,7 @@ pub fn run(src: &str) -> Result<()> {
 
     let replay_thread = replay_msgs(msg_receiver, blk_sender);
 
-    let blocks: Vec<_> = blk_receiver.try_iter().collect();
+    let blocks: Vec<_> = blk_receiver.iter().collect();
 
     loader_thread.map(|h| h.join().expect("loader thread failed"));
     replay_thread.map(|h| h.join().expect("replay thread failed"));

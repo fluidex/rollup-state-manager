@@ -121,7 +121,8 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
             inner_timing = Instant::now();
         }
     }
-    let blocks: Vec<_> = receiver.try_iter().collect();
+    drop(witgen); // to close sender
+    let blocks: Vec<_> = receiver.iter().collect();
     println!(
         "bench for {} blocks (TPS: {})",
         blocks.len(),
