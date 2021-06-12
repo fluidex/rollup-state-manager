@@ -7,14 +7,22 @@ export ORDERLEVELS=3;
 export ACCOUNTLEVELS=2;
 export VERBOSE=false;
 
+export RUST_BACKTRACE=full
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 REPO_DIR=$DIR/"../.."
 cd $REPO_DIR
 
-# make sure submodule is correctly cloned!!
-git submodule update --init --recursive
-if [ -z ${CI+x} ]; then git pull --recurse-submodules; fi
-cargo run --bin gen_global_state_testcase # debug mode for fast compile
+if [ -z ${CI+x} ]; then 
+	cargo run --bin gen_global_state_testcase #tests/global_state/testdata/data001.txt
+	#cargo run --bin --release gen_global_state_testcase
+else
+	# make sure submodule is correctly cloned!!
+	git submodule update --init --recursive
+	#git pull --recurse-submodules
+	cargo run --bin gen_global_state_testcase # debug mode for fast compile
+fi
+
 
 cd $REPO_DIR/circuits; npm i
 snarkit --version || npm -g install snarkit

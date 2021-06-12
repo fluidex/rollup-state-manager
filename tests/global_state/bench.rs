@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![allow(unreachable_patterns)]
 use anyhow::Result;
 use ethers::prelude::coins_bip39::English;
 use rollup_state_manager::account::{self, Account};
@@ -16,20 +17,22 @@ use std::time::Instant;
 use pprof::protos::Message;
 use std::io::Write;
 
+mod msg_processor;
 mod types;
-use types::{Accounts, Orders};
 
 //if we use nightly build, we are able to use bench test ...
-fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
-    let test_dir = circuit_repo.join("test").join("testdata");
-    let file = File::open(test_dir.join("msgs_float.jsonl"))?;
-
+fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
+    //let test_dir = circuit_repo.join("test").join("testdata");
+    //let file = File::open(test_dir.join("msgs_float.jsonl"))?;
+    let filepath = "circuits/test/testdata/msgs_float.jsonl";
+    //let filepath = "tests/global_state/testdata/data001.txt";
+    let file = File::open(filepath)?;
     let messages: Vec<WrappedMessage> = BufReader::new(file)
         .lines()
         .map(Result::unwrap)
         .map(parse_msg)
         .map(Result::unwrap)
-        .filter(|msg| matches!(msg, WrappedMessage::BALANCE(_) | WrappedMessage::TRADE(_)))
+        .filter(|msg| matches!(msg, WrappedMessage::BALANCE(_) | WrappedMessage::ORDER(_)))
         .collect();
 
     println!("prepare bench: {} records", messages.len());
@@ -43,15 +46,15 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     );
 
     //amplify the records: in each iter we run records on a group of new accounts
-    let mut orders = Orders::default();
-    let mut accounts = Accounts::default();
+    let mut processor = msg_processor::Processor::default();
 
     // TODO: max(user id)
     let account_num = 10;
     // we are generating more txs from the given test cases
     // by clone accounts with same trades
     let loop_num = 50;
-    let cache_order_sig = false;
+
+    let cache_order_sig = true;
     if cache_order_sig {
         for j in 0..account_num {
             // let seed = account::rand_seed();
@@ -64,17 +67,19 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
                 // let seed = seed.clone();
                 let mnemonic = mnemonic.clone();
                 let acc = Account::from_mnemonic(account_id, &mnemonic).unwrap();
-                accounts.set_account(account_id, acc);
+                processor.set_account(account_id, acc);
             }
         }
         for msg in messages.iter() {
             if let WrappedMessage::TRADE(trade) = msg {
-                orders.sign_orders(&accounts, trade.clone());
+                processor.sign_orders(trade.clone());
             }
         }
     }
 
-    let mut witgen = WitnessGenerator::new(state, *test_utils::params::NTXS, *test_utils::params::VERBOSE);
+    let (sender, receiver) = crossbeam_channel::unbounded();
+
+    let mut witgen = WitnessGenerator::new(state, *test_utils::params::NTXS, sender, *test_utils::params::VERBOSE);
 
     let timing = Instant::now();
     let mut inner_timing = Instant::now();
@@ -86,13 +91,18 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
                 WrappedMessage::BALANCE(balance) => {
                     let mut balance = balance.clone();
                     balance.user_id += account_offset;
-                    accounts.handle_deposit(&mut witgen, balance);
+                    processor.handle_balance_msg(&mut witgen, balance);
                 }
                 WrappedMessage::TRADE(trade) => {
                     let mut trade = trade.clone();
                     trade.ask_user_id += account_offset;
                     trade.bid_user_id += account_offset;
-                    orders.handle_trade(&mut witgen, &accounts, trade);
+                    processor.handle_trade_msg(&mut witgen, trade);
+                }
+                WrappedMessage::ORDER(order) => {
+                    let mut order = order.clone();
+                    order.order.user += account_offset;
+                    processor.handle_order_msg(&mut witgen, order);
                 }
                 _ => unreachable!(),
             }
@@ -100,20 +110,19 @@ fn bench_global_state(circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
 
         if i % 10 == 0 {
             let total = inner_timing.elapsed().as_secs_f32();
-            let (balance_t, _) = accounts.take_bench();
-            let (plact_t, spot_t) = orders.take_bench();
+            let (balance_t, trade_t) = processor.take_bench();
             println!(
-                "{}th 10 iters in {:.5}s: balance {:.3}%, place {:.3}%, spot {:.3}%",
+                "{}th 10 iters in {:.5}s: balance {:.3}%, trade {:.3}%",
                 i / 10,
                 total,
                 balance_t * 100.0 / total,
-                plact_t * 100.0 / total,
-                spot_t * 100.0 / total
+                trade_t * 100.0 / total
             );
             inner_timing = Instant::now();
         }
     }
-    let blocks = witgen.take_blocks();
+    drop(witgen); // to close sender
+    let blocks: Vec<_> = receiver.iter().collect();
     println!(
         "bench for {} blocks (TPS: {})",
         blocks.len(),
