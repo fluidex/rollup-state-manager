@@ -34,6 +34,7 @@ serde = { version = "1.0.124", features = [ "derive" ] }
 serde_derive = "1.0.90"
 serde_json = "1.0.64"
 sha2 = "0.9.5"
+crossbeam-channel = "0.5.1"
 
 [[bin]]
 name = "rollup_state_manager"

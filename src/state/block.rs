@@ -52,7 +52,8 @@ impl Block {
         keypair of account2 is created by deposit_to_new
         */
         let state = GlobalState::new(self.balance_levels, self.order_levels, self.account_levels, self.verbose);
-        let mut witgen = WitnessGenerator::new(state, self.n_txs, self.verbose);
+        let (sender, receiver) = crossbeam_channel::bounded(100);
+        let mut witgen = WitnessGenerator::new(state, self.n_txs, sender, self.verbose);
 
         let token_id0 = 0;
         let token_id1 = 1;
@@ -203,9 +204,8 @@ impl Block {
         witgen.full_spot_trade(full_trade);
 
         witgen.flush_with_nop();
-        witgen
-            .forge_all_l2_blocks()
-            .into_iter()
+        receiver
+            .try_iter()
             .enumerate()
             .map(|(i, block)| CircuitTestData {
                 name: format!("nonempty_block_{}", i),
@@ -217,13 +217,13 @@ impl Block {
 
     fn empty_block_case(&self) -> CircuitTestData {
         let state = GlobalState::new(self.balance_levels, self.order_levels, self.account_levels, self.verbose);
-        let mut witgen = WitnessGenerator::new(state, self.n_txs, self.verbose);
+        let (sender, receiver) = crossbeam_channel::bounded(100);
+        let mut witgen = WitnessGenerator::new(state, self.n_txs, sender, self.verbose);
         // we need to have at least 1 account
         witgen.create_new_account(1).unwrap();
-        for _ in 0..self.n_txs {
-            witgen.nop();
-        }
-        let block = witgen.forge_all_l2_blocks()[0].clone();
+        witgen.nop();
+        witgen.flush_with_nop();
+        let block = receiver.recv().unwrap();
         CircuitTestData {
             name: "empty_block".to_owned(),
             input: json!(L2BlockSerde::from(block)),

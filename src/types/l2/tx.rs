@@ -39,21 +39,18 @@ pub struct RawTx {
 }
 pub type AmountType = Float864;
 
-#[derive(Debug)]
-pub struct PlaceOrderTx {
-    pub order_id: u32,
-    pub account_id: u32,
-    pub token_id_sell: u32,
-    pub token_id_buy: u32,
-    pub amount_sell: Fr,
-    pub amount_buy: Fr,
-}
-
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct L2Key {
     pub eth_addr: Fr,
     pub sign: Fr,
     pub ay: Fr,
+}
+
+pub enum L2Tx {
+    Deposit(DepositTx),
+    Transfer(TransferTx),
+    FullSpotTrade(FullSpotTradeTx),
+    Withdraw(WithdrawTx),
 }
 
 #[derive(Debug)]

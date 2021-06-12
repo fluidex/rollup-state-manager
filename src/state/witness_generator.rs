@@ -14,8 +14,11 @@ use ff::Field;
 pub struct WitnessGenerator {
     state: GlobalState,
     n_tx: usize,
+    // 0 <= len(buffered_txs) < n_tx
     buffered_txs: Vec<RawTx>,
-    buffered_blocks: Vec<L2Block>,
+    block_sender: crossbeam_channel::Sender<L2Block>,
+    block_generate_num: usize,
+    //buffered_blocks: Vec<L2Block>,
     verbose: bool,
     verify_sig: bool,
 }
@@ -24,12 +27,14 @@ impl WitnessGenerator {
     pub fn print_config() {
         Tree::print_config();
     }
-    pub fn new(state: GlobalState, n_tx: usize, verbose: bool) -> Self {
+    pub fn new(state: GlobalState, n_tx: usize, block_sender: crossbeam_channel::Sender<L2Block>, verbose: bool) -> Self {
         Self {
             state,
             n_tx,
             buffered_txs: Vec::new(),
-            buffered_blocks: Vec::new(),
+            block_sender,
+            block_generate_num: 0,
+            //buffered_blocks: Vec::new(),
             verbose,
             verify_sig: true,
         }
@@ -73,8 +78,7 @@ impl WitnessGenerator {
         self.state.set_token_balance(account_id, token_id, balance);
     }
 
-    pub fn forge_with_txs(&self, buffered_txs: &[RawTx]) -> L2Block {
-        assert!(buffered_txs.len() == self.n_tx, "invalid txs len");
+    pub fn forge_with_txs(buffered_txs: &[RawTx]) -> L2Block {
         let txs_type = buffered_txs.iter().map(|tx| tx.tx_type).collect();
         let encoded_txs = buffered_txs.iter().map(|tx| tx.payload.clone()).collect();
         let balance_path_elements = buffered_txs
@@ -110,93 +114,19 @@ impl WitnessGenerator {
             new_account_roots,
         }
     }
-    pub fn forge(&mut self) -> L2Block {
-        self.flush_with_nop();
-        self.forge_with_txs(&self.buffered_txs)
-    }
-    pub fn forge_all_l2_blocks(&mut self) -> Vec<L2Block> {
-        self.buffered_blocks.clone()
-    }
     pub fn add_raw_tx(&mut self, raw_tx: RawTx) {
+        debug_assert!(self.buffered_txs.len() < self.n_tx);
         self.buffered_txs.push(raw_tx);
-        if self.buffered_txs.len() % self.n_tx == 0 {
-            // forge next block, using last n_tx txs
-            let txs = &self.buffered_txs[(self.buffered_txs.len() - self.n_tx)..];
-            let block = self.forge_with_txs(txs);
-            self.buffered_blocks.push(block);
-            assert!(
-                self.buffered_blocks.len() * self.n_tx == self.buffered_txs.len(),
-                "invalid block num"
-            );
-            if self.verbose {
-                println!("forge block {} done", self.buffered_blocks.len() - 1);
-            }
+        if self.buffered_txs.len() == self.n_tx {
+            let block = Self::forge_with_txs(&self.buffered_txs);
+            self.block_sender.try_send(block).unwrap();
+            self.block_generate_num += 1;
+            self.buffered_txs.clear();
         }
     }
-    pub fn get_buffered_blocks(&self) -> &[L2Block] {
-        self.buffered_blocks.as_slice()
+    pub fn get_block_generate_num(&self) -> usize {
+        self.block_generate_num
     }
-    pub fn take_blocks(self) -> Vec<L2Block> {
-        self.buffered_blocks
-    }
-    /*
-    pub fn deposit_to_new(&mut self, tx: DepositTx) {
-        if !self.has_account(tx.account_id) {
-            // TODO: return err rather than unwrap
-            self.state.init_account(tx.account_id, 1).unwrap();
-        }
-        let proof = self.state.balance_full_proof(tx.account_id, tx.token_id);
-        let acc = self.state.get_account(tx.account_id);
-
-        // first, generate the tx
-        let mut encoded_tx = [Fr::zero(); TX_LENGTH];
-        encoded_tx[tx_detail_idx::AMOUNT] = tx.amount.to_fr();
-
-        encoded_tx[tx_detail_idx::TOKEN_ID1] = u32_to_fr(tx.token_id);
-        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = u32_to_fr(tx.account_id);
-        encoded_tx[tx_detail_idx::BALANCE1] = Fr::zero();
-        encoded_tx[tx_detail_idx::NONCE1] = Fr::zero();
-        encoded_tx[tx_detail_idx::ETH_ADDR1] = Fr::zero();
-        encoded_tx[tx_detail_idx::SIGN1] = Fr::zero();
-        encoded_tx[tx_detail_idx::AY1] = Fr::zero();
-
-        encoded_tx[tx_detail_idx::TOKEN_ID2] = u32_to_fr(tx.token_id);
-        encoded_tx[tx_detail_idx::ACCOUNT_ID2] = u32_to_fr(tx.account_id);
-        encoded_tx[tx_detail_idx::BALANCE2] = tx.amount.to_fr();
-        encoded_tx[tx_detail_idx::NONCE2] = Fr::zero();
-        encoded_tx[tx_detail_idx::ETH_ADDR2] = tx.eth_addr;
-        encoded_tx[tx_detail_idx::SIGN2] = tx.sign;
-        encoded_tx[tx_detail_idx::AY2] = tx.ay;
-
-        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = Fr::one();
-        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = Fr::one();
-        encoded_tx[tx_detail_idx::DST_IS_NEW] = Fr::one();
-
-        let mut raw_tx = RawTx {
-            tx_type: TxType::Deposit,
-            payload: encoded_tx.to_vec(),
-            balance_path0: proof.balance_path.clone(),
-            balance_path1: proof.balance_path.clone(),
-            balance_path2: proof.balance_path.clone(),
-            balance_path3: proof.balance_path,
-            order_path0: self.state.trivial_order_path_elements(),
-            order_path1: self.state.trivial_order_path_elements(),
-            order_root0: acc.order_root,
-            order_root1: acc.order_root,
-            account_path0: proof.account_path.clone(),
-            account_path1: proof.account_path,
-            root_before: proof.root,
-            root_after: Fr::zero(),
-        };
-
-        // then update global state
-        self.state.set_token_balance(tx.account_id, tx.token_id, tx.amount.to_fr());
-        self.state.set_account_l2_addr(tx.account_id, tx.sign, tx.ay, tx.eth_addr);
-
-        raw_tx.root_after = self.state.root();
-        self.add_raw_tx(raw_tx);
-    }
-    */
     pub fn deposit(&mut self, tx: DepositTx) -> anyhow::Result<()> {
         let deposit_to_new = tx.l2key.is_some();
         if deposit_to_new && self.has_account(tx.account_id) {
@@ -618,8 +548,11 @@ impl WitnessGenerator {
     }
 
     pub fn flush_with_nop(&mut self) {
+        let mut cnt = 0;
         while self.buffered_txs.len() % self.n_tx != 0 {
             self.nop();
+            cnt += 1;
         }
+        log::debug!("flush with {} nop", cnt);
     }
 }
