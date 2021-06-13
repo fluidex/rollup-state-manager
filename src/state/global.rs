@@ -319,7 +319,7 @@ impl GlobalState {
                 let order_tree = self.order_trees.get_mut(&account_id).unwrap().clone();
                 let order_updates = update.order_updates;
                 tx.send((order_tree, order_updates, order_parallel)).unwrap();
-            };
+            }
 
             set_job.join().unwrap();
 
