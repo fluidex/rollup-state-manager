@@ -132,7 +132,7 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
 }
 
 fn run_bench() -> Result<()> {
-    let circuit_repo = fs::canonicalize(PathBuf::from("../circuits")).expect("invalid circuits repo path");
+    let circuit_repo = fs::canonicalize(PathBuf::from("circuits")).expect("invalid circuits repo path");
     let _ = bench_global_state(&circuit_repo)?;
     Ok(())
 }
