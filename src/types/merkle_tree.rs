@@ -58,6 +58,9 @@ impl Tree {
             data,
         }
     }
+    pub fn get_tree_data(&self) -> &ValueMap {
+        &self.data
+    }
     pub fn max_leaf_num(&self) -> u32 {
         2u32.checked_pow(self.height as u32).unwrap()
     }

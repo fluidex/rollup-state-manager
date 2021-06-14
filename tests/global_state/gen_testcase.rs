@@ -56,6 +56,7 @@ fn replay_msgs(
         }
         witgen.flush_with_nop();
         let block_num = witgen.get_block_generate_num();
+        witgen.dump_to_dir("circuits/testdata/persist");
         println!(
             "genesis {} blocks (TPS: {})",
             block_num,

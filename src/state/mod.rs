@@ -1,6 +1,7 @@
 pub mod account;
 pub mod block;
 pub mod global;
+pub mod messages;
 pub mod witness_generator;
 
 pub use account::AccountState;
