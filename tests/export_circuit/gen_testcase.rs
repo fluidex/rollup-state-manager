@@ -58,8 +58,8 @@ mod test_case {
             "oldRoot": fr_to_string(&proof1.root),
             "newLeaf": fr_to_string(&proof2.leaf),
             "newRoot": fr_to_string(&proof2.root),
-            "path_elements": proof1.path_elements.iter().map(|x| field_slice_to_string(x)).collect::<Vec<_>>(),
-            "path_index": [0, 1],
+            "pathElements": proof1.path_elements.iter().map(|x| field_slice_to_string(x)).collect::<Vec<_>>(),
+            "pathIndex": [0, 1],
         });
         CircuitTestCase {
             source: CircuitSource {

@@ -101,9 +101,11 @@ impl WitnessGenerator {
             .iter()
             .map(|tx| [tx.account_path0.clone(), tx.account_path1.clone()])
             .collect();
-        let old_account_roots = buffered_txs.iter().map(|tx| tx.root_before).collect();
-        let new_account_roots = buffered_txs.iter().map(|tx| tx.root_after).collect();
+        let old_account_roots: Vec<Fr> = buffered_txs.iter().map(|tx| tx.root_before).collect();
+        let new_account_roots: Vec<Fr> = buffered_txs.iter().map(|tx| tx.root_after).collect();
         L2Block {
+            old_root: *old_account_roots.first().unwrap(),
+            new_root: *new_account_roots.last().unwrap(),
             txs_type,
             encoded_txs,
             balance_path_elements,

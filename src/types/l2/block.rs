@@ -4,6 +4,8 @@ use crate::types::primitives::Fr;
 
 #[derive(Clone)]
 pub struct L2Block {
+    pub old_root: Fr,
+    pub new_root: Fr,
     pub txs_type: Vec<TxType>,
     pub encoded_txs: Vec<Vec<Fr>>,
     pub balance_path_elements: Vec<[MerklePath; 4]>,
