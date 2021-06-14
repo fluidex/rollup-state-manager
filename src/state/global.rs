@@ -10,11 +10,9 @@ use crate::types::primitives::Fr;
 use anyhow::bail;
 use ff::Field;
 use fnv::FnvHashMap;
+use rayon::prelude::*;
 use std::collections::BTreeMap;
-use std::{
-    sync::{Arc, Mutex},
-    thread,
-};
+use std::sync::{Arc, Mutex};
 
 pub struct BalanceProof {
     pub leaf: Fr,
@@ -298,28 +296,34 @@ impl GlobalState {
     }
     pub fn batch_update(&mut self, updates: Vec<AccountUpdates>, parallel: bool) {
         if parallel {
-            let mut handlers = vec![];
             let balance_parallel = 2;
             let order_parallel = 1;
             let account_parallel = 2;
-            for update in updates.clone() {
-                let account_id = update.account_id;
-                assert!(self.balance_trees.contains_key(&account_id), "set_token_balance");
-                let balance_tree = self.balance_trees.get_mut(&account_id).unwrap().clone();
-                let balance_updates = update.balance_updates;
-                handlers.push(thread::spawn(move || {
-                    balance_tree.lock().unwrap().set_value_parallel(&balance_updates, balance_parallel);
-                }));
-                assert!(self.order_trees.contains_key(&account_id), "set_order_leaf_hash_raw");
-                let order_tree = self.order_trees.get_mut(&account_id).unwrap().clone();
-                let order_updates = update.order_updates;
-                handlers.push(thread::spawn(move || {
-                    order_tree.lock().unwrap().set_value_parallel(&order_updates, order_parallel);
-                }));
-            }
-            for handler in handlers {
-                handler.join().unwrap();
-            }
+
+            updates
+                .clone()
+                .into_iter()
+                .map(|update| {
+                    let account_id = update.account_id;
+                    assert!(self.balance_trees.contains_key(&account_id), "set_token_balance");
+                    let balance_tree = self.balance_trees.get_mut(&account_id).unwrap().clone();
+                    let balance_updates = update.balance_updates;
+
+                    assert!(self.order_trees.contains_key(&account_id), "set_order_leaf_hash_raw");
+                    let order_tree = self.order_trees.get_mut(&account_id).unwrap().clone();
+                    let order_updates = update.order_updates;
+
+                    (
+                        (balance_tree, balance_updates, balance_parallel),
+                        (order_tree, order_updates, order_parallel),
+                    )
+                })
+                .flat_map(|(balance, order)| std::array::IntoIter::new([balance, order]))
+                .par_bridge()
+                .for_each(|(tree, updates, parallel)| {
+                    tree.lock().unwrap().set_value_parallel(updates.as_slice(), parallel);
+                });
+
             let mut account_updates = vec![];
             for update in updates {
                 let account_hash = self.recalculate_account_state_hash(update.account_id);
