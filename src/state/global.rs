@@ -399,6 +399,17 @@ impl GlobalState {
         self.balance_full_proof(0, 0)
     }
 
+    
+    #[cfg(feature = "persist_sled")]
+    pub fn save_account_state(&self, db: &sled::Tree) {
+        assert!(
+            self.accounts
+                .iter()
+                .map(|(id, state)| db.insert(bincode::serialize(&id).unwrap(), bincode::serialize(state).unwrap()))
+                .all(|ret| ret.is_ok())
+        )
+    }
+
     pub fn order_trees_debug_str(&self) -> String {
         let mut ret = String::from("");
         for tup in &self.order_trees {
