@@ -420,6 +420,22 @@ impl GlobalState {
         )
     }
 
+    #[cfg(feature = "persist_sled")]
+    pub fn save_balance_trees(&self, db: &sled::Tree) {
+        assert!(
+            self.balance_trees
+                .iter()
+                .map(|(id, tree)| db.insert(bincode::serialize(id).unwrap(), bincode::serialize(&*tree.clone()).unwrap()))
+                .all(|ret| ret.is_ok())
+        )
+    }
+
+
+    #[cfg(feature = "persist_sled")]
+    pub fn save_account_tree(&self, db: &sled::Db) {
+        db.insert("account_tree", bincode::serialize(&*self.account_tree.clone()).unwrap()).unwrap();
+    }
+
     pub fn order_trees_debug_str(&self) -> String {
         let mut ret = String::from("");
         for tup in &self.order_trees {
