@@ -112,3 +112,45 @@ pub fn fr_to_bool(f: &Fr) -> Result<bool> {
         Err(anyhow!("invalid fr"))
     }
 }
+
+pub mod fr_bytes {
+
+    use super::*;
+    use serde::{ser, de};
+
+    #[doc(hidden)]
+    #[derive(Debug)]
+    pub struct FrBytesVisitor;
+
+    pub fn serialize<S>(fr: &Fr, serializer: S) -> Result<S::Ok, S::Error>
+        where S: ser::Serializer
+    {
+        serializer.serialize_bytes(&fr_to_vec(fr))
+    }
+
+    pub fn deserialize<'de, D>(d: D) -> Result<Fr, D::Error>
+            where D: de::Deserializer<'de>
+    {
+        Ok(d.deserialize_bytes(FrBytesVisitor)?)
+    }
+
+    impl <'de> de::Visitor<'de> for FrBytesVisitor {
+        type Value = Fr;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a Fr in be bytes repr")
+        }
+
+        fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            if let Ok(fr) = vec_to_fr(v) {
+                Ok(fr)
+            } else {
+                Err(de::Error::invalid_type(de::Unexpected::Bytes(v), &self))
+            }
+        }
+    }
+
+}
