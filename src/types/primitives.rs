@@ -154,3 +154,33 @@ pub mod fr_bytes {
     }
 
 }
+
+pub mod fr_map {
+
+    use std::hash::Hash;
+
+    use super::*;
+    use fnv::FnvHashMap as MerkleValueMapType;
+    use serde::{ser, de, Serialize, Deserialize};
+
+    pub fn serialize<S, K>(fr: &MerkleValueMapType<K, Fr>, serializer: S) -> Result<S::Ok, S::Error>
+        where S: ser::Serializer, K: Eq + Hash + Serialize
+    {
+        #[derive(Serialize)]
+        struct Wrapper<'a>(#[serde(with = "fr_bytes")] &'a Fr);
+
+        let map = fr.iter().map(|(k, v)| (k, Wrapper(v)));
+        serializer.collect_map(map)
+    }
+
+    pub fn deserialize<'de, D, K>(deserializer: D) -> Result<MerkleValueMapType<K, Fr>, D::Error>
+        where D: de::Deserializer<'de>, K: Eq + Hash + de::Deserialize<'de>
+    {
+        #[derive(Deserialize)]
+        struct Wrapper(#[serde(with = "fr_bytes")] Fr);
+
+        let map = MerkleValueMapType::<K, Wrapper>::deserialize(deserializer)?;
+        Ok(map.into_iter().map(|(k, Wrapper(v))| (k, v)).collect())
+    }
+
+}
