@@ -61,12 +61,19 @@ type MerklePathStr = Vec<MerkleLeafStr>;
 //TODO: carmel style except for three "elements" field
 #[derive(Serialize)]
 pub struct L2BlockSerde {
+    #[serde(rename(serialize = "oldRoot"))]
+    old_root: FrStr,
+    #[serde(rename(serialize = "newRoot"))]
+    new_root: FrStr,
     #[serde(rename(serialize = "txsType"))]
     txs_type: Vec<l2::TxType>,
     #[serde(rename(serialize = "encodedTxs"))]
     encoded_txs: Vec<Vec<FrStr>>,
+    #[serde(rename(serialize = "balancePathElements"))]
     balance_path_elements: Vec<[MerklePathStr; 4]>,
+    #[serde(rename(serialize = "orderPathElements"))]
     order_path_elements: Vec<[MerklePathStr; 2]>,
+    #[serde(rename(serialize = "accountPathElements"))]
     account_path_elements: Vec<[MerklePathStr; 2]>,
     #[serde(rename(serialize = "orderRoots"))]
     order_roots: Vec<[FrStr; 2]>,
@@ -96,6 +103,8 @@ fn from_merkle<const N: usize>(origin: [MerklePath; N]) -> [MerklePathStr; N] {
 impl From<l2::L2Block> for L2BlockSerde {
     fn from(origin: l2::L2Block) -> Self {
         L2BlockSerde {
+            old_root: origin.old_root.into(),
+            new_root: origin.new_root.into(),
             txs_type: origin.txs_type,
             encoded_txs: origin
                 .encoded_txs
