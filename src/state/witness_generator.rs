@@ -1,8 +1,6 @@
 #![allow(clippy::field_reassign_with_default)]
 #![allow(clippy::vec_init_then_push)]
 
-use std::io::Write;
-
 use super::global::{AccountUpdates, GlobalState};
 use crate::types::l2::{
     tx_detail_idx, DepositTx, FullSpotTradeTx, L2Block, Order, RawTx, SpotTradeTx, TransferTx, TxType, WithdrawTx, TX_LENGTH,
@@ -557,32 +555,4 @@ impl WitnessGenerator {
         }
         log::debug!("flush with {} nop", cnt);
     }
-
-    fn dump_order_trees(&self, file: &mut std::fs::File) {
-        file.write_all(self.state.order_trees_debug_str().as_bytes()).unwrap();
-    }
-
-    fn dump_balance_trees(&self, file: &mut std::fs::File) {
-        file.write_all(self.state.balance_trees_debug_str().as_bytes()).unwrap();
-    }
-
-    fn dump_account_tree(&self, file: &mut std::fs::File) {
-        file.write_all(self.state.account_tree_debug_str().as_bytes()).unwrap();
-    }
-
-    pub fn dump_to_dir(&self, dir: &str) {
-        if !dir.is_empty() {
-            std::fs::create_dir_all(dir).unwrap();
-            let order_trees_file = format!("{}/order_trees.jsonl", dir);
-            self.dump_order_trees(&mut std::fs::File::create(order_trees_file).unwrap());
-            let balance_trees_file = format!("{}/balance_trees.jsonl", dir);
-            self.dump_balance_trees(&mut std::fs::File::create(balance_trees_file).unwrap());
-            let account_tree_file = format!("{}/account_tree.jsonl", dir);
-            self.dump_account_tree(&mut std::fs::File::create(account_tree_file).unwrap());
-        }
-    }
-
-    // TODO: load messages and build trees & states
-    // pub fn load_from_dir(&self, dir: &str) {
-    // }
 }

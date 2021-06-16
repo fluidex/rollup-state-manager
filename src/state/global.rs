@@ -1,11 +1,9 @@
 #![allow(clippy::field_reassign_with_default)]
 #![allow(clippy::vec_init_then_push)]
 
-use super::messages::{BalanceTreeMessage, OrderTreeMessage};
 use super::AccountState;
 use crate::types::l2::Order;
 use crate::types::merkle_tree::{MerkleProof, Tree};
-use crate::types::messages::TreeMessage;
 use crate::types::primitives::Fr;
 use anyhow::bail;
 use ff::Field;
@@ -434,27 +432,5 @@ impl GlobalState {
     #[cfg(feature = "persist_sled")]
     pub fn save_account_tree(&self, db: &sled::Db) {
         db.insert("account_tree", bincode::serialize(&*self.account_tree.clone()).unwrap()).unwrap();
-    }
-
-    pub fn order_trees_debug_str(&self) -> String {
-        let mut ret = String::from("");
-        for tup in &self.order_trees {
-            let tree_str = serde_json::to_string(&OrderTreeMessage::from(tup)).unwrap();
-            ret.push_str(&(tree_str + "\n"));
-        }
-        ret
-    }
-
-    pub fn balance_trees_debug_str(&self) -> String {
-        let mut ret = String::from("");
-        for tup in &self.balance_trees {
-            let tree_str = serde_json::to_string(&BalanceTreeMessage::from(tup)).unwrap();
-            ret.push_str(&(tree_str + "\n"));
-        }
-        ret
-    }
-
-    pub fn account_tree_debug_str(&self) -> String {
-        serde_json::to_string(&TreeMessage::from(self.account_tree.lock().unwrap())).unwrap()
     }
 }
