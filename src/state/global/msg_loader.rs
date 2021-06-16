@@ -1,4 +1,4 @@
-use rollup_state_manager::test_utils::messages::{parse_msg, WrappedMessage};
+use crate::test_utils::messages::{parse_msg, WrappedMessage};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 pub fn load_msgs_from_file(

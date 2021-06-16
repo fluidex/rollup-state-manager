@@ -12,6 +12,11 @@ use rayon::prelude::*;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
+pub mod export_circuit;
+pub mod msg_loader;
+pub mod msg_processor;
+mod types;
+
 pub struct BalanceProof {
     pub leaf: Fr,
     pub balance_path: Vec<[Fr; 1]>,

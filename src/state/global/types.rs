@@ -2,14 +2,14 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::large_enum_variant)]
 
+use crate::account::Signature;
+use crate::state::WitnessGenerator;
+use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
+use crate::types;
+use crate::types::fixnum;
+use crate::types::l2::{self, OrderSide};
+use crate::types::primitives::{fr_to_decimal, u32_to_fr};
 use num::Zero;
-use rollup_state_manager::account::Signature;
-use rollup_state_manager::state::WitnessGenerator;
-use rollup_state_manager::test_utils::types::{get_token_id_by_name, prec_token_id};
-use rollup_state_manager::types;
-use rollup_state_manager::types::fixnum;
-use rollup_state_manager::types::l2::{self, OrderSide};
-use rollup_state_manager::types::primitives::{fr_to_decimal, u32_to_fr};
 use rust_decimal::Decimal;
 
 #[derive(Clone, Copy)]

@@ -5,6 +5,7 @@
 #![allow(clippy::unnecessary_wraps)]
 
 use anyhow::Result;
+use rollup_state_manager::state::global::{export_circuit, msg_loader, msg_processor};
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils;
 use rollup_state_manager::test_utils::l2::L2Block;
@@ -12,11 +13,6 @@ use rollup_state_manager::test_utils::messages::WrappedMessage;
 use std::fs::{self};
 use std::path::PathBuf;
 use std::time::Instant;
-
-mod export_circuit;
-mod msg_loader;
-mod msg_processor;
-mod types;
 
 fn replay_msgs(
     msg_receiver: crossbeam_channel::Receiver<WrappedMessage>,

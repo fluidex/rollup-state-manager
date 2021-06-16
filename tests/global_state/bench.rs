@@ -3,6 +3,7 @@
 use anyhow::Result;
 use ethers::prelude::coins_bip39::English;
 use rollup_state_manager::account::{self, Account};
+use rollup_state_manager::state::global::msg_processor;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils::{
     self,
@@ -16,9 +17,6 @@ use std::time::Instant;
 
 use pprof::protos::Message;
 use std::io::Write;
-
-mod msg_processor;
-mod types;
 
 //if we use nightly build, we are able to use bench test ...
 fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {

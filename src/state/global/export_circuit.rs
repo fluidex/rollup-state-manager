@@ -1,9 +1,9 @@
 // TODO: move this file in main repo rather than test folder
 
+use crate::test_utils;
+use crate::test_utils::L2BlockSerde;
+use crate::types::l2;
 use anyhow::Result;
-use rollup_state_manager::test_utils;
-use rollup_state_manager::test_utils::L2BlockSerde;
-use rollup_state_manager::types::l2;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
