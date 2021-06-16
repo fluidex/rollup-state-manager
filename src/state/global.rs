@@ -410,6 +410,16 @@ impl GlobalState {
         )
     }
 
+    #[cfg(feature = "persist_sled")]
+    pub fn save_order_trees(&self, db: &sled::Tree) {
+        assert!(
+            self.order_trees
+                .iter()
+                .map(|(id, tree)| db.insert(bincode::serialize(id).unwrap(), bincode::serialize(&*tree.clone()).unwrap()))
+                .all(|ret| ret.is_ok())
+        )
+    }
+
     pub fn order_trees_debug_str(&self) -> String {
         let mut ret = String::from("");
         for tup in &self.order_trees {
