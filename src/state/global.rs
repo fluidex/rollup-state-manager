@@ -1,7 +1,7 @@
 #![allow(clippy::field_reassign_with_default)]
 #![allow(clippy::vec_init_then_push)]
 
-use super::messages::{AccountStateMessage, BalanceTreeMessage, OrderTreeMessage};
+use super::messages::{BalanceTreeMessage, OrderTreeMessage};
 use super::AccountState;
 use crate::types::l2::Order;
 use crate::types::merkle_tree::{MerkleProof, Tree};
@@ -424,15 +424,6 @@ impl GlobalState {
         for tup in &self.balance_trees {
             let tree_str = serde_json::to_string(&BalanceTreeMessage::from(tup)).unwrap();
             ret.push_str(&(tree_str + "\n"));
-        }
-        ret
-    }
-
-    pub fn account_states_debug_str(&self) -> String {
-        let mut ret = String::from("");
-        for tup in &self.accounts {
-            let state_str = serde_json::to_string(&AccountStateMessage::from(tup)).unwrap();
-            ret.push_str(&(state_str + "\n"));
         }
         ret
     }

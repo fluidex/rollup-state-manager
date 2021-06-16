@@ -566,10 +566,6 @@ impl WitnessGenerator {
         file.write_all(self.state.balance_trees_debug_str().as_bytes()).unwrap();
     }
 
-    fn dump_account_states(&self, file: &mut std::fs::File) {
-        file.write_all(self.state.account_states_debug_str().as_bytes()).unwrap();
-    }
-
     fn dump_account_tree(&self, file: &mut std::fs::File) {
         file.write_all(self.state.account_tree_debug_str().as_bytes()).unwrap();
     }
@@ -581,8 +577,6 @@ impl WitnessGenerator {
             self.dump_order_trees(&mut std::fs::File::create(order_trees_file).unwrap());
             let balance_trees_file = format!("{}/balance_trees.jsonl", dir);
             self.dump_balance_trees(&mut std::fs::File::create(balance_trees_file).unwrap());
-            let account_states_file = format!("{}/account_states.jsonl", dir);
-            self.dump_account_states(&mut std::fs::File::create(account_states_file).unwrap());
             let account_tree_file = format!("{}/account_tree.jsonl", dir);
             self.dump_account_tree(&mut std::fs::File::create(account_tree_file).unwrap());
         }
