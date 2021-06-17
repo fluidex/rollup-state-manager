@@ -1,19 +1,12 @@
 #![allow(dead_code)]
-#![allow(unreachable_patterns)]
-#![allow(clippy::upper_case_acronyms)]
-#![allow(clippy::large_enum_variant)]
-#![allow(clippy::unnecessary_wraps)]
 
-use anyhow::Result;
+use rollup_state_manager::config;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils;
 use rollup_state_manager::test_utils::l2::L2Block;
 use rollup_state_manager::test_utils::messages::WrappedMessage;
-use std::fs::{self};
-use std::path::PathBuf;
 use std::time::Instant;
 
-mod export_circuit;
 mod msg_consumer;
 mod msg_loader;
 mod msg_processor;
@@ -50,9 +43,6 @@ fn replay_msgs(
                 WrappedMessage::ORDER(order) => {
                     processor.handle_order_msg(&mut witgen, order);
                 }
-                _ => {
-                    //other msg is omitted
-                }
             }
         }
         witgen.flush_with_nop();
@@ -66,49 +56,32 @@ fn replay_msgs(
     }))
 }
 
-pub fn run(src: &str) -> Result<()> {
-    let circuit_repo = fs::canonicalize(PathBuf::from("circuits")).expect("invalid circuits repo path");
-    let filepath = PathBuf::from(src);
+fn run(settings: &config::Settings) {
     let (msg_sender, msg_receiver) = crossbeam_channel::unbounded();
     let (blk_sender, blk_receiver) = crossbeam_channel::unbounded();
 
-    let loader_thread = msg_loader::load_msgs_from_file(&filepath.to_str().unwrap(), msg_sender);
-
+    let loader_thread = msg_loader::load_msgs_from_mq(&settings.brokers, msg_sender);
     let replay_thread = replay_msgs(msg_receiver, blk_sender);
 
-    let blocks: Vec<_> = blk_receiver.iter().collect();
+    let _blocks: Vec<_> = blk_receiver.iter().collect();
 
     loader_thread.map(|h| h.join().expect("loader thread failed"));
     replay_thread.map(|h| h.join().expect("replay thread failed"));
 
-    let component = test_utils::circuit::CircuitSource {
-        src: String::from("src/block.circom"),
-        main: format!(
-            "Block({}, {}, {}, {})",
-            *test_utils::params::NTXS,
-            *test_utils::params::BALANCELEVELS,
-            *test_utils::params::ORDERLEVELS,
-            *test_utils::params::ACCOUNTLEVELS
-        ),
-    };
-
-    let circuit_dir = export_circuit::export_circuit_and_testdata(&circuit_repo, blocks, component)?;
-
-    println!("export test cases to {}", circuit_dir.to_str().unwrap());
-
-    Ok(())
+    // Saves the blocks to DB.
+    todo!();
 }
 
-/*
- * have a look at scripts/global_state_test.sh
- */
-
 fn main() {
-    let default_test_file = "circuits/test/testdata/msgs_float.jsonl";
-    //let default_test_file = "tests/global_state/testdata/data001.txt";
-    let test_file = std::env::args().nth(1).unwrap_or_else(|| default_test_file.into());
-    match run(&test_file) {
-        Ok(_) => println!("global_state test_case generated"),
-        Err(e) => panic!("{:#?}", e),
-    }
+    dotenv::dotenv().ok();
+    env_logger::init();
+    log::info!("state_keeper started");
+
+    let mut conf = config_rs::Config::new();
+    let config_file = dotenv::var("CONFIG").unwrap();
+    conf.merge(config_rs::File::with_name(&config_file)).unwrap();
+    let settings: config::Settings = conf.try_into().unwrap();
+    log::debug!("{:?}", settings);
+
+    run(&settings);
 }
