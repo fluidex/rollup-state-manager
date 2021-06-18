@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use ff::{from_hex, to_hex};
@@ -70,6 +71,10 @@ pub fn bigint_to_fr(x: BigInt) -> Fr {
         s.insert(0, '0');
     }
     from_hex(&s).unwrap()
+}
+pub fn str_to_fr(x: &str) -> Fr {
+    let i = BigInt::from_str(x).unwrap();
+    bigint_to_fr(i)
 }
 pub fn vec_to_fr(arr: &[u8]) -> Result<Fr> {
     if arr.len() > 32 {
