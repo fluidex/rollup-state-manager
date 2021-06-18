@@ -4,7 +4,7 @@
 use super::AccountState;
 use crate::types::l2::Order;
 use crate::types::merkle_tree::{MerkleProof, Tree};
-use crate::types::primitives::Fr;
+use crate::types::primitives::{Fr, FrWrapper};
 use anyhow::bail;
 use ff::Field;
 use fnv::FnvHashMap;
@@ -402,7 +402,7 @@ impl GlobalState {
         assert!(self
             .accounts
             .iter()
-            .map(|(id, state)| db.insert(bincode::serialize(&id).unwrap(), bincode::serialize(state).unwrap()))
+            .map(|(id, state)| db.insert(bincode::serialize(&FrWrapper::from(state.hash())).unwrap(), bincode::serialize(&(id, state)).unwrap()))
             .all(|ret| ret.is_ok()))
     }
 
