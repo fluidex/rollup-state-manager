@@ -133,7 +133,7 @@ pub mod fr_bytes {
     where
         D: de::Deserializer<'de>,
     {
-        Ok(d.deserialize_bytes(FrBytesVisitor)?)
+        d.deserialize_bytes(FrBytesVisitor)
     }
 
     impl<'de> de::Visitor<'de> for FrBytesVisitor {
