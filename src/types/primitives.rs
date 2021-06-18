@@ -116,25 +116,27 @@ pub fn fr_to_bool(f: &Fr) -> Result<bool> {
 pub mod fr_bytes {
 
     use super::*;
-    use serde::{ser, de};
+    use serde::{de, ser};
 
     #[doc(hidden)]
     #[derive(Debug)]
     pub struct FrBytesVisitor;
 
     pub fn serialize<S>(fr: &Fr, serializer: S) -> Result<S::Ok, S::Error>
-        where S: ser::Serializer
+    where
+        S: ser::Serializer,
     {
         serializer.serialize_bytes(&fr_to_vec(fr))
     }
 
     pub fn deserialize<'de, D>(d: D) -> Result<Fr, D::Error>
-            where D: de::Deserializer<'de>
+    where
+        D: de::Deserializer<'de>,
     {
         Ok(d.deserialize_bytes(FrBytesVisitor)?)
     }
 
-    impl <'de> de::Visitor<'de> for FrBytesVisitor {
+    impl<'de> de::Visitor<'de> for FrBytesVisitor {
         type Value = Fr;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -152,7 +154,6 @@ pub mod fr_bytes {
             }
         }
     }
-
 }
 
 pub mod fr_map {
@@ -161,10 +162,12 @@ pub mod fr_map {
 
     use super::*;
     use fnv::FnvHashMap as MerkleValueMapType;
-    use serde::{ser, de, Serialize, Deserialize};
+    use serde::{de, ser, Deserialize, Serialize};
 
     pub fn serialize<S, K>(fr: &MerkleValueMapType<K, Fr>, serializer: S) -> Result<S::Ok, S::Error>
-        where S: ser::Serializer, K: Eq + Hash + Serialize
+    where
+        S: ser::Serializer,
+        K: Eq + Hash + Serialize,
     {
         #[derive(Serialize)]
         struct Wrapper<'a>(#[serde(with = "fr_bytes")] &'a Fr);
@@ -174,7 +177,9 @@ pub mod fr_map {
     }
 
     pub fn deserialize<'de, D, K>(deserializer: D) -> Result<MerkleValueMapType<K, Fr>, D::Error>
-        where D: de::Deserializer<'de>, K: Eq + Hash + de::Deserialize<'de>
+    where
+        D: de::Deserializer<'de>,
+        K: Eq + Hash + de::Deserialize<'de>,
     {
         #[derive(Deserialize)]
         struct Wrapper(#[serde(with = "fr_bytes")] Fr);
@@ -182,5 +187,4 @@ pub mod fr_map {
         let map = MerkleValueMapType::<K, Wrapper>::deserialize(deserializer)?;
         Ok(map.into_iter().map(|(k, Wrapper(v))| (k, v)).collect())
     }
-
 }

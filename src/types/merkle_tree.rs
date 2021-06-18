@@ -1,9 +1,9 @@
 // https://github1s.com/Fluidex/circuits/blob/HEAD/helper.ts/binary_merkle_tree.ts
 
-use super::primitives::{hash, Fr, fr_bytes};
+use super::primitives::{fr_bytes, hash, Fr};
 pub use ff::{Field, PrimeField};
 use rayon::prelude::*;
-use serde::{Deserialize, Serialize, ser::SerializeStruct};
+use serde::{ser::SerializeStruct, Deserialize, Serialize};
 
 type LeafIndex = u32;
 type NodeIndex = usize;
@@ -254,7 +254,8 @@ pub fn empty_tree_root(level: usize, leaf: LeafType) -> LeafType {
 
 impl Serialize for Tree {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: serde::Serializer 
+    where
+        S: serde::Serializer,
     {
         #[derive(Serialize)]
         struct Wrapper<'a>(#[serde(with = "fr_bytes")] &'a Fr);
@@ -268,9 +269,10 @@ impl Serialize for Tree {
     }
 }
 
-impl <'de> Deserialize<'de> for Tree {
+impl<'de> Deserialize<'de> for Tree {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: serde::Deserializer<'de> 
+    where
+        D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
         struct Wrapper(#[serde(with = "fr_bytes")] Fr);

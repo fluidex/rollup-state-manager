@@ -1,9 +1,9 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/common.ts
 pub use crate::types::merkle_tree::MerklePath;
-use crate::types::primitives::{hash, shl, Fr};
 use crate::types::primitives::fr_bytes;
+use crate::types::primitives::{hash, shl, Fr};
 use ff::Field;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Default, Serialize, Deserialize)]
 pub struct AccountState {

@@ -397,40 +397,36 @@ impl GlobalState {
         self.balance_full_proof(0, 0)
     }
 
-    
     #[cfg(feature = "persist_sled")]
     pub fn save_account_state(&self, db: &sled::Tree) {
-        assert!(
-            self.accounts
-                .iter()
-                .map(|(id, state)| db.insert(bincode::serialize(&id).unwrap(), bincode::serialize(state).unwrap()))
-                .all(|ret| ret.is_ok())
-        )
+        assert!(self
+            .accounts
+            .iter()
+            .map(|(id, state)| db.insert(bincode::serialize(&id).unwrap(), bincode::serialize(state).unwrap()))
+            .all(|ret| ret.is_ok()))
     }
 
     #[cfg(feature = "persist_sled")]
     pub fn save_order_trees(&self, db: &sled::Tree) {
-        assert!(
-            self.order_trees
-                .iter()
-                .map(|(id, tree)| db.insert(bincode::serialize(id).unwrap(), bincode::serialize(&*tree.clone()).unwrap()))
-                .all(|ret| ret.is_ok())
-        )
+        assert!(self
+            .order_trees
+            .iter()
+            .map(|(id, tree)| db.insert(bincode::serialize(id).unwrap(), bincode::serialize(&*tree.clone()).unwrap()))
+            .all(|ret| ret.is_ok()))
     }
 
     #[cfg(feature = "persist_sled")]
     pub fn save_balance_trees(&self, db: &sled::Tree) {
-        assert!(
-            self.balance_trees
-                .iter()
-                .map(|(id, tree)| db.insert(bincode::serialize(id).unwrap(), bincode::serialize(&*tree.clone()).unwrap()))
-                .all(|ret| ret.is_ok())
-        )
+        assert!(self
+            .balance_trees
+            .iter()
+            .map(|(id, tree)| db.insert(bincode::serialize(id).unwrap(), bincode::serialize(&*tree.clone()).unwrap()))
+            .all(|ret| ret.is_ok()))
     }
-
 
     #[cfg(feature = "persist_sled")]
     pub fn save_account_tree(&self, db: &sled::Db) {
-        db.insert("account_tree", bincode::serialize(&*self.account_tree.clone()).unwrap()).unwrap();
+        db.insert("account_tree", bincode::serialize(&*self.account_tree.clone()).unwrap())
+            .unwrap();
     }
 }
