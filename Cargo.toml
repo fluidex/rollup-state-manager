@@ -54,6 +54,7 @@ path = "tests/export_circuit/gen_testcase.rs"
 [[bin]]
 name = "gen_global_state_testcase"
 path = "tests/global_state/gen_testcase.rs"
+required-features = [ "persist_sled" ]
 
 [[bin]]
 name = "bench_global_state"
