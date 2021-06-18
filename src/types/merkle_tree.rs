@@ -308,18 +308,18 @@ impl Serialize for Tree {
 
         let mut tree = serializer.serialize_struct("Tree", 3)?;
         tree.serialize_field("height", &self.height)?;
-        #[cfg(not(feature = "fr_string_repr"))] 
+        #[cfg(not(feature = "fr_string_repr"))]
         {
             tree.serialize_field("default_leaf_node_value", &Wrapper(&self.default_nodes[0]))?;
             let map: MerkleValueMapType<NodeIndex, Wrapper> = self.data.iter().map(|(k, v)| (*k, Wrapper(v))).collect();
             tree.serialize_field("data", &map)?;
-        } 
-        #[cfg(feature = "fr_string_repr")] 
+        }
+        #[cfg(feature = "fr_string_repr")]
         {
-            tree.serialize_field("default_leaf_node_value", &fr_to_string(&self.default_nodes[0]))?; 
+            tree.serialize_field("default_leaf_node_value", &fr_to_string(&self.default_nodes[0]))?;
             let map: MerkleValueMapType<NodeIndex, String> = self.data.iter().map(|(k, v)| (*k, fr_to_string(v))).collect();
             tree.serialize_field("data", &map)?;
-        }  
+        }
         tree.end()
     }
 }
@@ -371,26 +371,23 @@ impl<'de> Deserialize<'de> for Tree {
     }
 }
 
-impl <'a> TreeLeafIter<'a> {
+impl<'a> TreeLeafIter<'a> {
     fn new(tree: &'a Tree) -> TreeLeafIter<'a> {
         let max_leaf_num = tree.max_leaf_num() as usize;
-        let iter = tree.data
+        let iter = tree
+            .data
             .iter()
-            .filter_map(move |(idx, fr)| if *idx < max_leaf_num {
-                Some((*idx, fr))
-            } else {
-                None
-            });
+            .filter_map(move |(idx, fr)| if *idx < max_leaf_num { Some((*idx, fr)) } else { None });
 
         Self {
             tree: tree,
             size: tree.data.len(),
-            data_iter: Box::new(iter)
+            data_iter: Box::new(iter),
         }
     }
 }
 
-impl <'a> Iterator for TreeLeafIter<'a> {
+impl<'a> Iterator for TreeLeafIter<'a> {
     type Item = (u32, &'a LeafType);
 
     fn next(&mut self) -> Option<Self::Item> {
