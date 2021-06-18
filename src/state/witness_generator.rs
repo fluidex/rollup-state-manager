@@ -561,8 +561,8 @@ impl WitnessGenerator {
     #[cfg(feature = "persist_sled")]
     pub fn dump_to_sled(&self, db: &sled::Db) {
         self.state.save_account_tree(db);
-        let account_trees = db.open_tree("account_trees").unwrap();
-        self.state.save_balance_trees(&account_trees);
+        let account_states = db.open_tree("account_states").unwrap();
+        self.state.save_account_state(&account_states);
         let balance_trees = db.open_tree("balance_trees").unwrap();
         self.state.save_balance_trees(&balance_trees);
         let order_trees = db.open_tree("order_trees").unwrap();
