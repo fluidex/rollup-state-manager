@@ -380,7 +380,7 @@ impl<'a> TreeLeafIter<'a> {
             .filter_map(move |(idx, fr)| if *idx < max_leaf_num { Some((*idx, fr)) } else { None });
 
         Self {
-            tree: tree,
+            tree,
             size: tree.data.len(),
             data_iter: Box::new(iter),
         }

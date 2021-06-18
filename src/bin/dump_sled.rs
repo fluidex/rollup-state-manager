@@ -33,8 +33,8 @@ fn main() -> Result<()> {
                 .get(bincode::serialize(&FrWrapper::from(hash)).unwrap())
                 .ok()
                 .flatten()
-                .expect(format!("Failed to find {} {}", id, fr_to_string(hash)).as_str());
-            let (stored_id, state): (u32, AccountState) = bincode::deserialize(v.as_ref()).ok().expect("Failed to deserialize");
+                .unwrap();
+            let (stored_id, state): (u32, AccountState) = bincode::deserialize(v.as_ref()).expect("Failed to deserialize");
             assert_eq!(id, stored_id);
             (stored_id, state)
         })

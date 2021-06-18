@@ -138,9 +138,9 @@ impl<'a> From<&'a Fr> for FrWrapper<'a> {
     }
 }
 
-impl<'a> Into<Fr> for FrWrapper<'a> {
-    fn into(self) -> Fr {
-        self.0.into_owned()
+impl<'a> From<FrWrapper<'a>> for Fr {
+    fn from(fr: FrWrapper<'a>) -> Self {
+        fr.0.into_owned()
     }
 }
 

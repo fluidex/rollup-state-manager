@@ -4,7 +4,9 @@
 use super::AccountState;
 use crate::types::l2::Order;
 use crate::types::merkle_tree::{MerkleProof, Tree};
-use crate::types::primitives::{Fr, FrWrapper};
+use crate::types::primitives::Fr;
+#[cfg(feature = "persist_sled")]
+use crate::types::primitives::FrWrapper;
 use anyhow::bail;
 use ff::Field;
 use fnv::FnvHashMap;
