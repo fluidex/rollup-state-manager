@@ -1,8 +1,10 @@
 // https://github1s.com/Fluidex/circuits/blob/HEAD/helper.ts/binary_merkle_tree.ts
-use std::collections::hash_map::Iter as HashMapIterator;
 use std::iter::Iterator;
 
 use super::primitives::{fr_bytes, hash, Fr};
+#[cfg(feature = "fr_string_repr")]
+use super::primitives::{fr_to_string, str_to_fr};
+
 pub use ff::{Field, PrimeField};
 use rayon::prelude::*;
 use serde::{ser::SerializeStruct, Deserialize, Serialize};
@@ -43,9 +45,10 @@ pub struct Tree {
 }
 
 /// [`Tree`] iterator
-pub struct TreeIter<'a> {
+pub struct TreeLeafIter<'a> {
     tree: &'a Tree,
-    data_iter: HashMapIterator<'a, NodeIndex, LeafType>,
+    size: usize,
+    data_iter: Box<dyn Iterator<Item = (NodeIndex, &'a LeafType)> + 'a>,
 }
 
 impl Tree {
@@ -70,11 +73,8 @@ impl Tree {
         }
     }
 
-    pub fn iter(&self) -> TreeIter {
-        TreeIter {
-            tree: self,
-            data_iter: self.data.iter(),
-        }
+    pub fn iter(&self) -> TreeLeafIter {
+        TreeLeafIter::new(self)
     }
 
     #[inline]
@@ -308,13 +308,23 @@ impl Serialize for Tree {
 
         let mut tree = serializer.serialize_struct("Tree", 3)?;
         tree.serialize_field("height", &self.height)?;
-        tree.serialize_field("default_leaf_node_value", &Wrapper(&self.default_nodes[0]))?;
-        let map: MerkleValueMapType<NodeIndex, Wrapper> = self.data.iter().map(|(k, v)| (*k, Wrapper(v))).collect();
-        tree.serialize_field("data", &map)?;
+        #[cfg(not(feature = "fr_string_repr"))] 
+        {
+            tree.serialize_field("default_leaf_node_value", &Wrapper(&self.default_nodes[0]))?;
+            let map: MerkleValueMapType<NodeIndex, Wrapper> = self.data.iter().map(|(k, v)| (*k, Wrapper(v))).collect();
+            tree.serialize_field("data", &map)?;
+        } 
+        #[cfg(feature = "fr_string_repr")] 
+        {
+            tree.serialize_field("default_leaf_node_value", &fr_to_string(&self.default_nodes[0]))?; 
+            let map: MerkleValueMapType<NodeIndex, String> = self.data.iter().map(|(k, v)| (*k, fr_to_string(v))).collect();
+            tree.serialize_field("data", &map)?;
+        }  
         tree.end()
     }
 }
 
+#[cfg(not(feature = "fr_string_repr"))]
 impl<'de> Deserialize<'de> for Tree {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -340,21 +350,57 @@ impl<'de> Deserialize<'de> for Tree {
     }
 }
 
-impl<'a> Iterator for TreeIter<'a> {
+#[cfg(feature = "fr_string_repr")]
+impl<'de> Deserialize<'de> for Tree {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct TreeWrapper {
+            height: usize,
+            default_leaf_node_value: String,
+            data: MerkleValueMapType<NodeIndex, String>,
+        }
+
+        let wrapper = TreeWrapper::deserialize(deserializer)?;
+        let mut tree = Tree::new(wrapper.height, str_to_fr(wrapper.default_leaf_node_value.as_str()));
+        tree.data = wrapper.data.into_iter().map(|(k, v)| (k, str_to_fr(v.as_str()))).collect();
+
+        Ok(tree)
+    }
+}
+
+impl <'a> TreeLeafIter<'a> {
+    fn new(tree: &'a Tree) -> TreeLeafIter<'a> {
+        let max_leaf_num = tree.max_leaf_num() as usize;
+        let iter = tree.data
+            .iter()
+            .filter_map(move |(idx, fr)| if *idx < max_leaf_num {
+                Some((*idx, fr))
+            } else {
+                None
+            });
+
+        Self {
+            tree: tree,
+            size: tree.data.len(),
+            data_iter: Box::new(iter)
+        }
+    }
+}
+
+impl <'a> Iterator for TreeLeafIter<'a> {
     type Item = (u32, &'a LeafType);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.data_iter
             .next()
-            .map(|(flattened, leaf)| (self.tree.from_flattened_idx(0, *flattened), leaf))
+            .map(|(flattened, leaf)| (self.tree.from_flattened_idx(0, flattened), leaf))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.tree.data.len(), Some(self.tree.data.len()))
-    }
-
-    fn count(self) -> usize {
-        self.tree.data.len()
+        (0, Some(self.size))
     }
 }
 

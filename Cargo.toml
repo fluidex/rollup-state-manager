@@ -63,4 +63,5 @@ path = "tests/global_state/bench.rs"
 [features]
 default = [ ]
 bench_global_state = [ ]
+fr_string_repr = [ ]
 persist_sled = [ "sled", "bincode" ]
