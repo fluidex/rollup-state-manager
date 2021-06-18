@@ -1,6 +1,6 @@
 use super::msg_consumer::{Simple, SimpleConsumer, SimpleMessageHandler};
 use rdkafka::consumer::StreamConsumer;
-use rdkafka::message::BorrowedMessage;
+use rdkafka::message::{BorrowedMessage, Message};
 use rollup_state_manager::test_utils::messages::{parse_msg, WrappedMessage};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -65,8 +65,6 @@ pub fn load_msgs_from_mq(
                         log::error!("Kafka consumer error: {}", err);
                     }
                 }
-
-                break;
             }
         });
 
@@ -79,8 +77,25 @@ struct MessageWriter {
 }
 
 impl SimpleMessageHandler for &MessageWriter {
-    fn on_message(&self, _msg: &BorrowedMessage<'_>) {
-        // Sends the message via channel.
-        todo!();
+    fn on_message(&self, msg: &BorrowedMessage<'_>) {
+        let msg_type = std::str::from_utf8(msg.key().unwrap()).unwrap();
+        let msg_payload = std::str::from_utf8(msg.payload().unwrap()).unwrap();
+        let message = match msg_type {
+            "balances" => {
+                let data = serde_json::from_str(msg_payload).unwrap();
+                WrappedMessage::BALANCE(data)
+            }
+            "orders" => {
+                let data = serde_json::from_str(msg_payload).unwrap();
+                WrappedMessage::ORDER(data)
+            }
+            "trades" => {
+                let data = serde_json::from_str(msg_payload).unwrap();
+                WrappedMessage::TRADE(data)
+            }
+            _ => unreachable!(),
+        };
+
+        self.sender.try_send(message).unwrap();
     }
 }

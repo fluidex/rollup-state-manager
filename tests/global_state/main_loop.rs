@@ -1,3 +1,4 @@
+#![allow(clippy::unnecessary_wraps)]
 #![allow(dead_code)]
 
 use rollup_state_manager::config;
@@ -29,6 +30,7 @@ fn replay_msgs(
 
         let mut processor = msg_processor::Processor::default();
 
+        let mut current_block_num = 0;
         let timing = Instant::now();
         for msg in msg_receiver.iter() {
             match msg {
@@ -44,14 +46,20 @@ fn replay_msgs(
                     processor.handle_order_msg(&mut witgen, order);
                 }
             }
+
+            // TODO: Checks if needs to invoke `flush_with_nop` on which condition.
+
+            let new_block_num = witgen.get_block_generate_num();
+            if new_block_num > current_block_num {
+                current_block_num = new_block_num;
+                println!(
+                    "genesis {} blocks (TPS: {})",
+                    current_block_num,
+                    (*test_utils::params::NTXS * current_block_num) as f32 / timing.elapsed().as_secs_f32()
+                );
+            }
         }
-        witgen.flush_with_nop();
-        let block_num = witgen.get_block_generate_num();
-        println!(
-            "genesis {} blocks (TPS: {})",
-            block_num,
-            (*test_utils::params::NTXS * block_num) as f32 / timing.elapsed().as_secs_f32()
-        );
+
         Ok(())
     }))
 }
@@ -66,7 +74,7 @@ fn run(settings: &config::Settings) {
     let _blocks: Vec<_> = blk_receiver.iter().collect();
 
     loader_thread.map(|h| h.join().expect("loader thread failed"));
-    replay_thread.map(|h| h.join().expect("replay thread failed"));
+    replay_thread.map(|h| h.join().expect("loader thread failed"));
 
     // Saves the blocks to DB.
     todo!();
