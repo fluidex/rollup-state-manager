@@ -1,9 +1,12 @@
+use std::borrow::Cow;
+
 use anyhow::{anyhow, Result};
 use ff::{from_hex, to_hex};
 use ff::{Field, PrimeField, PrimeFieldRepr};
 use lazy_static::lazy_static;
 use num_bigint::BigInt;
 use rust_decimal::Decimal;
+use serde::{ser, de, Serialize, Deserialize};
 //use std::str::FromStr;
 
 /*
@@ -22,10 +25,15 @@ pub fn hash(inputs: &[Fr]) -> Fr {
 
 // if use poseidon
 pub type Fr = poseidon_rs::Fr;
+
+#[derive(Clone)]
+pub struct FrWrapper<'a>(Cow<'a, Fr>);
+
 lazy_static! {
     //pub static ref POSEIDON_PARAMS: poseidon_rs::Constants = poseidon_rs::load_constants();
     pub static ref POSEIDON_HASHER: poseidon_rs::Poseidon = poseidon_rs::Poseidon::new();
 }
+
 pub fn hash(inputs: &[Fr]) -> Fr {
     (&POSEIDON_HASHER).hash(inputs.to_vec()).unwrap()
 }
@@ -110,6 +118,51 @@ pub fn fr_to_bool(f: &Fr) -> Result<bool> {
         Ok(true)
     } else {
         Err(anyhow!("invalid fr"))
+    }
+}
+
+impl <'a> From<Fr> for FrWrapper<'a> {
+    fn from(fr: Fr) -> Self {
+        Self(Cow::Owned(fr))
+    }
+}
+
+impl <'a> From<&'a Fr> for FrWrapper<'a> {
+    fn from(fr: &'a Fr) -> Self {
+        Self(Cow::Borrowed(fr))
+    }
+}
+
+impl <'a> Into<Fr> for FrWrapper<'a> {
+    fn into(self) -> Fr {
+        self.0.into_owned()
+    }
+}
+
+impl <'a> ser::Serialize for FrWrapper<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: ser::Serializer 
+    {
+        #[derive(Serialize)]
+        struct Wrapper<'a>(#[serde(with = "fr_bytes")] &'a Fr);
+
+        let wrapper = Wrapper(self.0.as_ref());
+        
+        wrapper.serialize(serializer)
+    }
+}
+
+
+impl <'a, 'de> de::Deserialize<'de> for FrWrapper<'a> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: de::Deserializer<'de> 
+    {
+        #[derive(Deserialize)]
+        struct Wrapper(#[serde(with = "fr_bytes")] Fr);
+
+        let wrapper = Wrapper::deserialize(deserializer)?;
+
+        Ok(FrWrapper::from(wrapper.0))
     }
 }
 
