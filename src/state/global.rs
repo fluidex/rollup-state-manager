@@ -402,7 +402,10 @@ impl GlobalState {
         assert!(self
             .accounts
             .iter()
-            .map(|(id, state)| db.insert(bincode::serialize(&FrWrapper::from(state.hash())).unwrap(), bincode::serialize(&(id, state)).unwrap()))
+            .map(|(id, state)| db.insert(
+                bincode::serialize(&FrWrapper::from(state.hash())).unwrap(),
+                bincode::serialize(&(id, state)).unwrap()
+            ))
             .all(|ret| ret.is_ok()))
     }
 

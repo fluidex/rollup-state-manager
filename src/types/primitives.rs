@@ -6,7 +6,7 @@ use ff::{Field, PrimeField, PrimeFieldRepr};
 use lazy_static::lazy_static;
 use num_bigint::BigInt;
 use rust_decimal::Decimal;
-use serde::{ser, de, Serialize, Deserialize};
+use serde::{de, ser, Deserialize, Serialize};
 //use std::str::FromStr;
 
 /*
@@ -121,41 +121,42 @@ pub fn fr_to_bool(f: &Fr) -> Result<bool> {
     }
 }
 
-impl <'a> From<Fr> for FrWrapper<'a> {
+impl<'a> From<Fr> for FrWrapper<'a> {
     fn from(fr: Fr) -> Self {
         Self(Cow::Owned(fr))
     }
 }
 
-impl <'a> From<&'a Fr> for FrWrapper<'a> {
+impl<'a> From<&'a Fr> for FrWrapper<'a> {
     fn from(fr: &'a Fr) -> Self {
         Self(Cow::Borrowed(fr))
     }
 }
 
-impl <'a> Into<Fr> for FrWrapper<'a> {
+impl<'a> Into<Fr> for FrWrapper<'a> {
     fn into(self) -> Fr {
         self.0.into_owned()
     }
 }
 
-impl <'a> ser::Serialize for FrWrapper<'a> {
+impl<'a> ser::Serialize for FrWrapper<'a> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: ser::Serializer 
+    where
+        S: ser::Serializer,
     {
         #[derive(Serialize)]
         struct Wrapper<'a>(#[serde(with = "fr_bytes")] &'a Fr);
 
         let wrapper = Wrapper(self.0.as_ref());
-        
+
         wrapper.serialize(serializer)
     }
 }
 
-
-impl <'a, 'de> de::Deserialize<'de> for FrWrapper<'a> {
+impl<'a, 'de> de::Deserialize<'de> for FrWrapper<'a> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: de::Deserializer<'de> 
+    where
+        D: de::Deserializer<'de>,
     {
         #[derive(Deserialize)]
         struct Wrapper(#[serde(with = "fr_bytes")] Fr);

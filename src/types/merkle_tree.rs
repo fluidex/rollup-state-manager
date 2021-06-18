@@ -45,7 +45,7 @@ pub struct Tree {
 /// [`Tree`] iterator
 pub struct TreeIter<'a> {
     tree: &'a Tree,
-    data_iter: HashMapIterator<'a, NodeIndex, LeafType>
+    data_iter: HashMapIterator<'a, NodeIndex, LeafType>,
 }
 
 impl Tree {
@@ -73,7 +73,7 @@ impl Tree {
     pub fn iter(&self) -> TreeIter {
         TreeIter {
             tree: self,
-            data_iter: self.data.iter()
+            data_iter: self.data.iter(),
         }
     }
 
@@ -123,7 +123,7 @@ impl Tree {
     pub fn parent_idx(&self, n: LeafIndex) -> LeafIndex {
         n >> 1
     }
-    
+
     #[inline(always)]
     fn level_offset(&self, level: usize) -> usize {
         (1usize << (self.height + 1)) - (1usize << (self.height - level + 1))
@@ -156,7 +156,7 @@ impl Tree {
         let new_hash = hash(&[lhs, rhs]);
         self.data.insert(self.get_flattened_idx(level, idx), new_hash);
     }
-    
+
     pub fn set_value(&mut self, idx: u32, value: LeafType) {
         let mut idx = idx;
         if self.get_leaf(idx) == value {
@@ -340,14 +340,13 @@ impl<'de> Deserialize<'de> for Tree {
     }
 }
 
-impl <'a> Iterator for TreeIter<'a> {
+impl<'a> Iterator for TreeIter<'a> {
     type Item = (u32, &'a LeafType);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.data_iter.next()
-        .map(|(flattened, leaf)| {
-            (self.tree.from_flattened_idx(0, *flattened), leaf)
-        })
+        self.data_iter
+            .next()
+            .map(|(flattened, leaf)| (self.tree.from_flattened_idx(0, *flattened), leaf))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
