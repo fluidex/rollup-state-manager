@@ -86,7 +86,7 @@ fn main() -> Result<()> {
         .collect();
 
     {
-        let mut order_trees_json = fs::File::create(&dump_path.join("balance_trees.jsonl"))?;
+        let mut order_trees_json = fs::File::create(&dump_path.join("order_trees.jsonl"))?;
         for (idx, tree) in loaded_order_trees.iter() {
             serde_json::to_writer(&mut order_trees_json, &(idx, tree))?;
             order_trees_json.write_all(b"\n")?;
