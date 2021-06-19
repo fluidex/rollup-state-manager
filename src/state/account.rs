@@ -1,23 +1,28 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/common.ts
 pub use crate::types::merkle_tree::MerklePath;
-use crate::types::primitives::fr_bytes;
 use crate::types::primitives::{hash, shl, Fr};
 use ff::Field;
 use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Default, Serialize, Deserialize)]
 pub struct AccountState {
-    #[serde(with = "fr_bytes")]
+    #[cfg_attr(not(feature = "fr_string_repr"), serde(with = "crate::types::primitives::fr_bytes"))]
+    #[cfg_attr(feature = "fr_string_repr", serde(with = "crate::types::primitives::fr_str"))]
     pub nonce: Fr,
-    #[serde(with = "fr_bytes")]
+    #[cfg_attr(not(feature = "fr_string_repr"), serde(with = "crate::types::primitives::fr_bytes"))]
+    #[cfg_attr(feature = "fr_string_repr", serde(with = "crate::types::primitives::fr_str"))]
     pub sign: Fr,
-    #[serde(with = "fr_bytes")]
+    #[cfg_attr(not(feature = "fr_string_repr"), serde(with = "crate::types::primitives::fr_bytes"))]
+    #[cfg_attr(feature = "fr_string_repr", serde(with = "crate::types::primitives::fr_str"))]
     pub balance_root: Fr,
-    #[serde(with = "fr_bytes")]
+    #[cfg_attr(not(feature = "fr_string_repr"), serde(with = "crate::types::primitives::fr_bytes"))]
+    #[cfg_attr(feature = "fr_string_repr", serde(with = "crate::types::primitives::fr_str"))]
     pub ay: Fr,
-    #[serde(with = "fr_bytes")]
+    #[cfg_attr(not(feature = "fr_string_repr"), serde(with = "crate::types::primitives::fr_bytes"))]
+    #[cfg_attr(feature = "fr_string_repr", serde(with = "crate::types::primitives::fr_str"))]
     pub eth_addr: Fr,
-    #[serde(with = "fr_bytes")]
+    #[cfg_attr(not(feature = "fr_string_repr"), serde(with = "crate::types::primitives::fr_bytes"))]
+    #[cfg_attr(feature = "fr_string_repr", serde(with = "crate::types::primitives::fr_str"))]
     pub order_root: Fr,
 }
 
