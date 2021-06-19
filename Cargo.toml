@@ -36,6 +36,7 @@ serde = { version = "1.0.124", features = [ "derive" ] }
 serde_derive = "1.0.90"
 serde_json = "1.0.64"
 sha2 = "0.9.5"
+sqlx = { version = "0.5.1", features = [ "runtime-tokio-rustls", "postgres", "chrono", "decimal", "json" ] }
 tokio = { version = "1.6.0", features = [ "full" ] }
 crossbeam-channel = "0.5.1"
 

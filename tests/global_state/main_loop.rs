@@ -3,15 +3,31 @@
 
 use rollup_state_manager::config;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
-use rollup_state_manager::test_utils;
 use rollup_state_manager::test_utils::l2::L2Block;
 use rollup_state_manager::test_utils::messages::WrappedMessage;
-use std::time::Instant;
+use rollup_state_manager::test_utils::{params, L2BlockSerde};
+use sqlx::postgres::PgPool;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 mod msg_consumer;
 mod msg_loader;
 mod msg_processor;
 mod types;
+
+#[tokio::main]
+async fn main() {
+    dotenv::dotenv().ok();
+    env_logger::init();
+    log::info!("state_keeper started");
+
+    let mut conf = config_rs::Config::new();
+    let config_file = dotenv::var("CONFIG").unwrap();
+    conf.merge(config_rs::File::with_name(&config_file)).unwrap();
+    let settings: config::Settings = conf.try_into().unwrap();
+    log::debug!("{:?}", settings);
+
+    run(&settings).await;
+}
 
 fn replay_msgs(
     msg_receiver: crossbeam_channel::Receiver<WrappedMessage>,
@@ -19,12 +35,12 @@ fn replay_msgs(
 ) -> Option<std::thread::JoinHandle<anyhow::Result<()>>> {
     Some(std::thread::spawn(move || {
         let state = GlobalState::new(
-            *test_utils::params::BALANCELEVELS,
-            *test_utils::params::ORDERLEVELS,
-            *test_utils::params::ACCOUNTLEVELS,
-            *test_utils::params::VERBOSE,
+            *params::BALANCELEVELS,
+            *params::ORDERLEVELS,
+            *params::ACCOUNTLEVELS,
+            *params::VERBOSE,
         );
-        let mut witgen = WitnessGenerator::new(state, *test_utils::params::NTXS, block_sender, *test_utils::params::VERBOSE);
+        let mut witgen = WitnessGenerator::new(state, *params::NTXS, block_sender, *params::VERBOSE);
 
         println!("genesis root {}", witgen.root());
 
@@ -47,15 +63,13 @@ fn replay_msgs(
                 }
             }
 
-            // TODO: Checks if needs to invoke `flush_with_nop` on which condition.
-
             let new_block_num = witgen.get_block_generate_num();
             if new_block_num > current_block_num {
                 current_block_num = new_block_num;
                 println!(
                     "genesis {} blocks (TPS: {})",
                     current_block_num,
-                    (*test_utils::params::NTXS * current_block_num) as f32 / timing.elapsed().as_secs_f32()
+                    (*params::NTXS * current_block_num) as f32 / timing.elapsed().as_secs_f32()
                 );
             }
         }
@@ -64,32 +78,38 @@ fn replay_msgs(
     }))
 }
 
-fn run(settings: &config::Settings) {
+async fn run(settings: &config::Settings) {
     let (msg_sender, msg_receiver) = crossbeam_channel::unbounded();
     let (blk_sender, blk_receiver) = crossbeam_channel::unbounded();
 
     let loader_thread = msg_loader::load_msgs_from_mq(&settings.brokers, msg_sender);
     let replay_thread = replay_msgs(msg_receiver, blk_sender);
 
-    let _blocks: Vec<_> = blk_receiver.iter().collect();
+    let db_pool = PgPool::connect(&settings.prover_cluster_db).await.unwrap();
+    for block in blk_receiver.iter() {
+        save_block_to_db(&db_pool, block).await.unwrap();
+    }
 
     loader_thread.map(|h| h.join().expect("loader thread failed"));
     replay_thread.map(|h| h.join().expect("loader thread failed"));
-
-    // Saves the blocks to DB.
-    todo!();
 }
 
-fn main() {
-    dotenv::dotenv().ok();
-    env_logger::init();
-    log::info!("state_keeper started");
+async fn save_block_to_db(pool: &PgPool, block: L2Block) -> anyhow::Result<()> {
+    let input = L2BlockSerde::from(block);
+    let task_id = unique_task_id();
 
-    let mut conf = config_rs::Config::new();
-    let config_file = dotenv::var("CONFIG").unwrap();
-    conf.merge(config_rs::File::with_name(&config_file)).unwrap();
-    let settings: config::Settings = conf.try_into().unwrap();
-    log::debug!("{:?}", settings);
+    sqlx::query("insert into task (task_id, circuit, input, status) values ($1, $2, $3, $4)")
+        .bind(task_id)
+        .bind("block")
+        .bind(sqlx::types::Json(input))
+        .bind("ready")
+        .fetch_one(pool)
+        .await?;
 
-    run(&settings);
+    Ok(())
+}
+
+fn unique_task_id() -> String {
+    let current_millis = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+    format!("task_{}", current_millis)
 }
