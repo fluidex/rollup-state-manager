@@ -172,6 +172,49 @@ impl<'a, 'de> de::Deserialize<'de> for FrWrapper<'a> {
     }
 }
 
+pub mod fr_str {
+
+    use super::*;
+    use serde::{de, ser};
+
+    #[doc(hidden)]
+    #[derive(Debug)]
+    pub struct FrStrVisitor;
+
+    pub fn serialize<S>(fr: &Fr, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        serializer.serialize_str(fr_to_string(fr).as_str())
+    }
+
+    pub fn deserialize<'de, D>(d: D) -> Result<Fr, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        d.deserialize_str(FrStrVisitor)
+    }
+
+    impl<'de> de::Visitor<'de> for FrStrVisitor {
+        type Value = Fr;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a Fr in be bytes repr")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            if let Ok(fr) = BigInt::from_str(v) {
+                Ok(bigint_to_fr(fr))
+            } else {
+                Err(de::Error::invalid_type(de::Unexpected::Str(v), &self))
+            }
+        }
+    }
+}
+
 pub mod fr_bytes {
 
     use super::*;
