@@ -1,9 +1,9 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/common.ts
 pub use crate::types::merkle_tree::MerklePath;
-#[cfg(feature = "fr_string_repr")]
-use crate::types::primitives::fr_str as fr_serde;
 #[cfg(not(feature = "fr_string_repr"))]
 use crate::types::primitives::fr_bytes as fr_serde;
+#[cfg(feature = "fr_string_repr")]
+use crate::types::primitives::fr_str as fr_serde;
 use crate::types::primitives::{hash, shl, Fr};
 use ff::Field;
 use serde::{Deserialize, Serialize};
