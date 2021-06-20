@@ -186,18 +186,13 @@ impl GlobalState {
         panic!("Cannot find order pos, please use larger order tree height");
     }
     pub fn get_next_account_id(&self) -> anyhow::Result<u32> {
-        // TODO: should this function return Err(...) when the tree is full?
-        // TODO: we may need to allow sparse account tree later,
-        // eg, account 1 and account 5 is created, while account 2/3/4 is empty
         let account_id = self.balance_trees.len() as u32;
         if account_id >= 2u32.pow(self.account_levels as u32) {
             bail!("account_id {} overflows for account_levels {}", account_id, self.account_levels);
         }
         Ok(account_id)
     }
-    // TODO: private or public? It is better this function is called automatically
-    // rather than being called manully by the caller
-    pub fn init_account(&mut self, account_id: u32, next_order_id: u32) -> anyhow::Result<u32> {
+    fn init_account(&mut self, account_id: u32, next_order_id: u32) -> anyhow::Result<u32> {
         if self.accounts.contains_key(&account_id) {
             return Ok(account_id);
         }

@@ -14,8 +14,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-mod msg_processor;
-mod types;
+use rollup_state_manager::msg::msg_processor;
 
 //if we use nightly build, we are able to use bench test ...
 fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {

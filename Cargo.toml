@@ -44,7 +44,7 @@ tokio = { version = "1.6.0", features = [ "full" ] }
 
 [[bin]]
 name = "rollup_state_manager"
-path = "tests/global_state/main_loop.rs"
+path = "src/bin/main.rs"
 
 [[bin]]
 name = "dump_sled"

@@ -1,7 +1,7 @@
 use super::msg_consumer::{Simple, SimpleConsumer, SimpleMessageHandler};
+use crate::test_utils::messages::{parse_msg, WrappedMessage};
 use rdkafka::consumer::StreamConsumer;
 use rdkafka::message::{BorrowedMessage, Message};
-use rollup_state_manager::test_utils::messages::{parse_msg, WrappedMessage};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
