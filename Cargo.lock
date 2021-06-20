@@ -657,9 +657,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d663548de7f5cca343f1e0a48d14dcfb0e9eb4e079ec58883b7251539fa10aeb"
 dependencies = [
  "build_const",
- ]
- 
- 
+]
+
 [[package]]
 name = "crc32fast"
 version = "1.2.1"
