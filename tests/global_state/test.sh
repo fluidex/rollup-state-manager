@@ -16,7 +16,7 @@ cd $REPO_DIR
 # make sure submodule is correctly cloned!!
 git submodule update --init --recursive
 if [ -z ${CI+x} ]; then git pull --recurse-submodules; fi
-cargo run --bin gen_global_state_testcase # debug mode for fast compile
+cargo run --features="persist_sled, fr_string_repr" --bin gen_global_state_testcase # debug mode for fast compile
 
 cd $REPO_DIR/circuits; npm i
 snarkit --version || npm -g install snarkit

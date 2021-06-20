@@ -1,15 +1,26 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/common.ts
 pub use crate::types::merkle_tree::MerklePath;
+#[cfg(not(feature = "fr_string_repr"))]
+use crate::types::primitives::fr_bytes as fr_serde;
+#[cfg(feature = "fr_string_repr")]
+use crate::types::primitives::fr_str as fr_serde;
 use crate::types::primitives::{hash, shl, Fr};
 use ff::Field;
+use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize)]
 pub struct AccountState {
+    #[serde(with = "fr_serde")]
     pub nonce: Fr,
+    #[serde(with = "fr_serde")]
     pub sign: Fr,
+    #[serde(with = "fr_serde")]
     pub balance_root: Fr,
+    #[serde(with = "fr_serde")]
     pub ay: Fr,
+    #[serde(with = "fr_serde")]
     pub eth_addr: Fr,
+    #[serde(with = "fr_serde")]
     pub order_root: Fr,
 }
 
