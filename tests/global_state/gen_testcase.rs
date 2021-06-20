@@ -7,6 +7,7 @@
 use anyhow::Result;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils;
+use rollup_state_manager::params;
 use rollup_state_manager::test_utils::l2::L2Block;
 use rollup_state_manager::test_utils::messages::WrappedMessage;
 use std::fs::{self};
@@ -25,12 +26,12 @@ fn replay_msgs(
 ) -> Option<std::thread::JoinHandle<anyhow::Result<()>>> {
     Some(std::thread::spawn(move || {
         let state = GlobalState::new(
-            *test_utils::params::BALANCELEVELS,
-            *test_utils::params::ORDERLEVELS,
-            *test_utils::params::ACCOUNTLEVELS,
-            *test_utils::params::VERBOSE,
+            *params::BALANCELEVELS,
+            *params::ORDERLEVELS,
+            *params::ACCOUNTLEVELS,
+            *params::VERBOSE,
         );
-        let mut witgen = WitnessGenerator::new(state, *test_utils::params::NTXS, block_sender, *test_utils::params::VERBOSE);
+        let mut witgen = WitnessGenerator::new(state, *params::NTXS, block_sender, *params::VERBOSE);
 
         println!("genesis root {}", witgen.root());
 
@@ -64,7 +65,7 @@ fn replay_msgs(
         println!(
             "genesis {} blocks (TPS: {})",
             block_num,
-            (*test_utils::params::NTXS * block_num) as f32 / timing.elapsed().as_secs_f32()
+            (*params::NTXS * block_num) as f32 / timing.elapsed().as_secs_f32()
         );
         Ok(())
     }))
@@ -89,10 +90,10 @@ pub fn run(src: &str) -> Result<()> {
         src: String::from("src/block.circom"),
         main: format!(
             "Block({}, {}, {}, {})",
-            *test_utils::params::NTXS,
-            *test_utils::params::BALANCELEVELS,
-            *test_utils::params::ORDERLEVELS,
-            *test_utils::params::ACCOUNTLEVELS
+            *params::NTXS,
+            *params::BALANCELEVELS,
+            *params::ORDERLEVELS,
+            *params::ACCOUNTLEVELS
         ),
     };
 
