@@ -5,9 +5,9 @@
 #![allow(clippy::unnecessary_wraps)]
 
 use anyhow::Result;
+use rollup_state_manager::params;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils;
-use rollup_state_manager::params;
 use rollup_state_manager::test_utils::l2::L2Block;
 use rollup_state_manager::test_utils::messages::WrappedMessage;
 use std::fs::{self};
