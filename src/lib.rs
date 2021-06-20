@@ -4,6 +4,7 @@
 #![allow(dead_code)]
 pub mod account;
 pub mod config;
+pub mod r#const;
 pub mod params;
 pub mod state;
 pub mod test_utils;
