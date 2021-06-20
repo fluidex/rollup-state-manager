@@ -1,6 +1,5 @@
 pub mod circuit;
 pub mod messages;
-pub mod params;
 pub mod types;
 
 pub use crate::types::l2;

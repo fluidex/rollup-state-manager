@@ -3,11 +3,9 @@
 use anyhow::Result;
 use ethers::prelude::coins_bip39::English;
 use rollup_state_manager::account::{self, Account};
+use rollup_state_manager::params;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
-use rollup_state_manager::test_utils::{
-    self,
-    messages::{parse_msg, WrappedMessage},
-};
+use rollup_state_manager::test_utils::messages::{parse_msg, WrappedMessage};
 use rollup_state_manager::types::l2;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
@@ -39,10 +37,10 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
 
     GlobalState::print_config();
     let state = GlobalState::new(
-        *test_utils::params::BALANCELEVELS,
-        *test_utils::params::ORDERLEVELS,
-        *test_utils::params::ACCOUNTLEVELS,
-        *test_utils::params::VERBOSE,
+        *params::BALANCELEVELS,
+        *params::ORDERLEVELS,
+        *params::ACCOUNTLEVELS,
+        *params::VERBOSE,
     );
 
     //amplify the records: in each iter we run records on a group of new accounts
@@ -79,7 +77,7 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
 
     let (sender, receiver) = crossbeam_channel::unbounded();
 
-    let mut witgen = WitnessGenerator::new(state, *test_utils::params::NTXS, sender, *test_utils::params::VERBOSE);
+    let mut witgen = WitnessGenerator::new(state, *params::NTXS, sender, *params::VERBOSE);
 
     let timing = Instant::now();
     let mut inner_timing = Instant::now();
@@ -126,7 +124,7 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     println!(
         "bench for {} blocks (TPS: {})",
         blocks.len(),
-        (*test_utils::params::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
+        (*params::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
     );
     Ok(blocks)
 }

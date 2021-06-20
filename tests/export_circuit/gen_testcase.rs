@@ -6,8 +6,9 @@ use std::path::{Path, PathBuf};
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/binary_merkle_tree.ts
 mod test_case {
     use ff::{Field, PrimeField};
+    use rollup_state_manager::params;
     use rollup_state_manager::state::block::Block;
-    use rollup_state_manager::test_utils::{self, fr_to_string, Fr};
+    use rollup_state_manager::test_utils::{fr_to_string, Fr};
     use rollup_state_manager::test_utils::{CircuitSource, CircuitTestCase, CircuitTestData};
     use rollup_state_manager::types::merkle_tree::Tree;
     use serde_json::json;
@@ -15,17 +16,17 @@ mod test_case {
     pub fn blocks() -> Vec<CircuitTestCase> {
         let main = format!(
             "Block({}, {}, {}, {})",
-            *test_utils::params::NTXS,
-            *test_utils::params::BALANCELEVELS,
-            *test_utils::params::ORDERLEVELS,
-            *test_utils::params::ACCOUNTLEVELS
+            *params::NTXS,
+            *params::BALANCELEVELS,
+            *params::ORDERLEVELS,
+            *params::ACCOUNTLEVELS
         );
         let test_data = Block::new(
-            *test_utils::params::NTXS,
-            *test_utils::params::BALANCELEVELS,
-            *test_utils::params::ORDERLEVELS,
-            *test_utils::params::ACCOUNTLEVELS,
-            *test_utils::params::VERBOSE,
+            *params::NTXS,
+            *params::BALANCELEVELS,
+            *params::ORDERLEVELS,
+            *params::ACCOUNTLEVELS,
+            *params::VERBOSE,
         )
         .test_data();
         test_data

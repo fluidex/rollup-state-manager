@@ -2,10 +2,11 @@
 #![allow(dead_code)]
 
 use rollup_state_manager::config;
+use rollup_state_manager::params;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils::l2::L2Block;
 use rollup_state_manager::test_utils::messages::WrappedMessage;
-use rollup_state_manager::test_utils::{params, L2BlockSerde};
+use rollup_state_manager::test_utils::L2BlockSerde;
 use sqlx::postgres::PgPool;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
