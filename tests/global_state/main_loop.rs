@@ -67,10 +67,13 @@ fn replay_msgs(
             let new_block_num = witgen.get_block_generate_num();
             if new_block_num > current_block_num {
                 current_block_num = new_block_num;
+                let secs = timing.elapsed().as_secs_f32();
                 println!(
-                    "genesis {} blocks (TPS: {})",
+                    "generate {} blocks with block_size {} in {}s: average TPS: {}",
                     current_block_num,
-                    (*params::NTXS * current_block_num) as f32 / timing.elapsed().as_secs_f32()
+                    *params::NTXS,
+                    secs,
+                    (*params::NTXS * current_block_num) as f32 / secs
                 );
             }
         }

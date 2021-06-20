@@ -1,3 +1,5 @@
+// copied from https://github.com/Fluidex/dingir-exchange/blob/master/src/message/consumer.rs
+
 use anyhow::{format_err, Result};
 use futures::StreamExt;
 use std::time::Duration;
