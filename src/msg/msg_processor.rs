@@ -1,15 +1,15 @@
+use crate::account::{Account, Signature};
+use crate::state::WitnessGenerator;
+use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
+use crate::types::l2::{self, OrderInput, OrderSide};
+use crate::types::primitives::{u32_to_fr, Fr};
+use crate::types::{fixnum, matchengine::messages};
 use num::Zero;
-use rollup_state_manager::account::{Account, Signature};
-use rollup_state_manager::state::WitnessGenerator;
-use rollup_state_manager::test_utils::types::{get_token_id_by_name, prec_token_id};
-use rollup_state_manager::types::l2::{self, OrderInput, OrderSide};
-use rollup_state_manager::types::primitives::{u32_to_fr, Fr};
-use rollup_state_manager::types::{fixnum, matchengine::messages};
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::time::Instant;
 
-use super::types::{
+use super::msg_utils::{
     assert_balance_state, assert_order_state, exchange_order_to_rollup_order, trade_to_order_state, TokenIdPair, TokenPair,
 };
 
