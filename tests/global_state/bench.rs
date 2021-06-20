@@ -2,18 +2,17 @@
 #![allow(unreachable_patterns)]
 use anyhow::Result;
 use ethers::prelude::coins_bip39::English;
+use pprof::protos::Message;
 use rollup_state_manager::account::{self, Account};
 use rollup_state_manager::params;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils::messages::{parse_msg, WrappedMessage};
 use rollup_state_manager::types::l2;
 use std::fs::{self, File};
+use std::io::Write;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-
-use pprof::protos::Message;
-use std::io::Write;
 
 mod msg_processor;
 mod types;
