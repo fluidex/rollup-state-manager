@@ -17,8 +17,8 @@ pub struct OrderInput {
     pub account_id: u32,
     pub side: OrderSide,
     pub order_id: u32,
-    pub tokenbuy: Fr,
-    pub tokensell: Fr,
+    pub token_buy: Fr,
+    pub token_sell: Fr,
     pub total_sell: Fr,
     pub total_buy: Fr,
     pub sig: Signature,
@@ -31,8 +31,8 @@ impl OrderInput {
         let data = hash(&[
             magic_head,
             primitives::u32_to_fr(self.order_id),
-            self.tokensell,
-            self.tokenbuy,
+            self.token_sell,
+            self.token_buy,
             self.total_sell,
             self.total_buy,
         ]);
@@ -50,8 +50,8 @@ pub struct Order {
     pub account_id: u32,
     pub order_id: u32,
     pub side: OrderSide,
-    pub tokenbuy: Fr,
-    pub tokensell: Fr,
+    pub token_buy: Fr,
+    pub token_sell: Fr,
     pub total_sell: Fr,
     pub total_buy: Fr,
     pub sig: Signature,
@@ -64,8 +64,8 @@ impl Default for Order {
     fn default() -> Self {
         Self {
             order_id: 0,
-            tokenbuy: Fr::zero(),
-            tokensell: Fr::zero(),
+            token_buy: Fr::zero(),
+            token_sell: Fr::zero(),
             filled_sell: Fr::zero(),
             filled_buy: Fr::zero(),
             total_sell: Fr::zero(),
@@ -81,8 +81,8 @@ impl Order {
     pub fn from_order_input(order_input: &OrderInput) -> Self {
         Self {
             order_id: order_input.order_id,
-            tokenbuy: order_input.tokenbuy,
-            tokensell: order_input.tokensell,
+            token_buy: order_input.token_buy,
+            token_sell: order_input.token_sell,
             total_sell: order_input.total_sell,
             total_buy: order_input.total_buy,
             sig: order_input.sig,
@@ -95,8 +95,8 @@ impl Order {
     pub fn hash(&self) -> Fr {
         let mut data = Fr::zero();
         data.add_assign(&u32_to_fr(self.order_id));
-        data.add_assign(&shl(&self.tokenbuy, 32));
-        data.add_assign(&shl(&self.tokensell, 64));
+        data.add_assign(&shl(&self.token_buy, 32));
+        data.add_assign(&shl(&self.token_sell, 64));
         hash(&[data, self.filled_sell, self.filled_buy, self.total_sell, self.total_buy])
     }
     pub fn is_filled(&self) -> bool {
@@ -107,6 +107,9 @@ impl Order {
         //self.filled_buy >= self.total_buy || self.filled_sell >= self.total_sell
         (self.side == OrderSide::Buy && self.filled_buy >= self.total_buy)
             || (self.side == OrderSide::Sell && self.filled_sell >= self.total_sell)
+    }
+    pub fn is_default(&self) -> bool {
+        self.total_sell.is_zero()
     }
     pub fn sign_with(&mut self, account: &Account) -> Result<(), String> {
         self.sig = account.sign_hash(self.hash())?;

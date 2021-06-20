@@ -46,6 +46,53 @@ impl<'c> From<TokenPair<'c>> for TokenIdPair {
     }
 }
 
+impl From<String> for TokenIdPair {
+    fn from(origin: String) -> Self {
+        let mut assets = origin.split('_');
+        let base = assets.next().unwrap();
+        let quote = assets.next().unwrap();
+        TokenIdPair(get_token_id_by_name(base), get_token_id_by_name(quote))
+    }
+}
+
+pub fn exchange_order_to_rollup_order(origin: &types::matchengine::messages::Order) -> l2::OrderInput {
+    assert!(origin.finished_base.is_zero());
+    assert!(origin.finished_quote.is_zero());
+    let TokenIdPair(base_token_id, quote_token_id) = origin.market.clone().into();
+    let base_prec = prec_token_id(base_token_id);
+    let quote_prec = prec_token_id(quote_token_id);
+    match origin.side {
+        types::matchengine::messages::OrderSide::ASK => {
+            l2::OrderInput {
+                order_id: origin.id as u32,
+                token_buy: types::primitives::u32_to_fr(quote_token_id),
+                token_sell: types::primitives::u32_to_fr(base_token_id),
+                //filled_sell: fixnum::decimal_to_amount(&origin.finished_base, base_token_id).to_fr(),
+                //filled_buy: fixnum::decimal_to_amount(&origin.finished_quote, quote_token_id).to_fr(),
+                total_sell: fixnum::decimal_to_amount(&origin.amount, base_prec).to_fr(),
+                total_buy: fixnum::decimal_to_amount(&(origin.amount * origin.price), quote_prec).to_fr(),
+                sig: Signature::default(),
+                account_id: origin.user,
+                side: OrderSide::Sell,
+            }
+        }
+        types::matchengine::messages::OrderSide::BID => {
+            l2::OrderInput {
+                order_id: origin.id as u32,
+                token_buy: types::primitives::u32_to_fr(base_token_id),
+                token_sell: types::primitives::u32_to_fr(quote_token_id),
+                //filled_sell: fixnum::decimal_to_amount(&origin.finished_quote, quote_token_id).to_fr(),
+                //filled_buy: fixnum::decimal_to_amount(&origin.finished_base, base_token_id).to_fr(),
+                total_sell: fixnum::decimal_to_amount(&(origin.amount * origin.price), quote_prec).to_fr(),
+                total_buy: fixnum::decimal_to_amount(&origin.amount, base_prec).to_fr(),
+                sig: Signature::default(),
+                account_id: origin.user,
+                side: OrderSide::Buy,
+            }
+        }
+    }
+}
+
 pub fn trade_to_order_state(
     state: &types::matchengine::messages::VerboseTradeState,
     trade: &types::matchengine::messages::TradeMessage,
@@ -132,8 +179,8 @@ impl From<OrderState> for types::l2::Order {
         types::l2::Order {
             order_id: origin.order_id,
             //status: types::primitives::u32_to_fr(origin.status),
-            tokenbuy: types::primitives::u32_to_fr(origin.token_buy),
-            tokensell: types::primitives::u32_to_fr(origin.token_sell),
+            token_buy: types::primitives::u32_to_fr(origin.token_buy),
+            token_sell: types::primitives::u32_to_fr(origin.token_sell),
             filled_sell: fixnum::decimal_to_amount(&origin.filled_sell, prec_token_id(origin.token_sell)).to_fr(),
             filled_buy: fixnum::decimal_to_amount(&origin.filled_buy, prec_token_id(origin.token_buy)).to_fr(),
             total_sell: fixnum::decimal_to_amount(&origin.total_sell, prec_token_id(origin.token_sell)).to_fr(),
@@ -153,8 +200,8 @@ impl From<OrderState> for types::l2::OrderInput {
     fn from(order_state: OrderState) -> Self {
         types::l2::OrderInput {
             order_id: order_state.order_id,
-            tokensell: u32_to_fr(order_state.token_sell),
-            tokenbuy: u32_to_fr(order_state.token_buy),
+            token_sell: u32_to_fr(order_state.token_sell),
+            token_buy: u32_to_fr(order_state.token_buy),
             total_sell: fixnum::decimal_to_amount(&order_state.total_sell, prec_token_id(order_state.token_sell)).to_fr(),
             total_buy: fixnum::decimal_to_amount(&order_state.total_buy, prec_token_id(order_state.token_buy)).to_fr(),
             sig: Signature::default(),

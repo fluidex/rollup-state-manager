@@ -47,7 +47,7 @@ pub struct GlobalState {
     account_tree: Arc<Mutex<Tree>>,
     // idx to balanceTree
     balance_trees: FnvHashMap<u32, Arc<Mutex<Tree>>>,
-    // user -> order_id -> order
+    // user -> order_pos -> order
     order_map: FnvHashMap<u32, BTreeMap<u32, Order>>,
     // (user, order_id) -> order_pos
     order_id_to_pos: FnvHashMap<(u32, u32), u32>,
@@ -165,8 +165,25 @@ impl GlobalState {
     pub fn has_account(&self, account_id: u32) -> bool {
         !self.get_account(account_id).ay.is_zero()
     }
-    fn get_next_order_pos_for_user(&self, account_id: u32) -> u32 {
-        *self.next_order_positions.get(&account_id).unwrap()
+
+    // find a position range 0..2**n where the slot is either empty or occupied by a close order
+    // so we can place the new order here
+    fn get_next_order_pos_for_user(&mut self, account_id: u32, order_id: u32) -> u32 {
+        let start_pos = *self.next_order_positions.get(&account_id).unwrap();
+        for i in 0..2u32.pow(self.order_levels as u32) {
+            let candidate_pos = (start_pos + i) % 2u32.pow(self.order_levels as u32);
+            let order = self.get_account_order_by_pos(account_id, candidate_pos);
+            let is_empty_or_filled = order.is_default() || order.is_filled();
+            if is_empty_or_filled {
+                // the order is already in the tree, so why here...
+                assert_ne!(order_id, order.order_id);
+                if order.order_id < order_id {
+                    self.next_order_positions.insert(account_id, candidate_pos + 1);
+                    return candidate_pos;
+                }
+            }
+        }
+        panic!("Cannot find order pos, please use larger order tree height");
     }
     pub fn get_next_account_id(&self) -> anyhow::Result<u32> {
         // TODO: should this function return Err(...) when the tree is full?
@@ -204,11 +221,11 @@ impl GlobalState {
         let account_id = self.get_next_account_id()?;
         self.init_account(account_id, next_order_id)
     }
-    pub fn get_order_pos_by_id(&self, account_id: u32, order_id: u32) -> u32 {
-        *self.order_id_to_pos.get(&(account_id, order_id)).unwrap()
+    pub fn get_order_pos_by_id(&self, account_id: u32, order_id: u32) -> Option<u32> {
+        self.order_id_to_pos.get(&(account_id, order_id)).cloned()
     }
-    fn get_order_id_by_pos(&self, account_id: u32, order_pos: u32) -> Option<&u32> {
-        self.order_pos_to_id.get(&(account_id, order_pos))
+    pub fn get_order_id_by_pos(&self, account_id: u32, order_pos: u32) -> Option<u32> {
+        self.order_pos_to_id.get(&(account_id, order_pos)).cloned()
     }
 
     pub fn set_account_order(&mut self, account_id: u32, order_pos: u32, order: Order) {
@@ -228,35 +245,18 @@ impl GlobalState {
         self.flush_account_state(account_id);
     }
 
-    // find a position range 0..2**n where the slot is either empty or occupied by a close order
-    // so we can place the new order here
-    fn update_next_order_pos(&mut self, account_id: u32, start_pos: u32) {
-        for i in 0..2u32.pow(self.order_levels as u32) {
-            let candidate_pos = (start_pos + i) % 2u32.pow(self.order_levels as u32);
-            let order = self.get_account_order_by_pos(account_id, candidate_pos);
-            let is_empty_or_filled = order.filled_buy >= order.total_buy || order.filled_sell >= order.total_sell;
-            if is_empty_or_filled {
-                self.next_order_positions.insert(account_id, candidate_pos);
-                return;
-            }
-        }
-        panic!("Cannot find order pos");
+    pub fn update_order_state(&mut self, account_id: u32, order_pos: u32, order: Order) {
+        self.order_map.get_mut(&account_id).unwrap().insert(order_pos, order);
     }
-
-    pub fn update_order_state(&mut self, account_id: u32, order: Order) {
-        self.order_map.get_mut(&account_id).unwrap().insert(order.order_id, order);
-    }
-    pub fn find_pos_for_order(&mut self, account_id: u32, order_id: u32) -> (u32, Order) {
-        if !self.has_order(account_id, order_id) {
-            panic!("invalid order {} {}", account_id, order_id);
-        }
-        match self.order_id_to_pos.get(&(account_id, order_id)) {
-            Some(pos) => (*pos, self.get_account_order_by_id(account_id, order_id)),
+    pub fn find_or_insert_order(&mut self, account_id: u32, order: &Order) -> (u32, Order) {
+        let order_id = order.order_id;
+        match self.get_order_pos_by_id(account_id, order_id) {
+            Some(pos) => (pos, self.get_account_order_by_pos(account_id, pos)),
             None => {
-                let pos = self.get_next_order_pos_for_user(account_id);
+                let pos = self.get_next_order_pos_for_user(account_id, order_id);
+                // old_order may be empty
                 let old_order = self.get_account_order_by_pos(account_id, pos);
                 self.link_order_pos_and_id(account_id, pos, order_id);
-                self.update_next_order_pos(account_id, pos + 1);
                 (pos, old_order)
             }
         }
@@ -352,16 +352,21 @@ impl GlobalState {
         tree.lock().unwrap().set_value(token_id, balance);
     }
     pub fn has_order(&self, account_id: u32, order_id: u32) -> bool {
-        self.order_map.contains_key(&account_id) && self.order_map.get(&account_id).unwrap().contains_key(&order_id)
+        self.order_id_to_pos.contains_key(&(account_id, order_id))
+        //self.order_map.contains_key(&account_id) && self.order_map.get(&account_id).unwrap().contains_key(&order_id)
     }
     fn get_account_order_by_pos(&self, account_id: u32, order_pos: u32) -> Order {
-        match self.get_order_id_by_pos(account_id, order_pos) {
-            Some(order_id) => self.get_account_order_by_id(account_id, *order_id),
-            None => Order::default(),
-        }
+        *self
+            .order_map
+            .get(&account_id)
+            .unwrap()
+            .get(&order_pos)
+            .unwrap_or(&Order::default())
     }
     pub fn get_account_order_by_id(&self, account_id: u32, order_id: u32) -> Order {
-        *self.order_map.get(&account_id).unwrap().get(&order_id).unwrap()
+        assert!(self.has_order(account_id, order_id));
+        let order_pos = self.get_order_pos_by_id(account_id, order_id).unwrap();
+        self.get_account_order_by_pos(account_id, order_pos)
     }
 
     pub fn trivial_order_path_elements(&self) -> Vec<[Fr; 1]> {

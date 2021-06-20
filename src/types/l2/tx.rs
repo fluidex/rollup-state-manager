@@ -78,8 +78,9 @@ pub struct SpotTradeTx {
 #[derive(Debug)]
 pub struct FullSpotTradeTx {
     pub trade: SpotTradeTx,
-    pub maker_order: order::Order,
-    pub taker_order: order::Order,
+    // when xx_order is none, GlobalState must already has the order
+    pub maker_order: Option<order::Order>,
+    pub taker_order: Option<order::Order>,
 }
 
 #[derive(Debug)]

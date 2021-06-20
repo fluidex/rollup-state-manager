@@ -103,6 +103,9 @@ pub struct TradeMessage {
     pub bid_order_id: u64,
     pub bid_role: MarketRole,
     pub bid_fee: Decimal,
+
+    pub bid_order: Option<Order>,
+    pub ask_order: Option<Order>,
     pub state_before: Option<VerboseTradeState>,
     pub state_after: Option<VerboseTradeState>,
 }
