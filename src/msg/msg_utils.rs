@@ -1,15 +1,10 @@
-#![allow(dead_code)]
-#![allow(clippy::upper_case_acronyms)]
-#![allow(clippy::large_enum_variant)]
-
+use crate::account::Signature;
+use crate::state::WitnessGenerator;
+use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
+use crate::types::l2::{self, OrderSide};
+use crate::types::primitives::{fr_to_decimal, u32_to_fr};
+use crate::types::{self, fixnum, matchengine};
 use num::Zero;
-use rollup_state_manager::account::Signature;
-use rollup_state_manager::state::WitnessGenerator;
-use rollup_state_manager::test_utils::types::{get_token_id_by_name, prec_token_id};
-use rollup_state_manager::types;
-use rollup_state_manager::types::fixnum;
-use rollup_state_manager::types::l2::{self, OrderSide};
-use rollup_state_manager::types::primitives::{fr_to_decimal, u32_to_fr};
 use rust_decimal::Decimal;
 
 #[derive(Clone, Copy)]
@@ -28,7 +23,7 @@ pub struct OrderState {
 
     pub order_id: u32,
     pub account_id: u32,
-    pub role: types::matchengine::messages::MarketRole,
+    pub role: matchengine::messages::MarketRole,
 }
 
 impl<'c> From<&'c str> for TokenPair<'c> {
@@ -55,14 +50,14 @@ impl From<String> for TokenIdPair {
     }
 }
 
-pub fn exchange_order_to_rollup_order(origin: &types::matchengine::messages::Order) -> l2::OrderInput {
+pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> l2::OrderInput {
     assert!(origin.finished_base.is_zero());
     assert!(origin.finished_quote.is_zero());
     let TokenIdPair(base_token_id, quote_token_id) = origin.market.clone().into();
     let base_prec = prec_token_id(base_token_id);
     let quote_prec = prec_token_id(quote_token_id);
     match origin.side {
-        types::matchengine::messages::OrderSide::ASK => {
+        matchengine::messages::OrderSide::ASK => {
             l2::OrderInput {
                 order_id: origin.id as u32,
                 token_buy: types::primitives::u32_to_fr(quote_token_id),
@@ -76,7 +71,7 @@ pub fn exchange_order_to_rollup_order(origin: &types::matchengine::messages::Ord
                 side: OrderSide::Sell,
             }
         }
-        types::matchengine::messages::OrderSide::BID => {
+        matchengine::messages::OrderSide::BID => {
             l2::OrderInput {
                 order_id: origin.id as u32,
                 token_buy: types::primitives::u32_to_fr(base_token_id),
@@ -94,8 +89,8 @@ pub fn exchange_order_to_rollup_order(origin: &types::matchengine::messages::Ord
 }
 
 pub fn trade_to_order_state(
-    state: &types::matchengine::messages::VerboseTradeState,
-    trade: &types::matchengine::messages::TradeMessage,
+    state: &matchengine::messages::VerboseTradeState,
+    trade: &matchengine::messages::TradeMessage,
 ) -> (OrderState, OrderState) {
     // ASK, BID
     let ask = &state.ask_order_state;
@@ -135,10 +130,10 @@ impl OrderState {
         self.filled_buy.is_zero() && self.filled_sell.is_zero()
     }
     pub fn parse(
-        origin: &types::matchengine::messages::VerboseOrderState,
+        origin: &matchengine::messages::VerboseOrderState,
         id_pair: TokenIdPair,
         side: &'static str,
-        trade: &types::matchengine::messages::TradeMessage,
+        trade: &matchengine::messages::TradeMessage,
     ) -> Self {
         match side {
             "ASK" => OrderState {
@@ -174,9 +169,9 @@ impl OrderState {
     }
 }
 
-impl From<OrderState> for types::l2::Order {
+impl From<OrderState> for l2::Order {
     fn from(origin: OrderState) -> Self {
-        types::l2::Order {
+        l2::Order {
             order_id: origin.order_id,
             //status: types::primitives::u32_to_fr(origin.status),
             token_buy: types::primitives::u32_to_fr(origin.token_buy),
@@ -196,9 +191,9 @@ impl From<OrderState> for types::l2::Order {
     }
 }
 
-impl From<OrderState> for types::l2::OrderInput {
+impl From<OrderState> for l2::OrderInput {
     fn from(order_state: OrderState) -> Self {
-        types::l2::OrderInput {
+        l2::OrderInput {
             order_id: order_state.order_id,
             token_sell: u32_to_fr(order_state.token_sell),
             token_buy: u32_to_fr(order_state.token_buy),
@@ -244,7 +239,7 @@ struct CommonBalanceState {
 }
 
 impl CommonBalanceState {
-    fn parse(origin: &types::matchengine::messages::VerboseBalanceState, _id_pair: TokenIdPair) -> Self {
+    fn parse(origin: &matchengine::messages::VerboseBalanceState, _id_pair: TokenIdPair) -> Self {
         CommonBalanceState {
             bid_user_base: origin.bid_user_base,
             bid_user_quote: origin.bid_user_quote,
@@ -267,7 +262,7 @@ impl CommonBalanceState {
 }
 
 pub fn assert_balance_state(
-    balance_state: &types::matchengine::messages::VerboseBalanceState,
+    balance_state: &matchengine::messages::VerboseBalanceState,
     witgen: &WitnessGenerator,
     bid_id: u32,
     ask_id: u32,

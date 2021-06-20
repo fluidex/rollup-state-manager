@@ -15,10 +15,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 mod export_circuit;
-mod msg_consumer;
-mod msg_loader;
-mod msg_processor;
-mod types;
+use rollup_state_manager::msg::{self, msg_consumer, msg_loader, msg_processor};
 
 fn replay_msgs(
     msg_receiver: crossbeam_channel::Receiver<WrappedMessage>,
