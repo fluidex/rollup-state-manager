@@ -5,6 +5,8 @@ use super::AccountState;
 use crate::types::l2::Order;
 use crate::types::merkle_tree::{MerkleProof, Tree};
 use crate::types::primitives::Fr;
+#[cfg(feature = "persist_sled")]
+use crate::types::primitives::FrWrapper;
 use anyhow::bail;
 use ff::Field;
 use fnv::FnvHashMap;
@@ -395,5 +397,41 @@ impl GlobalState {
     pub fn trivial_state_proof(&self) -> BalanceProof {
         // TODO: cache this
         self.balance_full_proof(0, 0)
+    }
+
+    #[cfg(feature = "persist_sled")]
+    pub fn save_account_state(&self, db: &sled::Tree) {
+        assert!(self
+            .accounts
+            .iter()
+            .map(|(id, state)| db.insert(
+                bincode::serialize(&FrWrapper::from(state.hash())).unwrap(),
+                bincode::serialize(&(id, state)).unwrap()
+            ))
+            .all(|ret| ret.is_ok()))
+    }
+
+    #[cfg(feature = "persist_sled")]
+    pub fn save_order_trees(&self, db: &sled::Tree) {
+        assert!(self
+            .order_trees
+            .iter()
+            .map(|(id, tree)| db.insert(bincode::serialize(id).unwrap(), bincode::serialize(&*tree.clone()).unwrap()))
+            .all(|ret| ret.is_ok()))
+    }
+
+    #[cfg(feature = "persist_sled")]
+    pub fn save_balance_trees(&self, db: &sled::Tree) {
+        assert!(self
+            .balance_trees
+            .iter()
+            .map(|(id, tree)| db.insert(bincode::serialize(id).unwrap(), bincode::serialize(&*tree.clone()).unwrap()))
+            .all(|ret| ret.is_ok()))
+    }
+
+    #[cfg(feature = "persist_sled")]
+    pub fn save_account_tree(&self, db: &sled::Db) {
+        db.insert("account_tree", bincode::serialize(&*self.account_tree.clone()).unwrap())
+            .unwrap();
     }
 }

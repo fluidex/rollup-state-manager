@@ -1,9 +1,13 @@
+use std::borrow::Cow;
+use std::str::FromStr;
+
 use anyhow::{anyhow, Result};
 use ff::{from_hex, to_hex};
 use ff::{Field, PrimeField, PrimeFieldRepr};
 use lazy_static::lazy_static;
 use num_bigint::BigInt;
 use rust_decimal::Decimal;
+use serde::{de, ser, Deserialize, Serialize};
 //use std::str::FromStr;
 
 /*
@@ -22,10 +26,15 @@ pub fn hash(inputs: &[Fr]) -> Fr {
 
 // if use poseidon
 pub type Fr = poseidon_rs::Fr;
+
+#[derive(Clone)]
+pub struct FrWrapper<'a>(Cow<'a, Fr>);
+
 lazy_static! {
     //pub static ref POSEIDON_PARAMS: poseidon_rs::Constants = poseidon_rs::load_constants();
     pub static ref POSEIDON_HASHER: poseidon_rs::Poseidon = poseidon_rs::Poseidon::new();
 }
+
 pub fn hash(inputs: &[Fr]) -> Fr {
     (&POSEIDON_HASHER).hash(inputs.to_vec()).unwrap()
 }
@@ -62,6 +71,10 @@ pub fn bigint_to_fr(x: BigInt) -> Fr {
         s.insert(0, '0');
     }
     from_hex(&s).unwrap()
+}
+pub fn str_to_fr(x: &str) -> Fr {
+    let i = BigInt::from_str(x).unwrap();
+    bigint_to_fr(i)
 }
 pub fn vec_to_fr(arr: &[u8]) -> Result<Fr> {
     if arr.len() > 32 {
@@ -110,5 +123,170 @@ pub fn fr_to_bool(f: &Fr) -> Result<bool> {
         Ok(true)
     } else {
         Err(anyhow!("invalid fr"))
+    }
+}
+
+impl<'a> From<Fr> for FrWrapper<'a> {
+    fn from(fr: Fr) -> Self {
+        Self(Cow::Owned(fr))
+    }
+}
+
+impl<'a> From<&'a Fr> for FrWrapper<'a> {
+    fn from(fr: &'a Fr) -> Self {
+        Self(Cow::Borrowed(fr))
+    }
+}
+
+impl<'a> From<FrWrapper<'a>> for Fr {
+    fn from(fr: FrWrapper<'a>) -> Self {
+        fr.0.into_owned()
+    }
+}
+
+impl<'a> ser::Serialize for FrWrapper<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        #[derive(Serialize)]
+        struct Wrapper<'a>(#[serde(with = "fr_bytes")] &'a Fr);
+
+        let wrapper = Wrapper(self.0.as_ref());
+
+        wrapper.serialize(serializer)
+    }
+}
+
+impl<'a, 'de> de::Deserialize<'de> for FrWrapper<'a> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Wrapper(#[serde(with = "fr_bytes")] Fr);
+
+        let wrapper = Wrapper::deserialize(deserializer)?;
+
+        Ok(FrWrapper::from(wrapper.0))
+    }
+}
+
+pub mod fr_str {
+
+    use super::*;
+    use serde::{de, ser};
+
+    #[doc(hidden)]
+    #[derive(Debug)]
+    pub struct FrStrVisitor;
+
+    pub fn serialize<S>(fr: &Fr, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        serializer.serialize_str(fr_to_string(fr).as_str())
+    }
+
+    pub fn deserialize<'de, D>(d: D) -> Result<Fr, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        d.deserialize_str(FrStrVisitor)
+    }
+
+    impl<'de> de::Visitor<'de> for FrStrVisitor {
+        type Value = Fr;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a Fr in be bytes repr")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            if let Ok(fr) = BigInt::from_str(v) {
+                Ok(bigint_to_fr(fr))
+            } else {
+                Err(de::Error::invalid_type(de::Unexpected::Str(v), &self))
+            }
+        }
+    }
+}
+
+pub mod fr_bytes {
+
+    use super::*;
+    use serde::{de, ser};
+
+    #[doc(hidden)]
+    #[derive(Debug)]
+    pub struct FrBytesVisitor;
+
+    pub fn serialize<S>(fr: &Fr, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        serializer.serialize_bytes(&fr_to_vec(fr))
+    }
+
+    pub fn deserialize<'de, D>(d: D) -> Result<Fr, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        d.deserialize_bytes(FrBytesVisitor)
+    }
+
+    impl<'de> de::Visitor<'de> for FrBytesVisitor {
+        type Value = Fr;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a Fr in be bytes repr")
+        }
+
+        fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            if let Ok(fr) = vec_to_fr(v) {
+                Ok(fr)
+            } else {
+                Err(de::Error::invalid_type(de::Unexpected::Bytes(v), &self))
+            }
+        }
+    }
+}
+
+pub mod fr_map {
+
+    use std::hash::Hash;
+
+    use super::*;
+    use fnv::FnvHashMap as MerkleValueMapType;
+    use serde::{de, ser, Deserialize, Serialize};
+
+    pub fn serialize<S, K>(fr: &MerkleValueMapType<K, Fr>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+        K: Eq + Hash + Serialize,
+    {
+        #[derive(Serialize)]
+        struct Wrapper<'a>(#[serde(with = "fr_bytes")] &'a Fr);
+
+        let map = fr.iter().map(|(k, v)| (k, Wrapper(v)));
+        serializer.collect_map(map)
+    }
+
+    pub fn deserialize<'de, D, K>(deserializer: D) -> Result<MerkleValueMapType<K, Fr>, D::Error>
+    where
+        D: de::Deserializer<'de>,
+        K: Eq + Hash + de::Deserialize<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Wrapper(#[serde(with = "fr_bytes")] Fr);
+
+        let map = MerkleValueMapType::<K, Wrapper>::deserialize(deserializer)?;
+        Ok(map.into_iter().map(|(k, Wrapper(v))| (k, v)).collect())
     }
 }

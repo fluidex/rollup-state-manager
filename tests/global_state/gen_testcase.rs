@@ -57,6 +57,10 @@ fn replay_msgs(
         }
         witgen.flush_with_nop();
         let block_num = witgen.get_block_generate_num();
+        if let Ok(path) = std::env::var("SLED_DB_PATH") {
+            let db = sled::open(&path).unwrap();
+            witgen.dump_to_sled(&db);
+        }
         println!(
             "genesis {} blocks (TPS: {})",
             block_num,
