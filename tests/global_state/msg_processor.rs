@@ -9,24 +9,44 @@ use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::time::Instant;
 
-use super::types::{assert_balance_state, assert_order_state, trade_to_order_state, TokenIdPair, TokenPair};
+use super::types::{
+    assert_balance_state, assert_order_state, exchange_order_to_rollup_order, trade_to_order_state, TokenIdPair, TokenPair,
+};
 
 // Preprocessor is used to attach order_sig for each order
 // it is only useful in development system
 // it should not be used in prod system
-#[derive(Default)]
 pub struct Processor {
     trade_tx_total_time: f32,
     balance_tx_total_time: f32,
     accounts: HashMap<u32, Account>,
+
     // (order_hash, bjj_key) -> sig
+    // only useful in debug mode
     order_sig_cache: HashMap<(Fr, String), Signature>,
+
     // FIXME: we cache the order twice? here and inside witgen
     // (uid, order_id) -> Order
     order_cache: HashMap<(u32, u32), OrderInput>,
+
     enable_check_order_sig: bool,
     enable_handle_order: bool,
 }
+
+impl Default for Processor {
+    fn default() -> Self {
+        Processor {
+            trade_tx_total_time: 0.0,
+            balance_tx_total_time: 0.0,
+            accounts: Default::default(),
+            order_sig_cache: Default::default(),
+            order_cache: Default::default(),
+            enable_check_order_sig: false,
+            enable_handle_order: false,
+        }
+    }
+}
+
 impl Processor {
     pub fn take_bench(&mut self) -> (f32, f32) {
         let ret = (self.trade_tx_total_time, self.balance_tx_total_time);
@@ -109,27 +129,42 @@ impl Processor {
         self.check_state(witgen, &trade.state_before, &trade);
 
         let timing = Instant::now();
-        if !self.enable_handle_order {
-            if let Some(state) = &trade.state_before {
-                // we disabled handling order msg,
-                // so we have to construct order from trade state msg
-                let (ask, bid) = trade_to_order_state(&state, &trade);
-                if ask.is_empty() {
-                    self.cache_order(&l2::OrderInput::from(ask));
+        let mut taker_order: Option<l2::Order> = None;
+        let mut maker_order: Option<l2::Order> = None;
+        if let Some(ask_order) = &trade.ask_order {
+            let mut order = exchange_order_to_rollup_order(&ask_order);
+            self.check_order_sig(&mut order);
+            assert!(!witgen.has_order(order.account_id, order.order_id));
+            let ask_order = l2::order::Order::from_order_input(&order);
+            match trade.ask_role {
+                messages::MarketRole::MAKER => {
+                    maker_order = Some(ask_order);
                 }
-                if bid.is_empty() {
-                    self.cache_order(&l2::OrderInput::from(bid));
+                messages::MarketRole::TAKER => {
+                    taker_order = Some(ask_order);
                 }
-            } else {
-                panic!("state of trade msg is empty");
-            }
+            };
         }
-
-        self.check_global_state_knows_order(witgen, trade.ask_user_id, trade.ask_order_id as u32);
-        self.check_global_state_knows_order(witgen, trade.bid_user_id, trade.bid_order_id as u32);
-
-        let trade_tx = self.trade_into_spot_tx(&trade);
-        witgen.spot_trade(trade_tx);
+        if let Some(bid_order) = &trade.bid_order {
+            let mut bid_order = exchange_order_to_rollup_order(&bid_order);
+            self.check_order_sig(&mut bid_order);
+            assert!(!witgen.has_order(bid_order.account_id, bid_order.order_id));
+            let bid_order = l2::order::Order::from_order_input(&bid_order);
+            match trade.bid_role {
+                messages::MarketRole::MAKER => {
+                    maker_order = Some(bid_order);
+                }
+                messages::MarketRole::TAKER => {
+                    taker_order = Some(bid_order);
+                }
+            };
+        }
+        let tx = l2::FullSpotTradeTx {
+            trade: self.trade_into_spot_tx(&trade),
+            taker_order,
+            maker_order,
+        };
+        witgen.full_spot_trade(tx);
         self.trade_tx_total_time += timing.elapsed().as_secs_f32();
         self.check_state(witgen, &trade.state_after, &trade);
     }
@@ -182,8 +217,8 @@ impl Processor {
 
         OrderInput {
             order_id: order.id as u32,
-            tokensell: u32_to_fr(tokensell),
-            tokenbuy: u32_to_fr(tokenbuy),
+            token_sell: u32_to_fr(tokensell),
+            token_buy: u32_to_fr(tokenbuy),
             total_sell: fixnum::decimal_to_amount(&total_sell, prec_token_id(tokensell)).to_fr(),
             total_buy: fixnum::decimal_to_amount(&total_buy, prec_token_id(tokenbuy)).to_fr(),
             sig: Signature::default(),
@@ -207,14 +242,14 @@ impl Processor {
         }
     }
 
-    fn check_global_state_knows_order(&self, witgen: &mut WitnessGenerator, account_id: u32, order_id: u32) {
-        if !witgen.has_order(account_id, order_id) {
-            //println!("check_global_state_knows_order {} {}", account_id, order_id);
-            let order = self.order_cache.get(&(account_id, order_id)).expect("no order found");
-            let order = l2::order::Order::from_order_input(&order);
-            witgen.update_order_state(order.account_id, order);
-        }
-    }
+    //fn check_global_state_knows_order(&self, witgen: &mut WitnessGenerator, account_id: u32, order_id: u32) {
+    //    if !witgen.has_order(account_id, order_id) {
+    //        //println!("check_global_state_knows_order {} {}", account_id, order_id);
+    //        let order = self.order_cache.get(&(account_id, order_id)).expect("no order found");
+    //        let order = l2::order::Order::from_order_input(&order);
+    //        witgen.update_order_state(order.account_id, order);
+    //    }
+    //}
     fn cache_order(&mut self, order_input: &OrderInput) {
         let mut order_input = *order_input;
         self.check_order_sig(&mut order_input);

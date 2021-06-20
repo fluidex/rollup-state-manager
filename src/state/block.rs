@@ -152,8 +152,8 @@ impl Block {
         let order_id1 = 1;
         let mut order1 = Order {
             order_id: order_id1,
-            tokenbuy: u32_to_fr(token_id1),
-            tokensell: u32_to_fr(token_id0),
+            token_buy: u32_to_fr(token_id1),
+            token_sell: u32_to_fr(token_id0),
             total_buy: decimal_to_amount(&Decimal::new(10000, 0), prec_token_id(token_id1)).to_fr(),
             total_sell: decimal_to_amount(&Decimal::new(1000, 0), prec_token_id(token_id0)).to_fr(),
             filled_buy: Fr::zero(),
@@ -172,8 +172,8 @@ impl Block {
         let order_id2 = 1;
         let mut order2 = Order {
             order_id: order_id2,
-            tokenbuy: u32_to_fr(token_id0),
-            tokensell: u32_to_fr(token_id1),
+            token_buy: u32_to_fr(token_id0),
+            token_sell: u32_to_fr(token_id1),
             total_buy: decimal_to_amount(&Decimal::new(1000, 0), prec_token_id(token_id0)).to_fr(),
             total_sell: decimal_to_amount(&Decimal::new(10000, 0), prec_token_id(token_id1)).to_fr(),
             filled_buy: Fr::zero(),
@@ -198,8 +198,8 @@ impl Block {
 
         let full_trade = l2::FullSpotTradeTx {
             trade,
-            maker_order: order1,
-            taker_order: order2,
+            maker_order: Some(order1),
+            taker_order: Some(order2),
         };
         witgen.full_spot_trade(full_trade);
 
