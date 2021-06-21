@@ -214,7 +214,7 @@ impl DepositTx {
             account_id,
             token_id,
             amount,
-            l2key: Some(L2Key { ay, sign, eth_addr }),
+            l2key: Some(L2Key { eth_addr, sign, ay }),
         })
     }
 }
