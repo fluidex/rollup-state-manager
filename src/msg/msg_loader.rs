@@ -22,9 +22,10 @@ pub fn load_msgs_from_file(
     }))
 }
 
-const BALANCES_TOPIC: &str = "balances";
-const ORDERS_TOPIC: &str = "orders";
-const TRADES_TOPIC: &str = "trades";
+const UNIFY_TOPIC: &str = "unifyevents";
+const MSG_TYPE_BALANCES: &str = "balances";
+const MSG_TYPE_ORDERS: &str = "orders";
+const MSG_TYPE_TRADES: &str = "trades";
 
 pub fn load_msgs_from_mq(
     brokers: &str,
@@ -49,11 +50,7 @@ pub fn load_msgs_from_mq(
             let consumer = std::sync::Arc::new(consumer);
             loop {
                 let cr_main = SimpleConsumer::new(consumer.as_ref())
-                    .add_topic(BALANCES_TOPIC, Simple::from(&writer))
-                    .unwrap()
-                    .add_topic(ORDERS_TOPIC, Simple::from(&writer))
-                    .unwrap()
-                    .add_topic(TRADES_TOPIC, Simple::from(&writer))
+                    .add_topic(UNIFY_TOPIC, Simple::from(&writer))
                     .unwrap();
 
                 tokio::select! {
@@ -79,18 +76,18 @@ struct MessageWriter {
 
 impl SimpleMessageHandler for &MessageWriter {
     fn on_message(&self, msg: &BorrowedMessage<'_>) {
-        let topic = msg.topic();
+        let msg_type = std::str::from_utf8(msg.key().unwrap()).unwrap();
         let msg_payload = std::str::from_utf8(msg.payload().unwrap()).unwrap();
-        let message = match topic {
-            BALANCES_TOPIC => {
+        let message = match msg_type {
+            MSG_TYPE_BALANCES => {
                 let data = serde_json::from_str(msg_payload).unwrap();
                 WrappedMessage::BALANCE(data)
             }
-            ORDERS_TOPIC => {
+            MSG_TYPE_ORDERS => {
                 let data = serde_json::from_str(msg_payload).unwrap();
                 WrappedMessage::ORDER(data)
             }
-            TRADES_TOPIC => {
+            MSG_TYPE_TRADES => {
                 let data = serde_json::from_str(msg_payload).unwrap();
                 WrappedMessage::TRADE(data)
             }
