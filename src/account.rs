@@ -380,6 +380,7 @@ impl<D: Digest> FixedOutput for ProxyDigest<D> {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryInto;
     use std::str::FromStr;
 
     use super::*;
@@ -388,15 +389,17 @@ mod tests {
 
     #[test]
     fn test_account() {
+        // Step1: test l2 keypair
         // https://github.com/Fluidex/circuits/blob/afeeda76e1309f3d8a14ec77ea082cb176acc90a/helper.ts/account_test.ts#L32
         let seed = hex::decode("87b34b2b842db0cc945659366068053f325ff227fd9c6788b2504ac2c4c5dc2a").unwrap();
         let acc: L2Account = L2Account::new(seed).unwrap();
         let priv_bigint = acc.priv_key.scalar_key().to_string();
+        let pubkey_expected = hex::decode("a59226beb68d565521497d38e37f7d09c9d4e97ac1ebc94fba5de524cb1ca4a0").unwrap();
         assert_eq!(
             priv_bigint,
             "4168145781671332788401281374517684700242591274637494106675223138867941841158"
         );
-        assert_eq!(acc.bjj_pub_key, "a59226beb68d565521497d38e37f7d09c9d4e97ac1ebc94fba5de524cb1ca4a0");
+        assert_eq!(hex::decode(acc.bjj_pub_key.clone()).unwrap(), pubkey_expected);
         assert_eq!(
             fr_to_bigint(&acc.ax).to_str_radix(16),
             "1fce25ec2e7eeec94079ec7866a933a8b21f33e0ebd575f3001d62d19251d455"
@@ -406,7 +409,11 @@ mod tests {
             "20a41ccb24e55dba4fc9ebc17ae9d4c9097d7fe3387d492155568db6be2692a5"
         );
         assert_eq!(acc.sign, u32_to_fr(1));
-        let sig = acc.sign_hash(Fr::from_str("1357924680").unwrap()).unwrap();
+
+        // Step2: test l2 sig
+        let msg = Fr::from_str("1357924680").unwrap();
+        let sig = acc.sign_hash(msg).unwrap();
+        let sig_packed_expected = hex::decode("7ddc5c6aadf5e80200bd9f28e9d5bf932cbb7f4224cce0fa11154f4ad24dc5831c295fb522b7b8b4921e271bc6b265f4d7114fbe9516d23e69760065053ca704").unwrap();
         assert_eq!(
             fr_to_string(&sig.r8x),
             "15679698175365968671287592821268512384454163537665670071564984871581219397966"
@@ -420,10 +427,14 @@ mod tests {
             "2104729104368328243963691045555606467740179640947024714099030450797354625308"
         );
         assert_eq!(acc.verify(sig), true);
-        assert_eq!(hex::encode(acc.sign_hash_packed(Fr::from_str("1357924680").unwrap()).unwrap()),
-          "7ddc5c6aadf5e80200bd9f28e9d5bf932cbb7f4224cce0fa11154f4ad24dc5831c295fb522b7b8b4921e271bc6b265f4d7114fbe9516d23e69760065053ca704",  
-        );
+        assert_eq!(acc.sign_hash_packed(msg).unwrap().to_vec(), sig_packed_expected);
 
+        // test sig verification of packed pubkey and packed sig
+        let sig_unpacked = babyjubjub_rs::decompress_signature(&sig_packed_expected.try_into().unwrap()).unwrap();
+        let pubkey_unpacked = babyjubjub_rs::decompress_point(pubkey_expected.try_into().unwrap()).unwrap();
+        assert!(babyjubjub_rs::verify(pubkey_unpacked, sig_unpacked, fr_to_bigint(&msg)));
+
+        // Step3: l1 sig -> l2 keypair
         // mnemonic => L1 account & eth addr & L2 account
         // https://github.com/Fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/account_test.ts#L7
         let mnemonic = Mnemonic::<English>::new_from_phrase("radar blur cabbage chef fix engine embark joy scheme fiction master release")
