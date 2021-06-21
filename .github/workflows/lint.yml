@@ -61,4 +61,4 @@ jobs:
         # continue-on-error: true
         with:
           command: clippy
-          args: --features="persist_sled" -- -D warnings
+          args: -- -D warnings
