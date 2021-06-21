@@ -137,6 +137,9 @@ impl L2Account {
             r8y: sig.r_b8.y,
         })
     }
+    pub fn sign_hash_packed(&self, hash: Fr) -> Result<[u8; 64], String> {
+        Ok(self.priv_key.sign(fr_to_bigint(&hash))?.compress())
+    }
     pub fn verify(&self, sig: Signature) -> bool {
         let msg = fr_to_bigint(&sig.hash);
         let r_b8 = Point { x: sig.r8x, y: sig.r8y };
@@ -414,6 +417,9 @@ mod tests {
             "2104729104368328243963691045555606467740179640947024714099030450797354625308"
         );
         assert_eq!(acc.verify(sig), true);
+        assert_eq!(hex::encode(acc.sign_hash_packed(Fr::from_str("1357924680").unwrap()).unwrap()),
+          "7ddc5c6aadf5e80200bd9f28e9d5bf932cbb7f4224cce0fa11154f4ad24dc5831c295fb522b7b8b4921e271bc6b265f4d7114fbe9516d23e69760065053ca704",  
+        );
 
         // mnemonic => L1 account & eth addr & L2 account
         // https://github.com/Fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/account_test.ts#L7
