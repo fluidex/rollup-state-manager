@@ -54,6 +54,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
+          args: --features "persist_sled" --
           # args: --release -- # debug mode for fast compile
 
 #      - name: Run "cargo bench"

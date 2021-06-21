@@ -20,7 +20,6 @@ use ethers::{
             },
             Secp256k1,
         },
-        rand::prelude::ThreadRng,
         types::{Address, H256},
     },
     prelude::coins_bip39::{English, Mnemonic, Wordlist},
@@ -235,7 +234,11 @@ pub fn rand_seed() -> Vec<u8> {
 
 pub fn random_mnemonic<W: Wordlist>() -> Mnemonic<W> {
     let mut rng = ethers::core::rand::thread_rng();
-    Mnemonic::<W>::new_with_count::<ThreadRng>(&mut rng, 24).unwrap()
+    random_mnemonic_with_rng(&mut rng)
+}
+
+pub fn random_mnemonic_with_rng<W: Wordlist, R: ethers::core::rand::Rng>(rng: &mut R) -> Mnemonic<W> {
+    Mnemonic::<W>::new_with_count::<R>(rng, 24).unwrap()
 }
 
 lazy_static! {
