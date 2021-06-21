@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use fnv::FnvHashMap;
+use rollup_state_manager::r#const::sled_db::{ACCOUNTSTATES_KEY, ACCOUNTTREE_KEY, BALANCETREES_KEY, ORDERTREES_KEY};
 use rollup_state_manager::state::AccountState;
 use rollup_state_manager::test_utils::fr_to_string;
 use rollup_state_manager::types::merkle_tree::Tree;
@@ -21,10 +22,13 @@ fn main() -> Result<()> {
 
     let db = sled::open(&sled_path).context("Failed to open sled")?;
 
-    let account_tree: Tree = db.get("account_tree")?.and_then(|v| bincode::deserialize(v.as_ref()).ok()).unwrap();
+    let account_tree: Tree = db
+        .get(ACCOUNTTREE_KEY)?
+        .and_then(|v| bincode::deserialize(v.as_ref()).ok())
+        .unwrap();
     serde_json::to_writer_pretty(&mut fs::File::create(&dump_path.join("account_tree.json"))?, &account_tree)?;
 
-    let account_states = db.open_tree("account_states").unwrap();
+    let account_states = db.open_tree(ACCOUNTSTATES_KEY).unwrap();
     let loaded_account_states: FnvHashMap<u32, AccountState> = account_tree
         .iter()
         .map(|(id, hash)| {
@@ -48,7 +52,7 @@ fn main() -> Result<()> {
         }
     }
 
-    let balance_trees = db.open_tree("balance_trees").unwrap();
+    let balance_trees = db.open_tree(BALANCETREES_KEY).unwrap();
     let loaded_balance_trees: FnvHashMap<u32, Tree> = loaded_account_states
         .iter()
         .map(|(id, _)| {
@@ -70,7 +74,7 @@ fn main() -> Result<()> {
         }
     }
 
-    let order_trees = db.open_tree("order_trees").unwrap();
+    let order_trees = db.open_tree(ORDERTREES_KEY).unwrap();
 
     let loaded_order_trees: FnvHashMap<u32, Tree> = loaded_account_states
         .iter()
