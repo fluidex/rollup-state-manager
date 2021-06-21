@@ -1,9 +1,11 @@
-use crate::account::{Account, Signature};
+use crate::account::{random_mnemonic_with_rng, Account, Signature};
 use crate::state::WitnessGenerator;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, OrderInput, OrderSide};
 use crate::types::primitives::{u32_to_fr, Fr};
 use crate::types::{fixnum, matchengine::messages};
+use ethers::core::rand::SeedableRng;
+use ethers::prelude::coins_bip39::English;
 use num::Zero;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
@@ -64,7 +66,13 @@ impl Processor {
         let token_id = get_token_id_by_name(&deposit.asset);
         let account_id = deposit.user_id;
         let is_old = witgen.has_account(account_id);
-        let account = self.accounts.entry(account_id).or_insert_with(|| Account::new(account_id));
+        let account = self.accounts.entry(account_id).or_insert_with(|| {
+            // create deterministic keypair for debugging
+            let mut r = ethers::core::rand::rngs::StdRng::seed_from_u64(account_id as u64);
+            let mnemonic = random_mnemonic_with_rng(&mut r);
+            //println!("mnemonic for account {} is {}", account_id, mnemonic.to_phrase().unwrap());
+            Account::from_mnemonic::<English>(account_id, &mnemonic).unwrap()
+        });
 
         let balance_before = deposit.balance - deposit.change;
         assert!(!balance_before.is_sign_negative(), "invalid balance {:?}", deposit);
