@@ -2,6 +2,7 @@
 #![allow(clippy::vec_init_then_push)]
 
 use super::global::{AccountUpdates, GlobalState};
+#[cfg(feature = "persist_sled")]
 use crate::r#const::sled_db::{ACCOUNTSTATES_KEY, BALANCETREES_KEY, ORDERTREES_KEY};
 use crate::types::l2::{tx_detail_idx, DepositTx, FullSpotTradeTx, L2Block, Order, RawTx, TransferTx, TxType, WithdrawTx, TX_LENGTH};
 use crate::types::merkle_tree::Tree;
