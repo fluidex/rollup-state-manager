@@ -2,6 +2,8 @@
 #![allow(clippy::vec_init_then_push)]
 
 use super::global::{AccountUpdates, GlobalState};
+#[cfg(feature = "persist_sled")]
+use crate::r#const::sled_db::{ACCOUNTSTATES_KEY, BALANCETREES_KEY, ORDERTREES_KEY};
 use crate::types::l2::{tx_detail_idx, DepositTx, FullSpotTradeTx, L2Block, Order, RawTx, TransferTx, TxType, WithdrawTx, TX_LENGTH};
 use crate::types::merkle_tree::Tree;
 use crate::types::primitives::{fr_add, fr_sub, u32_to_fr, Fr};
@@ -579,11 +581,11 @@ impl WitnessGenerator {
     #[cfg(feature = "persist_sled")]
     pub fn dump_to_sled(&self, db: &sled::Db) {
         self.state.save_account_tree(db);
-        let account_states = db.open_tree("account_states").unwrap();
+        let account_states = db.open_tree(ACCOUNTSTATES_KEY).unwrap();
         self.state.save_account_state(&account_states);
-        let balance_trees = db.open_tree("balance_trees").unwrap();
+        let balance_trees = db.open_tree(BALANCETREES_KEY).unwrap();
         self.state.save_balance_trees(&balance_trees);
-        let order_trees = db.open_tree("order_trees").unwrap();
+        let order_trees = db.open_tree(ORDERTREES_KEY).unwrap();
         self.state.save_order_trees(&order_trees);
     }
 }
