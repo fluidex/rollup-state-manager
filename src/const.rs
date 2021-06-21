@@ -1,3 +1,4 @@
+#[cfg(feature = "persist_sled")]
 pub mod sled_db {
     pub const ACCOUNTTREE_KEY: &str = "account_tree";
     pub const ACCOUNTSTATES_KEY: &str = "account_states";
