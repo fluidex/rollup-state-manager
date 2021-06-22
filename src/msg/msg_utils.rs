@@ -2,7 +2,11 @@ use crate::account::{Signature, SignatureBJJ};
 use crate::state::WitnessGenerator;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, OrderSide};
+<<<<<<< HEAD
 use crate::types::primitives::*;
+=======
+use crate::types::primitives::{bigint_to_fr, fr_to_decimal, u32_to_fr, Fr};
+>>>>>>> origin/master
 use crate::types::{self, fixnum, matchengine};
 use num::Zero;
 use rust_decimal::Decimal;
