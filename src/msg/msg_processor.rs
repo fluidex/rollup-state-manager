@@ -230,6 +230,7 @@ impl Processor {
             token_buy: u32_to_fr(tokenbuy),
             total_sell: fixnum::decimal_to_amount(&total_sell, prec_token_id(tokensell)).to_fr(),
             total_buy: fixnum::decimal_to_amount(&total_buy, prec_token_id(tokenbuy)).to_fr(),
+            // TODO:
             sig: SignatureBJJ::default(),
             account_id: order.user,
             side: if is_ask { OrderSide::Sell } else { OrderSide::Buy },
@@ -266,7 +267,8 @@ impl Processor {
     //}
     fn cache_order(&mut self, order_input: &mut OrderInput) {
         self.check_order_sig(order_input);
-        self.order_cache.insert((order_input.account_id, order_input.order_id), order_input.clone());
+        self.order_cache
+            .insert((order_input.account_id, order_input.order_id), order_input.clone());
         //println!("store order {} {}", order_input.account_id, order_input.order_id);
     }
     fn check_state(&self, witgen: &WitnessGenerator, trade_state: &Option<messages::VerboseTradeState>, trade: &messages::TradeMessage) {

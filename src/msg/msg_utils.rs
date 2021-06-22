@@ -52,45 +52,16 @@ impl From<String> for TokenIdPair {
     }
 }
 
-fn hash_order(order: &crate::types::matchengine::messages::Order) -> Fr {
-    let TokenIdPair(base_token_id, quote_token_id) = order.market.clone().into();
-    let (token_buy, token_sell) = match order.side {
-        matchengine::messages::OrderSide::ASK => (u32_to_fr(quote_token_id), u32_to_fr(base_token_id)),
-        matchengine::messages::OrderSide::BID => (u32_to_fr(base_token_id), u32_to_fr(quote_token_id)),
-    };
-    let base_prec = prec_token_id(base_token_id);
-    let quote_prec = prec_token_id(quote_token_id);
-    let (total_buy, total_sell) = match order.side {
-        matchengine::messages::OrderSide::ASK => (
-            fixnum::decimal_to_amount(&(order.amount * order.price), quote_prec).to_fr(),
-            fixnum::decimal_to_amount(&order.amount, base_prec).to_fr(),
-        ),
-        matchengine::messages::OrderSide::BID => (
-            fixnum::decimal_to_amount(&order.amount, base_prec).to_fr(),
-            fixnum::decimal_to_amount(&(order.amount * order.price), quote_prec).to_fr(),
-        ),
-    };
+impl From<Option<String>> for SignatureBJJ {
+    fn from(signature: Option<String>) -> SignatureBJJ {
+        if signature.is_none() {
+            return SignatureBJJ::default();
+        }
 
-    // copy from https://github.com/Fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/state-utils.ts#L38
-    // TxType::PlaceOrder
-    let magic_head = u32_to_fr(4);
-    let data = hash(&[magic_head, u32_to_fr(order.id as u32), token_sell, token_buy, total_sell, total_buy]);
-    //data = hash([data, accountID, nonce]);
-    // nonce and orderID seems redundant?
-
-    // account_id is not needed if the hash is signed later?
-    //data = hash(&[data, primitives::u32_to_fr(self.account_id)]);
-    data
-}
-
-fn extract_signature(order: &matchengine::messages::Order) -> SignatureBJJ {
-    if order.signature.as_ref().is_none() {
-        return SignatureBJJ::default();
+        let sig_packed_vec = hex::decode(&(signature.unwrap())).unwrap();
+        let sig_unpacked: babyjubjub_rs::Signature = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
+        unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_unpacked) }
     }
-
-    let sig_packed_vec = hex::decode(&(order.signature.as_ref().unwrap())).unwrap();
-    let sig_unpacked: babyjubjub_rs::Signature = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
-    unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_unpacked) }
 }
 
 pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> l2::OrderInput {
@@ -109,7 +80,7 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
                 //filled_buy: fixnum::decimal_to_amount(&origin.finished_quote, quote_token_id).to_fr(),
                 total_sell: fixnum::decimal_to_amount(&origin.amount, base_prec).to_fr(),
                 total_buy: fixnum::decimal_to_amount(&(origin.amount * origin.price), quote_prec).to_fr(),
-                sig: extract_signature(origin),
+                sig: origin.signature.clone().into(),
                 account_id: origin.user,
                 side: OrderSide::Sell,
             }
@@ -123,7 +94,7 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
                 //filled_buy: fixnum::decimal_to_amount(&origin.finished_base, base_token_id).to_fr(),
                 total_sell: fixnum::decimal_to_amount(&(origin.amount * origin.price), quote_prec).to_fr(),
                 total_buy: fixnum::decimal_to_amount(&origin.amount, base_prec).to_fr(),
-                sig: extract_signature(origin),
+                sig: origin.signature.clone().into(),
                 account_id: origin.user,
                 side: OrderSide::Buy,
             }
