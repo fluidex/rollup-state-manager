@@ -1,5 +1,5 @@
 #![allow(clippy::let_and_return)]
-use crate::types::primitives::{self, hash, shl, u32_to_fr, Fr};
+use crate::types::primitives::{hash, shl, u32_to_fr, Fr};
 
 use crate::account::{Account, Signature};
 
@@ -25,23 +25,7 @@ pub struct OrderInput {
 }
 impl OrderInput {
     pub fn hash(&self) -> Fr {
-        // copy from https://github.com/Fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/state-utils.ts#L38
-        // TxType::PlaceOrder
-        let magic_head = primitives::u32_to_fr(4);
-        let data = hash(&[
-            magic_head,
-            primitives::u32_to_fr(self.order_id),
-            self.token_sell,
-            self.token_buy,
-            self.total_sell,
-            self.total_buy,
-        ]);
-        //data = hash([data, accountID, nonce]);
-        // nonce and orderID seems redundant?
-
-        // account_id is not needed if the hash is signed later?
-        //data = hash(&[data, primitives::u32_to_fr(self.account_id)]);
-        data
+        self.sig.hash
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq)]
