@@ -29,3 +29,16 @@ pub fn get_mnemonic_by_account_id(account_id: u32) -> Mnemonic<English> {
     //println!("mnemonic for account {} is {}", account_id, mnemonic.to_phrase().unwrap());
     mnemonic
 }
+
+#[cfg(test)]
+#[test]
+fn print_test_accounts() {
+    let num = 20;
+    for i in 0..num {
+        println!(
+            "{{\"account_id\": {}, \"mnemonic\": \"{}\"}}",
+            i,
+            get_mnemonic_by_account_id(i).to_phrase().unwrap()
+        );
+    }
+}
