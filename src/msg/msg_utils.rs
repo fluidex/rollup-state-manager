@@ -57,6 +57,10 @@ fn hash_order(_order: &crate::types::matchengine::messages::Order) -> Fr {
 }
 
 fn extract_signature(order: &matchengine::messages::Order) -> Signature {
+    if let None = order.signature.as_ref() {
+        return Signature::default();
+    }
+
     let sig_packed_vec = hex::decode(&(order.signature.as_ref().unwrap())).unwrap();
     let sig_unpacked: babyjubjub_rs::Signature = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
     // unsafe
