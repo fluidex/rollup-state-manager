@@ -53,23 +53,21 @@ impl From<String> for TokenIdPair {
 
 fn hash_order(order: &crate::types::matchengine::messages::Order) -> Fr {
     let TokenIdPair(base_token_id, quote_token_id) = order.market.clone().into();
-    let token_buy = match order.side {
-        matchengine::messages::OrderSide::ASK => u32_to_fr(quote_token_id),
-        matchengine::messages::OrderSide::BID => u32_to_fr(base_token_id),
-    };
-    let token_sell = match order.side {
-        matchengine::messages::OrderSide::ASK => u32_to_fr(base_token_id),
-        matchengine::messages::OrderSide::BID => u32_to_fr(quote_token_id),
+    let (token_buy, token_sell) = match order.side {
+        matchengine::messages::OrderSide::ASK => (u32_to_fr(quote_token_id), u32_to_fr(base_token_id)),
+        matchengine::messages::OrderSide::BID => (u32_to_fr(base_token_id), u32_to_fr(quote_token_id)),
     };
     let base_prec = prec_token_id(base_token_id);
     let quote_prec = prec_token_id(quote_token_id);
-    let total_buy = match order.side {
-        matchengine::messages::OrderSide::ASK => fixnum::decimal_to_amount(&(order.amount * order.price), quote_prec).to_fr(),
-        matchengine::messages::OrderSide::BID => fixnum::decimal_to_amount(&order.amount, base_prec).to_fr(),
-    };
-    let total_sell = match order.side {
-        matchengine::messages::OrderSide::ASK => fixnum::decimal_to_amount(&order.amount, base_prec).to_fr(),
-        matchengine::messages::OrderSide::BID => fixnum::decimal_to_amount(&(order.amount * order.price), quote_prec).to_fr(),
+    let (total_buy, total_sell) = match order.side {
+        matchengine::messages::OrderSide::ASK => (
+            fixnum::decimal_to_amount(&(order.amount * order.price), quote_prec).to_fr(),
+            fixnum::decimal_to_amount(&order.amount, base_prec).to_fr(),
+        ),
+        matchengine::messages::OrderSide::BID => (
+            fixnum::decimal_to_amount(&order.amount, base_prec).to_fr(),
+            fixnum::decimal_to_amount(&(order.amount * order.price), quote_prec).to_fr(),
+        ),
     };
 
     // copy from https://github.com/Fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/state-utils.ts#L38
