@@ -96,7 +96,29 @@ impl Order {
         }
     }
     pub fn hash(&self) -> Fr {
-        self.sig.hash
+        // let mut data = Fr::zero();
+        // data.add_assign(&u32_to_fr(self.order_id));
+        // data.add_assign(&shl(&self.token_buy, 32));
+        // data.add_assign(&shl(&self.token_sell, 64));
+        // hash(&[data, self.filled_sell, self.filled_buy, self.total_sell, self.total_buy])
+        
+        // copy from https://github.com/Fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/state-utils.ts#L38
+        // TxType::PlaceOrder
+        let magic_head = u32_to_fr(4);
+        let data = hash(&[
+            magic_head,
+            u32_to_fr(self.order_id),
+            self.token_sell,
+            self.token_buy,
+            self.total_sell,
+            self.total_buy,
+        ]);
+        //data = hash([data, accountID, nonce]);
+        // nonce and orderID seems redundant?
+
+        // account_id is not needed if the hash is signed later?
+        //data = hash(&[data, u32_to_fr(self.account_id)]);
+        data
     }
     pub fn is_filled(&self) -> bool {
         //debug_assert!(self.filled_buy <= self.total_buy, "too much filled buy");
