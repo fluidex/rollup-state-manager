@@ -253,7 +253,7 @@ pub fn get_l2_block_test_case() -> CircuitTestCase {
     CircuitTestCase {
         source: CircuitSource {
             src: "src/block.circom".to_owned(),
-            main: main.to_owned(),
+            main,
         },
         data: test_data,
     }
