@@ -1,11 +1,10 @@
-use crate::account::{random_mnemonic_with_rng, Account, Signature, SignatureBJJ};
+use crate::account::{Account, Signature, SignatureBJJ};
 use crate::state::WitnessGenerator;
-use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
+use crate::test_utils::types::{get_mnemonic_by_account_id, get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, OrderInput, OrderSide};
 use crate::types::primitives::{fr_to_bigint, u32_to_fr, Fr};
 use crate::types::{fixnum, matchengine::messages};
 use babyjubjub_rs::Point;
-use ethers::core::rand::SeedableRng;
 use ethers::prelude::coins_bip39::English;
 use num::Zero;
 use rust_decimal::Decimal;
@@ -69,9 +68,7 @@ impl Processor {
         let is_old = witgen.has_account(account_id);
         let account = self.accounts.entry(account_id).or_insert_with(|| {
             // create deterministic keypair for debugging
-            let mut r = ethers::core::rand::rngs::StdRng::seed_from_u64(account_id as u64);
-            let mnemonic = random_mnemonic_with_rng(&mut r);
-            //println!("mnemonic for account {} is {}", account_id, mnemonic.to_phrase().unwrap());
+            let mnemonic = get_mnemonic_by_account_id(account_id);
             Account::from_mnemonic::<English>(account_id, &mnemonic).unwrap()
         });
 
@@ -81,7 +78,7 @@ impl Processor {
         let expected_balance_before = witgen.get_token_balance(deposit.user_id, token_id);
         assert_eq!(
             expected_balance_before,
-            fixnum::decimal_to_amount(&balance_before, prec_token_id(token_id)).to_fr()
+            fixnum::decimal_to_fr(&balance_before, prec_token_id(token_id))
         );
 
         let timing = Instant::now();
@@ -228,8 +225,8 @@ impl Processor {
             order_id: order.id as u32,
             token_sell: u32_to_fr(tokensell),
             token_buy: u32_to_fr(tokenbuy),
-            total_sell: fixnum::decimal_to_amount(&total_sell, prec_token_id(tokensell)).to_fr(),
-            total_buy: fixnum::decimal_to_amount(&total_buy, prec_token_id(tokenbuy)).to_fr(),
+            total_sell: fixnum::decimal_to_fr(&total_sell, prec_token_id(tokensell)),
+            total_buy: fixnum::decimal_to_fr(&total_buy, prec_token_id(tokenbuy)),
             sig: order.signature.clone().into(),
             account_id: order.user,
             side: if is_ask { OrderSide::Sell } else { OrderSide::Buy },

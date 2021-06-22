@@ -1,14 +1,16 @@
-use crate::account::{Account, Signature};
-use crate::state::global::GlobalState;
-use crate::state::witness_generator::WitnessGenerator;
-use crate::test_utils::types::prec_token_id;
-use crate::test_utils::{CircuitTestData, L2BlockSerde};
-use crate::types::fixnum::decimal_to_amount;
-use crate::types::l2::{self, DepositTx, L2Key, Order, SpotTradeTx, TransferTx, WithdrawTx};
-use crate::types::primitives::{u32_to_fr, Fr};
 use ff::Field;
+use rollup_state_manager::account::{Account, Signature};
+use rollup_state_manager::state::global::GlobalState;
+use rollup_state_manager::state::witness_generator::WitnessGenerator;
+use rollup_state_manager::test_utils::circuit::{CircuitSource, CircuitTestCase, CircuitTestData};
+use rollup_state_manager::test_utils::types::prec_token_id;
+use rollup_state_manager::types::fixnum::{decimal_to_amount, decimal_to_fr};
+use rollup_state_manager::types::l2::{self, DepositTx, L2BlockSerde, L2Key, Order, SpotTradeTx, TransferTx, WithdrawTx};
+use rollup_state_manager::types::primitives::{u32_to_fr, Fr};
 use rust_decimal::Decimal;
 use serde_json::json;
+
+use rollup_state_manager::params;
 
 pub struct Block {
     n_txs: usize,
@@ -154,8 +156,8 @@ impl Block {
             order_id: order_id1,
             token_buy: u32_to_fr(token_id1),
             token_sell: u32_to_fr(token_id0),
-            total_buy: decimal_to_amount(&Decimal::new(10000, 0), prec_token_id(token_id1)).to_fr(),
-            total_sell: decimal_to_amount(&Decimal::new(1000, 0), prec_token_id(token_id0)).to_fr(),
+            total_buy: decimal_to_fr(&Decimal::new(10000, 0), prec_token_id(token_id1)),
+            total_sell: decimal_to_fr(&Decimal::new(1000, 0), prec_token_id(token_id0)),
             filled_buy: Fr::zero(),
             filled_sell: Fr::zero(),
             sig: Signature::default(),
@@ -174,8 +176,8 @@ impl Block {
             order_id: order_id2,
             token_buy: u32_to_fr(token_id0),
             token_sell: u32_to_fr(token_id1),
-            total_buy: decimal_to_amount(&Decimal::new(1000, 0), prec_token_id(token_id0)).to_fr(),
-            total_sell: decimal_to_amount(&Decimal::new(10000, 0), prec_token_id(token_id1)).to_fr(),
+            total_buy: decimal_to_fr(&Decimal::new(1000, 0), prec_token_id(token_id0)),
+            total_sell: decimal_to_fr(&Decimal::new(10000, 0), prec_token_id(token_id1)),
             filled_buy: Fr::zero(),
             filled_sell: Fr::zero(),
             sig: Signature::default(),
@@ -210,7 +212,7 @@ impl Block {
             .map(|(i, block)| CircuitTestData {
                 name: format!("nonempty_block_{}", i),
                 input: json!(L2BlockSerde::from(block)),
-                output: json!({}),
+                output: None,
             })
             .collect()
     }
@@ -227,7 +229,32 @@ impl Block {
         CircuitTestData {
             name: "empty_block".to_owned(),
             input: json!(L2BlockSerde::from(block)),
-            output: json!({}),
+            output: None,
         }
+    }
+}
+
+pub fn get_l2_block_test_case() -> CircuitTestCase {
+    let main = format!(
+        "Block({}, {}, {}, {})",
+        *params::NTXS,
+        *params::BALANCELEVELS,
+        *params::ORDERLEVELS,
+        *params::ACCOUNTLEVELS
+    );
+    let test_data = Block::new(
+        *params::NTXS,
+        *params::BALANCELEVELS,
+        *params::ORDERLEVELS,
+        *params::ACCOUNTLEVELS,
+        *params::VERBOSE,
+    )
+    .test_data();
+    CircuitTestCase {
+        source: CircuitSource {
+            src: "src/block.circom".to_owned(),
+            main,
+        },
+        data: test_data,
     }
 }
