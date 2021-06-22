@@ -549,5 +549,13 @@ mod tests {
         let mut buf: [u8; 64] = [0; 64];
         buf[..].copy_from_slice(&b[..]);
         assert_eq!(sig_compressed, buf, "different approaches to get sig_compressed");
+
+        let signature = Signature {
+            hash: order.hash(),
+            s: bigint_to_fr(order.sig.s),
+            r8x: order.sig.r_b8.x,
+            r8y: order.sig.r_b8.y,
+        };
+        assert!(acc.l2_account.verify(signature));
     }
 }
