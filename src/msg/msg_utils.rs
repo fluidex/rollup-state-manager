@@ -57,9 +57,8 @@ fn hash_order(_order: &crate::types::matchengine::messages::Order) -> String {
 
 use crate::account::SignatureBJJ;
 use std::convert::TryInto;
-// TODO: remove lifetime annotation?
-impl<'c> From<&'c matchengine::messages::Order> for crate::account::Signature {
-    fn from(order: &'c matchengine::messages::Order) -> Self {
+impl From<&matchengine::messages::Order> for crate::account::Signature {
+    fn from(order: &matchengine::messages::Order) -> Self {
         let order_hash = hash_order(order);
 
         let sig_packed_vec = hex::decode(&order.signature).unwrap();
