@@ -56,13 +56,19 @@ impl Default for Signature {
     }
 }
 
+fn hash_order(order: &crate::types::matchengine::messages::Order) -> String {
+    unimplemented!()
+}
+
 impl Signature {
     // without 0x_prefix
-    pub fn from_str(order_hash: &str, order_sig: &str) -> Self {
-        let sig_packed_vec = hex::decode(order_sig).unwrap();
+    pub fn from_order_msg(order: &crate::types::matchengine::messages::Order) -> Self {
+        let order_hash = hash_order(order);
+
+        let sig_packed_vec = hex::decode(&order.signature).unwrap();
         let sig_unpacked = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
         Self {
-            hash: str_to_fr(order_hash),
+            hash: str_to_fr(&order_hash),
         }
     }
 }
