@@ -26,6 +26,8 @@ pub struct OrderState {
     pub order_id: u32,
     pub account_id: u32,
     pub role: matchengine::messages::MarketRole,
+
+    pub signature: Option<String>,
 }
 
 impl<'c> From<&'c str> for TokenPair<'c> {
@@ -122,6 +124,10 @@ pub fn trade_to_order_state(
             order_id: trade.ask_order_id as u32,
             account_id: trade.ask_user_id,
             role: trade.ask_role,
+            signature: match &trade.ask_order {
+                Some(o) => o.signature.clone(),
+                None => None,
+            },
         },
         OrderState {
             side: "BID",
@@ -134,6 +140,10 @@ pub fn trade_to_order_state(
             order_id: trade.bid_order_id as u32,
             account_id: trade.bid_user_id,
             role: trade.bid_role,
+            signature: match &trade.bid_order {
+                Some(o) => o.signature.clone(),
+                None => None,
+            },
         },
     )
 }
@@ -163,6 +173,10 @@ impl OrderState {
                 order_id: trade.ask_order_id as u32,
                 account_id: trade.ask_user_id,
                 role: trade.ask_role,
+                signature: match &trade.ask_order {
+                    Some(o) => o.signature.clone(),
+                    None => None,
+                },
             },
             "BID" => OrderState {
                 //origin,
@@ -177,6 +191,10 @@ impl OrderState {
                 order_id: trade.bid_order_id as u32,
                 account_id: trade.bid_user_id,
                 role: trade.bid_role,
+                signature: match &trade.bid_order {
+                    Some(o) => o.signature.clone(),
+                    None => None,
+                },
             },
             _ => unreachable!(),
         }
@@ -214,8 +232,7 @@ impl From<OrderState> for l2::OrderInput {
             token_buy: u32_to_fr(order_state.token_buy),
             total_sell: fixnum::decimal_to_amount(&order_state.total_sell, prec_token_id(order_state.token_sell)).to_fr(),
             total_buy: fixnum::decimal_to_amount(&order_state.total_buy, prec_token_id(order_state.token_buy)).to_fr(),
-            // TODO:
-            sig: SignatureBJJ::default(),
+            sig: order_state.signature.clone().into(),
             account_id: order_state.account_id,
             side: if order_state.side.to_lowercase() == "buy" || order_state.side.to_lowercase() == "bid" {
                 OrderSide::Buy
