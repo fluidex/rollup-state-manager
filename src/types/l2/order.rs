@@ -96,6 +96,12 @@ impl Order {
         }
     }
     pub fn hash(&self) -> Fr {
+        // if already signed
+        if self.sig != Signature::default() {
+            return self.sig.hash;
+        }
+
+        // otherwise mock a hash
         let mut data = Fr::zero();
         data.add_assign(&u32_to_fr(self.order_id));
         data.add_assign(&shl(&self.token_buy, 32));
