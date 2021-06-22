@@ -491,5 +491,14 @@ mod tests {
     }
 
     #[test]
-    fn test_order_signature() {}
+    fn test_order_signature() {
+        // https://github.com/Fluidex/rollup-state-manager/blob/master/tests/data/accounts.jsonl account id 1
+        let mnemonic = Mnemonic::<English>::new_from_phrase("olympic comfort palm large heavy verb acid lion attract vast dash memory olympic syrup announce sure body cruise flip merge fabric frame question result")
+            .expect("should generate mnemonic from phrase");
+        let acc = Account::from_mnemonic(0, &mnemonic).expect("should generate account from mnemonic");
+        assert_eq!(
+            acc.l2_account.bjj_pub_key,
+            "5d182c51bcfe99583d7075a7a0c10d96bef82b8a059c4bf8c5f6e7124cf2bba3"
+        );
+    }
 }
