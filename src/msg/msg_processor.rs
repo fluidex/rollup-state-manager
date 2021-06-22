@@ -137,11 +137,11 @@ impl Processor {
         let timing = Instant::now();
         let mut taker_order: Option<l2::Order> = None;
         let mut maker_order: Option<l2::Order> = None;
-        if let Some(ask_order) = &trade.ask_order {
-            let mut order = exchange_order_to_rollup_order(&ask_order);
-            self.check_order_sig(&mut order);
-            assert!(!witgen.has_order(order.account_id, order.order_id));
-            let ask_order = l2::order::Order::from_order_input(&order);
+        if let Some(ask_order_origin) = &trade.ask_order {
+            let mut ask_order_input = exchange_order_to_rollup_order(&ask_order_origin);
+            self.check_order_sig(&mut ask_order_input);
+            assert!(!witgen.has_order(ask_order_input.account_id, ask_order_input.order_id));
+            let ask_order = l2::Order::from(ask_order_input);
             match trade.ask_role {
                 messages::MarketRole::MAKER => {
                     maker_order = Some(ask_order);
@@ -151,11 +151,11 @@ impl Processor {
                 }
             };
         }
-        if let Some(bid_order) = &trade.bid_order {
-            let mut bid_order = exchange_order_to_rollup_order(&bid_order);
-            self.check_order_sig(&mut bid_order);
-            assert!(!witgen.has_order(bid_order.account_id, bid_order.order_id));
-            let bid_order = l2::order::Order::from_order_input(&bid_order);
+        if let Some(bid_order_origin) = &trade.bid_order {
+            let mut bid_order_input = exchange_order_to_rollup_order(&bid_order_origin);
+            self.check_order_sig(&mut bid_order_input);
+            assert!(!witgen.has_order(bid_order_input.account_id, bid_order_input.order_id));
+            let bid_order = l2::Order::from(bid_order_input);
             match trade.bid_role {
                 messages::MarketRole::MAKER => {
                     maker_order = Some(bid_order);

@@ -1,12 +1,11 @@
-use ff::Field;
-use rollup_state_manager::account::{Account, Signature};
+use rollup_state_manager::account::Account;
 use rollup_state_manager::state::global::GlobalState;
 use rollup_state_manager::state::witness_generator::WitnessGenerator;
 use rollup_state_manager::test_utils::circuit::{CircuitSource, CircuitTestCase, CircuitTestData};
 use rollup_state_manager::test_utils::types::prec_token_id;
 use rollup_state_manager::types::fixnum::{decimal_to_amount, decimal_to_fr};
-use rollup_state_manager::types::l2::{self, DepositTx, L2BlockSerde, L2Key, Order, SpotTradeTx, TransferTx, WithdrawTx};
-use rollup_state_manager::types::primitives::{u32_to_fr, Fr};
+use rollup_state_manager::types::l2::{self, DepositTx, L2BlockSerde, L2Key, OrderInput, SpotTradeTx, TransferTx, WithdrawTx};
+use rollup_state_manager::types::primitives::u32_to_fr;
 use rust_decimal::Decimal;
 use serde_json::json;
 
@@ -152,15 +151,13 @@ impl Block {
 
         // order1
         let order_id1 = 1;
-        let mut order1 = Order {
+        let mut order1 = OrderInput {
             order_id: order_id1,
             token_buy: u32_to_fr(token_id1),
             token_sell: u32_to_fr(token_id0),
             total_buy: decimal_to_fr(&Decimal::new(10000, 0), prec_token_id(token_id1)),
             total_sell: decimal_to_fr(&Decimal::new(1000, 0), prec_token_id(token_id0)),
-            filled_buy: Fr::zero(),
-            filled_sell: Fr::zero(),
-            sig: Signature::default(),
+            sig: Default::default(),
             account_id: 1,
             side: l2::order::OrderSide::Buy,
         };
@@ -172,15 +169,13 @@ impl Block {
         //witgen.set_account_order(account_id1, order_id1, order1);
         // order2
         let order_id2 = 1;
-        let mut order2 = Order {
+        let mut order2 = OrderInput {
             order_id: order_id2,
             token_buy: u32_to_fr(token_id0),
             token_sell: u32_to_fr(token_id1),
             total_buy: decimal_to_fr(&Decimal::new(1000, 0), prec_token_id(token_id0)),
             total_sell: decimal_to_fr(&Decimal::new(10000, 0), prec_token_id(token_id1)),
-            filled_buy: Fr::zero(),
-            filled_sell: Fr::zero(),
-            sig: Signature::default(),
+            sig: Default::default(),
             account_id: 2,
             side: l2::order::OrderSide::Buy,
         };
@@ -200,8 +195,8 @@ impl Block {
 
         let full_trade = l2::FullSpotTradeTx {
             trade,
-            maker_order: Some(order1),
-            taker_order: Some(order2),
+            maker_order: Some(order1.into()),
+            taker_order: Some(order2.into()),
         };
         witgen.full_spot_trade(full_trade);
 

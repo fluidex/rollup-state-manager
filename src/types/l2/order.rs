@@ -41,6 +41,11 @@ impl OrderInput {
         //data = hash(&[data, u32_to_fr(self.account_id)]);
         data
     }
+    pub fn sign_with(&mut self, account: &Account) -> Result<(), String> {
+        let hash = self.hash();
+        self.sig = account.sign_hash_raw(hash)?;
+        Ok(())
+    }
 }
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Order {
@@ -75,8 +80,8 @@ impl Default for Order {
     }
 }
 
-impl Order {
-    pub fn from_order_input(order_input: &OrderInput) -> Self {
+impl From<OrderInput> for Order {
+    fn from(order_input: OrderInput) -> Order {
         Self {
             order_id: order_input.order_id,
             token_buy: order_input.token_buy,
@@ -95,6 +100,9 @@ impl Order {
             filled_buy: Fr::zero(),
         }
     }
+}
+
+impl Order {
     pub fn hash(&self) -> Fr {
         let mut data = Fr::zero();
         data.add_assign(&u32_to_fr(self.order_id));
@@ -113,10 +121,6 @@ impl Order {
     }
     pub fn is_default(&self) -> bool {
         self.total_sell.is_zero()
-    }
-    pub fn sign_with(&mut self, account: &Account) -> Result<(), String> {
-        self.sig = account.sign_hash(self.hash())?;
-        Ok(())
     }
     pub fn trade_with(&mut self, sell: &Fr, buy: &Fr) {
         // TODO: check overflow?
