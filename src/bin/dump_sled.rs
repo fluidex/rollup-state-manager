@@ -8,7 +8,7 @@ use fnv::FnvHashMap;
 use rollup_state_manager::r#const::sled_db::{ACCOUNTSTATES_KEY, ACCOUNTTREE_KEY, BALANCETREES_KEY, ORDERTREES_KEY};
 use rollup_state_manager::state::AccountState;
 use rollup_state_manager::types::merkle_tree::Tree;
-use rollup_state_manager::types::primitives::{FrWrapper, fr_to_string};
+use rollup_state_manager::types::primitives::{fr_to_string, FrWrapper};
 
 fn main() -> Result<()> {
     let sled_path: PathBuf = env::var("SLED_DB_PATH")
