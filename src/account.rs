@@ -61,6 +61,8 @@ fn hash_order(order: &crate::types::matchengine::messages::Order) -> String {
     unimplemented!()
 }
 
+
+// TODO: move to msg_utils
 impl Signature {
     // without 0x_prefix
     pub fn from_order_msg(order: &crate::types::matchengine::messages::Order) -> Self {
