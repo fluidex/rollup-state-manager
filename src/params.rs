@@ -24,4 +24,8 @@ lazy_static! {
         .unwrap_or_else(|_| false.to_string())
         .parse::<bool>()
         .unwrap_or(false);
+    pub static ref OVERWRITE_SIGNATURE: bool = std::env::var("OVERWRITE_SIGNATURE")
+        .unwrap_or_else(|_| false.to_string())
+        .parse::<bool>()
+        .unwrap_or(false);
 }
