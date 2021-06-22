@@ -1,11 +1,12 @@
-use crate::account::Signature;
+use crate::account::{Signature, SignatureBJJ};
 use crate::state::WitnessGenerator;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, OrderSide};
-use crate::types::primitives::{bigint_to_fr, fr_to_decimal, str_to_fr, u32_to_fr};
+use crate::types::primitives::{bigint_to_fr, fr_to_decimal, u32_to_fr, Fr};
 use crate::types::{self, fixnum, matchengine};
 use num::Zero;
 use rust_decimal::Decimal;
+use std::convert::TryInto;
 
 #[derive(Clone, Copy)]
 pub struct TokenIdPair(pub u32, pub u32);
@@ -51,26 +52,20 @@ impl From<String> for TokenIdPair {
 }
 
 // TODO:
-fn hash_order(_order: &crate::types::matchengine::messages::Order) -> String {
+fn hash_order(_order: &crate::types::matchengine::messages::Order) -> Fr {
     unimplemented!()
 }
 
-use crate::account::SignatureBJJ;
-use std::convert::TryInto;
-impl From<&matchengine::messages::Order> for crate::account::Signature {
-    fn from(order: &matchengine::messages::Order) -> Self {
-        let order_hash = hash_order(order);
-
-        let sig_packed_vec = hex::decode(&order.signature).unwrap();
-        let sig_unpacked: babyjubjub_rs::Signature = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
-        // unsafe
-        let sig: SignatureBJJ = unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_unpacked) };
-        Self {
-            hash: str_to_fr(&order_hash),
-            s: bigint_to_fr(sig.s),
-            r8x: sig.r_b8.x,
-            r8y: sig.r_b8.y,
-        }
+fn extract_signature(order: &matchengine::messages::Order) -> Signature {
+    let sig_packed_vec = hex::decode(&(order.signature.as_ref().unwrap())).unwrap();
+    let sig_unpacked: babyjubjub_rs::Signature = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
+    // unsafe
+    let sig: SignatureBJJ = unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_unpacked) };
+    Signature {
+        hash: hash_order(order),
+        s: bigint_to_fr(sig.s),
+        r8x: sig.r_b8.x,
+        r8y: sig.r_b8.y,
     }
 }
 
@@ -91,7 +86,7 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
                 total_sell: fixnum::decimal_to_amount(&origin.amount, base_prec).to_fr(),
                 total_buy: fixnum::decimal_to_amount(&(origin.amount * origin.price), quote_prec).to_fr(),
                 // sig: Signature::default(),
-                sig: origin.into(),
+                sig: extract_signature(origin),
                 account_id: origin.user,
                 side: OrderSide::Sell,
             }
@@ -106,7 +101,7 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
                 total_sell: fixnum::decimal_to_amount(&(origin.amount * origin.price), quote_prec).to_fr(),
                 total_buy: fixnum::decimal_to_amount(&origin.amount, base_prec).to_fr(),
                 // sig: Signature::default(),
-                sig: origin.into(),
+                sig: extract_signature(origin),
                 account_id: origin.user,
                 side: OrderSide::Buy,
             }
