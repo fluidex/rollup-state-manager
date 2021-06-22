@@ -96,11 +96,7 @@ impl Order {
         }
     }
     pub fn hash(&self) -> Fr {
-        let mut data = Fr::zero();
-        data.add_assign(&u32_to_fr(self.order_id));
-        data.add_assign(&shl(&self.token_buy, 32));
-        data.add_assign(&shl(&self.token_sell, 64));
-        hash(&[data, self.filled_sell, self.filled_buy, self.total_sell, self.total_buy])
+        self.sig.hash
     }
     pub fn is_filled(&self) -> bool {
         //debug_assert!(self.filled_buy <= self.total_buy, "too much filled buy");
