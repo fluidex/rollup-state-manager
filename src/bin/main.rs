@@ -93,16 +93,32 @@ async fn run(settings: &config::Settings) {
     replay_thread.map(|h| h.join().expect("loader thread failed"));
 }
 
+#[derive(sqlx::Type)]
+#[sqlx(type_name = "varchar", rename_all = "lowercase")]
+pub enum CircuitType {
+    Block,
+}
+
+#[derive(sqlx::Type)]
+#[sqlx(type_name = "task_status", rename_all = "snake_case")]
+enum TaskStatus {
+    Inited,
+    Witgening,
+    Ready,
+    Assigned,
+    Proved,
+}
+
 async fn save_block_to_db(pool: &PgPool, block: L2Block) -> anyhow::Result<()> {
     let input = L2BlockSerde::from(block);
     let task_id = unique_task_id();
 
     sqlx::query("insert into task (task_id, circuit, input, status) values ($1, $2, $3, $4)")
         .bind(task_id)
-        .bind("block")
+        .bind(CircuitType::Block)
         .bind(sqlx::types::Json(input))
-        .bind("ready")
-        .fetch_one(pool)
+        .bind(TaskStatus::Ready)
+        .execute(pool)
         .await?;
 
     Ok(())
