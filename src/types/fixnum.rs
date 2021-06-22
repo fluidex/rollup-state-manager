@@ -18,6 +18,7 @@ pub fn decimal_to_u64(num: &Decimal, prec: u32) -> u64 {
 pub fn decimal_to_fr(num: &Decimal, prec: u32) -> Fr {
     // TODO: is u64 enough?
     u64_to_fr(decimal_to_u64(num, prec))
+    // Float864::from_decimal(num, prec).unwrap().to_fr()
 }
 
 pub fn decimal_to_amount(num: &Decimal, prec: u32) -> Float864 {

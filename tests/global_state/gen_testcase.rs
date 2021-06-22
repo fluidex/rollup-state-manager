@@ -8,13 +8,13 @@ use anyhow::Result;
 use rollup_state_manager::params;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils;
-use rollup_state_manager::test_utils::l2::L2Block;
+use rollup_state_manager::test_utils::circuit::{write_test_case, CircuitTestCase, CircuitTestData};
 use rollup_state_manager::test_utils::messages::WrappedMessage;
-use std::fs::{self};
-use std::path::PathBuf;
+use rollup_state_manager::types::l2::{L2Block, L2BlockSerde};
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-mod export_circuit;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
 
 fn replay_msgs(
@@ -55,9 +55,13 @@ fn replay_msgs(
         }
         witgen.flush_with_nop();
         let block_num = witgen.get_block_generate_num();
-        if let Ok(path) = std::env::var("SLED_DB_PATH") {
-            let db = sled::open(&path).unwrap();
-            witgen.dump_to_sled(&db);
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "persist_sled")] {
+            if let Ok(path) = std::env::var("SLED_DB_PATH") {
+                let db = sled::open(&path).unwrap();
+                witgen.dump_to_sled(&db);
+            }
+            }
         }
         println!(
             "genesis {} blocks (TPS: {})",
@@ -83,21 +87,37 @@ pub fn run(src: &str) -> Result<()> {
     loader_thread.map(|h| h.join().expect("loader thread failed"));
     replay_thread.map(|h| h.join().expect("replay thread failed"));
 
-    let component = test_utils::circuit::CircuitSource {
-        src: String::from("src/block.circom"),
-        main: format!(
-            "Block({}, {}, {}, {})",
-            *params::NTXS,
-            *params::BALANCELEVELS,
-            *params::ORDERLEVELS,
-            *params::ACCOUNTLEVELS
-        ),
+    export_circuit_and_testdata(&circuit_repo, blocks)?;
+    Ok(())
+}
+
+pub fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<L2Block>) -> Result<()> {
+    let test_case = CircuitTestCase {
+        source: test_utils::circuit::CircuitSource {
+            src: String::from("src/block.circom"),
+            main: format!(
+                "Block({}, {}, {}, {})",
+                *params::NTXS,
+                *params::BALANCELEVELS,
+                *params::ORDERLEVELS,
+                *params::ACCOUNTLEVELS
+            ),
+        },
+        data: blocks
+            .iter()
+            .enumerate()
+            .map(|(blk_idx, block)| CircuitTestData {
+                name: format!("{:04}", blk_idx),
+                input: serde_json::to_value(L2BlockSerde::from(block.clone())).unwrap(),
+                output: None,
+            })
+            .collect(),
     };
 
-    let circuit_dir = export_circuit::export_circuit_and_testdata(&circuit_repo, blocks, component)?;
+    let test_dir = circuit_repo.join("testdata");
+    let circuit_dir = write_test_case(circuit_repo, &test_dir, test_case)?;
 
-    println!("export test cases to {}", circuit_dir.to_str().unwrap());
-
+    println!("write {} test cases to {:?}", blocks.len(), circuit_dir.to_str());
     Ok(())
 }
 
