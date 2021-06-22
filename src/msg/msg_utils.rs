@@ -57,7 +57,7 @@ fn hash_order(_order: &crate::types::matchengine::messages::Order) -> Fr {
 }
 
 fn extract_signature(order: &matchengine::messages::Order) -> Signature {
-    if let None = order.signature.as_ref() {
+    if order.signature.as_ref().is_none() {
         return Signature::default();
     }
 
