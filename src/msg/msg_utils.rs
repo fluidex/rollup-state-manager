@@ -14,6 +14,7 @@ pub struct TokenIdPair(pub u32, pub u32);
 #[derive(Clone, Copy)]
 pub struct TokenPair<'c>(pub &'c str, pub &'c str);
 
+#[derive(Clone)]
 pub struct OrderState {
     pub side: &'static str,
     pub token_sell: u32,
@@ -203,6 +204,7 @@ impl OrderState {
 
 impl From<OrderState> for l2::Order {
     fn from(origin: OrderState) -> Self {
+        let initial: l2::OrderInput = origin.clone().into();
         l2::Order {
             order_id: origin.order_id,
             //status: types::primitives::u32_to_fr(origin.status),
@@ -212,8 +214,7 @@ impl From<OrderState> for l2::Order {
             filled_buy: fixnum::decimal_to_amount(&origin.filled_buy, prec_token_id(origin.token_buy)).to_fr(),
             total_sell: fixnum::decimal_to_amount(&origin.total_sell, prec_token_id(origin.token_sell)).to_fr(),
             total_buy: fixnum::decimal_to_amount(&origin.total_buy, prec_token_id(origin.token_buy)).to_fr(),
-            // TODO:
-            sig: Signature::default(),
+            sig: l2::Order::from_order_input(&initial).sig,
             account_id: origin.account_id,
             side: if origin.side.to_lowercase() == "buy" || origin.side.to_lowercase() == "bid" {
                 OrderSide::Buy
