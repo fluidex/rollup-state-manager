@@ -531,5 +531,23 @@ mod tests {
             "11cfed280efe7a90a79f3ff69ad6dafc57bfd03e24f176cd1149068268994212",
             "message (hexdecimal string) to sign"
         );
+
+        let sig_final = unsafe { std::mem::transmute::<SignatureBJJ, babyjubjub_rs::Signature>(order.sig.clone()) };
+        let sig_compressed = sig_final.compress();
+        assert_eq!(
+            hex::encode(sig_compressed),
+            "57e6cf2e5b8db0a90072d15bc49e737df2e10746e5f531a24d72557894f2c90964d77726505232a4c9e7631eed22ad9210dce2858642fdfe3e58e95d44b99002",
+        );
+
+        let mut b: Vec<u8> = Vec::new();
+        b.append(&mut order.sig.r_b8.compress().to_vec());
+        let (_, s_bytes) = order.sig.s.to_bytes_le();
+        let mut s_32bytes: [u8; 32] = [0; 32];
+        let len = std::cmp::min(s_bytes.len(), s_32bytes.len());
+        s_32bytes[..len].copy_from_slice(&s_bytes[..len]);
+        b.append(&mut s_32bytes.to_vec());
+        let mut buf: [u8; 64] = [0; 64];
+        buf[..].copy_from_slice(&b[..]);
+        assert_eq!(sig_compressed, buf, "different approaches to get sig_compressed");
     }
 }
