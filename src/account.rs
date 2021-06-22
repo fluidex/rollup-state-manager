@@ -527,7 +527,7 @@ mod tests {
         );
 
         assert_eq!(
-            hex::encode(fr_to_vec(&order.hash())),
+            hex::encode(fr_to_vec(&order.hash())), // big endian
             "11cfed280efe7a90a79f3ff69ad6dafc57bfd03e24f176cd1149068268994212",
             "message (hexdecimal string) to sign"
         );
