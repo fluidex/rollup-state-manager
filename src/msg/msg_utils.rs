@@ -66,7 +66,8 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
                 //filled_buy: fixnum::decimal_to_amount(&origin.finished_quote, quote_token_id).to_fr(),
                 total_sell: fixnum::decimal_to_amount(&origin.amount, base_prec).to_fr(),
                 total_buy: fixnum::decimal_to_amount(&(origin.amount * origin.price), quote_prec).to_fr(),
-                sig: Signature::default(),
+                // sig: Signature::default(),
+                sig: Signature::from_str("", &origin.signature),
                 account_id: origin.user,
                 side: OrderSide::Sell,
             }
@@ -80,7 +81,8 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
                 //filled_buy: fixnum::decimal_to_amount(&origin.finished_base, base_token_id).to_fr(),
                 total_sell: fixnum::decimal_to_amount(&(origin.amount * origin.price), quote_prec).to_fr(),
                 total_buy: fixnum::decimal_to_amount(&origin.amount, base_prec).to_fr(),
-                sig: Signature::default(),
+                // sig: Signature::default(),
+                sig: Signature::from_str("", &origin.signature),
                 account_id: origin.user,
                 side: OrderSide::Buy,
             }

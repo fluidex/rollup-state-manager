@@ -1,4 +1,4 @@
-use crate::types::primitives::{bigint_to_fr, fr_to_bigint, u32_to_fr, Fr};
+use crate::types::primitives::{bigint_to_fr, fr_to_bigint, str_to_fr, u32_to_fr, Fr};
 use anyhow::Result;
 use arrayref::array_ref;
 use babyjubjub_rs::{self, decompress_point, Point, PrivateKey};
@@ -52,6 +52,17 @@ impl Default for Signature {
             s: Fr::zero(),
             r8x: Fr::zero(),
             r8y: Fr::zero(),
+        }
+    }
+}
+
+impl Signature {
+    // without 0x_prefix
+    pub fn from_str(order_hash: &str, order_sig: &str) -> Self {
+        let sig_packed_vec = hex::decode(order_sig).unwrap();
+        let sig_unpacked = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
+        Self {
+            hash: str_to_fr(order_hash),
         }
     }
 }

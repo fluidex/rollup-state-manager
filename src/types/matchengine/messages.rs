@@ -49,6 +49,7 @@ pub struct Order {
     pub finished_base: Decimal,
     pub finished_quote: Decimal,
     pub finished_fee: Decimal,
+    pub signature: String,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

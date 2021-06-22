@@ -141,11 +141,9 @@ impl Processor {
         let mut taker_order: Option<l2::Order> = None;
         let mut maker_order: Option<l2::Order> = None;
         if let Some(ask_order) = &trade.ask_order {
-            // TODO:
             let mut order = exchange_order_to_rollup_order(&ask_order);
             self.check_order_sig(&mut order);
             assert!(!witgen.has_order(order.account_id, order.order_id));
-            // TODO:
             let ask_order = l2::order::Order::from_order_input(&order);
             match trade.ask_role {
                 messages::MarketRole::MAKER => {
