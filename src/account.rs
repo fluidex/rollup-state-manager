@@ -65,9 +65,22 @@ pub struct L2Account {
     pub bjj_pub_key: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct SignatureBJJ {
     pub r_b8: Point,
     pub s: BigInt,
+}
+
+impl Default for SignatureBJJ {
+    fn default() -> Self {
+        Self {
+            r_b8: Point {
+                x: Fr::default(),
+                y: Fr::default(),
+            },
+            s: BigInt::default(),
+        }
+    }
 }
 
 impl L2Account {

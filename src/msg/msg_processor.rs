@@ -1,9 +1,10 @@
-use crate::account::{random_mnemonic_with_rng, Account, Signature};
+use crate::account::{random_mnemonic_with_rng, Account, Signature, SignatureBJJ};
 use crate::state::WitnessGenerator;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, OrderInput, OrderSide};
-use crate::types::primitives::{u32_to_fr, Fr};
+use crate::types::primitives::{fr_to_bigint, u32_to_fr, Fr};
 use crate::types::{fixnum, matchengine::messages};
+use babyjubjub_rs::Point;
 use ethers::core::rand::SeedableRng;
 use ethers::prelude::coins_bip39::English;
 use num::Zero;
@@ -229,7 +230,7 @@ impl Processor {
             token_buy: u32_to_fr(tokenbuy),
             total_sell: fixnum::decimal_to_amount(&total_sell, prec_token_id(tokensell)).to_fr(),
             total_buy: fixnum::decimal_to_amount(&total_buy, prec_token_id(tokenbuy)).to_fr(),
-            sig: Signature::default(),
+            sig: SignatureBJJ::default(),
             account_id: order.user,
             side: if is_ask { OrderSide::Sell } else { OrderSide::Buy },
         }
@@ -246,7 +247,10 @@ impl Processor {
                 //println!("sign order");
                 account.sign_hash(order_hash).unwrap()
             });
-            order_to_put.sig = sig;
+            order_to_put.sig = SignatureBJJ {
+                s: fr_to_bigint(&sig.s),
+                r_b8: Point { x: sig.r8x, y: sig.r8y },
+            };
         } else {
             // use original signature, do nothing
         }

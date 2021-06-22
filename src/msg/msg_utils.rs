@@ -83,21 +83,14 @@ fn hash_order(order: &crate::types::matchengine::messages::Order) -> Fr {
     data
 }
 
-fn extract_signature(order: &matchengine::messages::Order) -> Signature {
+fn extract_signature(order: &matchengine::messages::Order) -> SignatureBJJ {
     if order.signature.as_ref().is_none() {
-        return Signature::default();
+        return SignatureBJJ::default();
     }
 
     let sig_packed_vec = hex::decode(&(order.signature.as_ref().unwrap())).unwrap();
     let sig_unpacked: babyjubjub_rs::Signature = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
-    // unsafe
-    let sig: SignatureBJJ = unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_unpacked) };
-    Signature {
-        hash: hash_order(order),
-        s: bigint_to_fr(sig.s),
-        r8x: sig.r_b8.x,
-        r8y: sig.r_b8.y,
-    }
+    unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_unpacked) }
 }
 
 pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> l2::OrderInput {
@@ -230,6 +223,7 @@ impl From<OrderState> for l2::Order {
             filled_buy: fixnum::decimal_to_amount(&origin.filled_buy, prec_token_id(origin.token_buy)).to_fr(),
             total_sell: fixnum::decimal_to_amount(&origin.total_sell, prec_token_id(origin.token_sell)).to_fr(),
             total_buy: fixnum::decimal_to_amount(&origin.total_buy, prec_token_id(origin.token_buy)).to_fr(),
+            // TODO:
             sig: Signature::default(),
             account_id: origin.account_id,
             side: if origin.side.to_lowercase() == "buy" || origin.side.to_lowercase() == "bid" {
@@ -249,7 +243,8 @@ impl From<OrderState> for l2::OrderInput {
             token_buy: u32_to_fr(order_state.token_buy),
             total_sell: fixnum::decimal_to_amount(&order_state.total_sell, prec_token_id(order_state.token_sell)).to_fr(),
             total_buy: fixnum::decimal_to_amount(&order_state.total_buy, prec_token_id(order_state.token_buy)).to_fr(),
-            sig: Signature::default(),
+            // TODO:
+            sig: SignatureBJJ::default(),
             account_id: order_state.account_id,
             side: if order_state.side.to_lowercase() == "buy" || order_state.side.to_lowercase() == "bid" {
                 OrderSide::Buy
