@@ -1,8 +1,6 @@
 #![allow(clippy::let_and_return)]
-use crate::types::primitives::{self, hash, shl, u32_to_fr, Fr};
-
-use crate::account::{Account, Signature};
-
+use crate::account::{Account, Signature, SignatureBJJ};
+use crate::types::primitives::*;
 use ff::Field;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -11,7 +9,7 @@ pub enum OrderSide {
     Sell,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct OrderInput {
     // TODO: or Fr?
     pub account_id: u32,
@@ -21,16 +19,16 @@ pub struct OrderInput {
     pub token_sell: Fr,
     pub total_sell: Fr,
     pub total_buy: Fr,
-    pub sig: Signature,
+    pub sig: SignatureBJJ,
 }
 impl OrderInput {
     pub fn hash(&self) -> Fr {
         // copy from https://github.com/Fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/state-utils.ts#L38
         // TxType::PlaceOrder
-        let magic_head = primitives::u32_to_fr(4);
+        let magic_head = u32_to_fr(4);
         let data = hash(&[
             magic_head,
-            primitives::u32_to_fr(self.order_id),
+            u32_to_fr(self.order_id),
             self.token_sell,
             self.token_buy,
             self.total_sell,
@@ -40,7 +38,7 @@ impl OrderInput {
         // nonce and orderID seems redundant?
 
         // account_id is not needed if the hash is signed later?
-        //data = hash(&[data, primitives::u32_to_fr(self.account_id)]);
+        //data = hash(&[data, u32_to_fr(self.account_id)]);
         data
     }
 }
@@ -85,7 +83,12 @@ impl Order {
             token_sell: order_input.token_sell,
             total_sell: order_input.total_sell,
             total_buy: order_input.total_buy,
-            sig: order_input.sig,
+            sig: Signature {
+                hash: order_input.hash(),
+                s: bigint_to_fr(order_input.sig.s.clone()),
+                r8x: order_input.sig.r_b8.x,
+                r8y: order_input.sig.r_b8.y,
+            },
             account_id: order_input.account_id,
             side: order_input.side,
             filled_sell: Fr::zero(),

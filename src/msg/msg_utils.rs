@@ -1,8 +1,9 @@
+#![allow(clippy::let_and_return)]
 use crate::account::{Signature, SignatureBJJ};
 use crate::state::WitnessGenerator;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, OrderSide};
-use crate::types::primitives::{bigint_to_fr, fr_to_decimal, u32_to_fr, Fr};
+use crate::types::primitives::*;
 use crate::types::{self, fixnum, matchengine};
 use num::Zero;
 use rust_decimal::Decimal;
@@ -13,6 +14,7 @@ pub struct TokenIdPair(pub u32, pub u32);
 #[derive(Clone, Copy)]
 pub struct TokenPair<'c>(pub &'c str, pub &'c str);
 
+#[derive(Clone)]
 pub struct OrderState {
     pub side: &'static str,
     pub token_sell: u32,
@@ -25,6 +27,8 @@ pub struct OrderState {
     pub order_id: u32,
     pub account_id: u32,
     pub role: matchengine::messages::MarketRole,
+
+    pub signature: Option<String>,
 }
 
 impl<'c> From<&'c str> for TokenPair<'c> {
@@ -51,25 +55,15 @@ impl From<String> for TokenIdPair {
     }
 }
 
-// TODO:
-fn hash_order(_order: &crate::types::matchengine::messages::Order) -> Fr {
-    unimplemented!()
-}
+impl From<Option<String>> for SignatureBJJ {
+    fn from(signature: Option<String>) -> SignatureBJJ {
+        if signature.is_none() {
+            return SignatureBJJ::default();
+        }
 
-fn extract_signature(order: &matchengine::messages::Order) -> Signature {
-    if order.signature.as_ref().is_none() {
-        return Signature::default();
-    }
-
-    let sig_packed_vec = hex::decode(&(order.signature.as_ref().unwrap())).unwrap();
-    let sig_unpacked: babyjubjub_rs::Signature = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
-    // unsafe
-    let sig: SignatureBJJ = unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_unpacked) };
-    Signature {
-        hash: hash_order(order),
-        s: bigint_to_fr(sig.s),
-        r8x: sig.r_b8.x,
-        r8y: sig.r_b8.y,
+        let sig_packed_vec = hex::decode(&(signature.unwrap())).unwrap();
+        let sig_unpacked: babyjubjub_rs::Signature = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
+        unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_unpacked) }
     }
 }
 
@@ -89,7 +83,7 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
                 //filled_buy: fixnum::decimal_to_fr(&origin.finished_quote, quote_token_id),
                 total_sell: fixnum::decimal_to_fr(&origin.amount, base_prec),
                 total_buy: fixnum::decimal_to_fr(&(origin.amount * origin.price), quote_prec),
-                sig: extract_signature(origin),
+                sig: origin.signature.clone().into(),
                 account_id: origin.user,
                 side: OrderSide::Sell,
             }
@@ -103,7 +97,7 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
                 //filled_buy: fixnum::decimal_to_fr(&origin.finished_base, base_token_id),
                 total_sell: fixnum::decimal_to_fr(&(origin.amount * origin.price), quote_prec),
                 total_buy: fixnum::decimal_to_fr(&origin.amount, base_prec),
-                sig: extract_signature(origin),
+                sig: origin.signature.clone().into(),
                 account_id: origin.user,
                 side: OrderSide::Buy,
             }
@@ -131,6 +125,10 @@ pub fn trade_to_order_state(
             order_id: trade.ask_order_id as u32,
             account_id: trade.ask_user_id,
             role: trade.ask_role,
+            signature: match &trade.ask_order {
+                Some(o) => o.signature.clone(),
+                None => None,
+            },
         },
         OrderState {
             side: "BID",
@@ -143,6 +141,10 @@ pub fn trade_to_order_state(
             order_id: trade.bid_order_id as u32,
             account_id: trade.bid_user_id,
             role: trade.bid_role,
+            signature: match &trade.bid_order {
+                Some(o) => o.signature.clone(),
+                None => None,
+            },
         },
     )
 }
@@ -172,6 +174,10 @@ impl OrderState {
                 order_id: trade.ask_order_id as u32,
                 account_id: trade.ask_user_id,
                 role: trade.ask_role,
+                signature: match &trade.ask_order {
+                    Some(o) => o.signature.clone(),
+                    None => None,
+                },
             },
             "BID" => OrderState {
                 //origin,
@@ -186,6 +192,10 @@ impl OrderState {
                 order_id: trade.bid_order_id as u32,
                 account_id: trade.bid_user_id,
                 role: trade.bid_role,
+                signature: match &trade.bid_order {
+                    Some(o) => o.signature.clone(),
+                    None => None,
+                },
             },
             _ => unreachable!(),
         }
@@ -194,6 +204,7 @@ impl OrderState {
 
 impl From<OrderState> for l2::Order {
     fn from(origin: OrderState) -> Self {
+        let initial: l2::OrderInput = origin.clone().into();
         l2::Order {
             order_id: origin.order_id,
             //status: types::primitives::u32_to_fr(origin.status),
@@ -203,7 +214,7 @@ impl From<OrderState> for l2::Order {
             filled_buy: fixnum::decimal_to_fr(&origin.filled_buy, prec_token_id(origin.token_buy)),
             total_sell: fixnum::decimal_to_fr(&origin.total_sell, prec_token_id(origin.token_sell)),
             total_buy: fixnum::decimal_to_fr(&origin.total_buy, prec_token_id(origin.token_buy)),
-            sig: Signature::default(),
+            sig: l2::Order::from_order_input(&initial).sig,
             account_id: origin.account_id,
             side: if origin.side.to_lowercase() == "buy" || origin.side.to_lowercase() == "bid" {
                 OrderSide::Buy
@@ -222,7 +233,7 @@ impl From<OrderState> for l2::OrderInput {
             token_buy: u32_to_fr(order_state.token_buy),
             total_sell: fixnum::decimal_to_fr(&order_state.total_sell, prec_token_id(order_state.token_sell)),
             total_buy: fixnum::decimal_to_fr(&order_state.total_buy, prec_token_id(order_state.token_buy)),
-            sig: Signature::default(),
+            sig: order_state.signature.clone().into(),
             account_id: order_state.account_id,
             side: if order_state.side.to_lowercase() == "buy" || order_state.side.to_lowercase() == "bid" {
                 OrderSide::Buy

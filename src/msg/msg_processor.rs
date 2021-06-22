@@ -1,9 +1,10 @@
-use crate::account::{Account, Signature};
+use crate::account::{Account, Signature, SignatureBJJ};
 use crate::state::WitnessGenerator;
 use crate::test_utils::types::{get_mnemonic_by_account_id, get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, OrderInput, OrderSide};
-use crate::types::primitives::{u32_to_fr, Fr};
+use crate::types::primitives::{fr_to_bigint, u32_to_fr, Fr};
 use crate::types::{fixnum, matchengine::messages};
+use babyjubjub_rs::Point;
 use ethers::prelude::coins_bip39::English;
 use num::Zero;
 use rust_decimal::Decimal;
@@ -122,8 +123,8 @@ impl Processor {
             messages::OrderEventType::PUT => {
                 let is_new_order = order.order.finished_base == Decimal::zero() && order.order.finished_quote == Decimal::zero();
                 debug_assert!(is_new_order);
-                let order_input = Self::parse_order_from_msg(&order);
-                self.cache_order(&order_input);
+                let mut order_input = Self::parse_order_from_msg(&order);
+                self.cache_order(&mut order_input);
             }
             _ => {
                 log::debug!("skip order msg {:?}", order.event);
@@ -226,7 +227,7 @@ impl Processor {
             token_buy: u32_to_fr(tokenbuy),
             total_sell: fixnum::decimal_to_fr(&total_sell, prec_token_id(tokensell)),
             total_buy: fixnum::decimal_to_fr(&total_buy, prec_token_id(tokenbuy)),
-            sig: Signature::default(),
+            sig: order.signature.clone().into(),
             account_id: order.user,
             side: if is_ask { OrderSide::Sell } else { OrderSide::Buy },
         }
@@ -243,7 +244,10 @@ impl Processor {
                 //println!("sign order");
                 account.sign_hash(order_hash).unwrap()
             });
-            order_to_put.sig = sig;
+            order_to_put.sig = SignatureBJJ {
+                s: fr_to_bigint(&sig.s),
+                r_b8: Point { x: sig.r8x, y: sig.r8y },
+            };
         } else {
             // use original signature, do nothing
         }
@@ -257,10 +261,10 @@ impl Processor {
     //        witgen.update_order_state(order.account_id, order);
     //    }
     //}
-    fn cache_order(&mut self, order_input: &OrderInput) {
-        let mut order_input = *order_input;
-        self.check_order_sig(&mut order_input);
-        self.order_cache.insert((order_input.account_id, order_input.order_id), order_input);
+    fn cache_order(&mut self, order_input: &mut OrderInput) {
+        self.check_order_sig(order_input);
+        self.order_cache
+            .insert((order_input.account_id, order_input.order_id), order_input.clone());
         //println!("store order {} {}", order_input.account_id, order_input.order_id);
     }
     fn check_state(&self, witgen: &WitnessGenerator, trade_state: &Option<messages::VerboseTradeState>, trade: &messages::TradeMessage) {
