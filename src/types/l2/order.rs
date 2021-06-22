@@ -28,7 +28,8 @@ impl OrderInput {
         let magic_head = u32_to_fr(4);
         let data = hash(&[
             magic_head,
-            u32_to_fr(self.order_id),
+            // TODO: sign nonce or order_id
+            //u32_to_fr(self.order_id),
             self.token_sell,
             self.token_buy,
             self.total_sell,
