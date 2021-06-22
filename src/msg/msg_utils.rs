@@ -57,7 +57,7 @@ fn hash_order(_order: &crate::types::matchengine::messages::Order) -> String {
 
 use crate::account::SignatureBJJ;
 use std::convert::TryInto;
-// TODO: opt lifetime?
+// TODO: remove lifetime annotation?
 impl<'c> From<&'c matchengine::messages::Order> for crate::account::Signature {
     fn from(order: &'c matchengine::messages::Order) -> Self {
         let order_hash = hash_order(order);
