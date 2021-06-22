@@ -32,6 +32,7 @@ use lazy_static::lazy_static;
 use num_bigint::BigInt;
 use rand::Rng;
 use std::str::FromStr;
+use std::convert::TryInto;
 
 /// Derault derivation path.
 /// Copied from https://github.com/gakonst/ethers-rs/blob/01cc80769c291fc80f5b1e9173b7b580ae6b6413/ethers-signers/src/wallet/mnemonic.rs#L16
