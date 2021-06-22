@@ -1,3 +1,4 @@
+#![allow(clippy::let_and_return)]
 use crate::account::random_mnemonic_with_rng;
 use ethers::core::rand::SeedableRng;
 use ethers::prelude::coins_bip39::{English, Mnemonic};
