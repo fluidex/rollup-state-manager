@@ -230,8 +230,7 @@ impl Processor {
             token_buy: u32_to_fr(tokenbuy),
             total_sell: fixnum::decimal_to_amount(&total_sell, prec_token_id(tokensell)).to_fr(),
             total_buy: fixnum::decimal_to_amount(&total_buy, prec_token_id(tokenbuy)).to_fr(),
-            // TODO:
-            sig: SignatureBJJ::default(),
+            sig: order.signature.clone().into(),
             account_id: order.user,
             side: if is_ask { OrderSide::Sell } else { OrderSide::Buy },
         }
