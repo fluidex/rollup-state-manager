@@ -133,7 +133,6 @@ impl Processor {
             }
         }
     }
-    // here
     pub fn handle_trade_msg(&mut self, witgen: &mut WitnessGenerator, trade: messages::TradeMessage) {
         self.check_state(witgen, &trade.state_before, &trade);
 
