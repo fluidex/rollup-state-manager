@@ -404,7 +404,7 @@ mod tests {
 
     use super::*;
     use crate::types::l2::*;
-    use crate::types::primitives::fr_to_string;
+    use crate::types::primitives::*;
     use ff::PrimeField;
 
     #[test]
@@ -519,5 +519,17 @@ mod tests {
             sig: SignatureBJJ::default(),
         };
         order.sign_with(&acc).unwrap();
+
+        assert_eq!(
+            fr_to_string(&order.hash()),
+            "8056692562185768785417295010793063162660984530596417435073781442183268221458",
+            "message (Fr) to sign"
+        );
+
+        assert_eq!(
+            fr_to_bigint(&order.hash()).to_str_radix(16),
+            "11cfed280efe7a90a79f3ff69ad6dafc57bfd03e24f176cd1149068268994212",
+            "message (hexdecimal string) to sign"
+        );
     }
 }
