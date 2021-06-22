@@ -214,7 +214,7 @@ impl From<OrderState> for l2::Order {
             filled_buy: fixnum::decimal_to_fr(&origin.filled_buy, prec_token_id(origin.token_buy)),
             total_sell: fixnum::decimal_to_fr(&origin.total_sell, prec_token_id(origin.token_sell)),
             total_buy: fixnum::decimal_to_fr(&origin.total_buy, prec_token_id(origin.token_buy)),
-            sig: l2::Order::from_order_input(&initial).sig,
+            sig: l2::Order::from(initial).sig,
             account_id: origin.account_id,
             side: if origin.side.to_lowercase() == "buy" || origin.side.to_lowercase() == "bid" {
                 OrderSide::Buy

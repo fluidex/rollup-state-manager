@@ -137,10 +137,13 @@ impl L2Account {
             Ok(sig) => babyjubjub_rs::verify(self.pub_key.clone(), sig, msg),
         }
     }
-
-    pub fn sign_hash(&self, hash: Fr) -> Result<Signature, String> {
+    pub fn sign_hash_raw(&self, hash: Fr) -> Result<SignatureBJJ, String> {
         let sig_orig: babyjubjub_rs::Signature = self.priv_key.sign(fr_to_bigint(&hash))?;
         let sig: SignatureBJJ = unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_orig) };
+        Ok(sig)
+    }
+    pub fn sign_hash(&self, hash: Fr) -> Result<Signature, String> {
+        let sig = self.sign_hash_raw(hash)?;
         let s = bigint_to_fr(sig.s);
         Ok(Signature {
             hash,
@@ -237,6 +240,9 @@ impl Account {
     }
     pub fn sign_hash(&self, hash: Fr) -> Result<Signature, String> {
         self.l2_account.sign_hash(hash)
+    }
+    pub fn sign_hash_raw(&self, hash: Fr) -> Result<SignatureBJJ, String> {
+        self.l2_account.sign_hash_raw(hash)
     }
 }
 
