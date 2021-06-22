@@ -65,9 +65,9 @@ pub struct L2Account {
     pub bjj_pub_key: String,
 }
 
-struct SignatureBJJ {
-    r_b8: Point,
-    s: BigInt,
+pub struct SignatureBJJ {
+    pub r_b8: Point,
+    pub s: BigInt,
 }
 
 impl L2Account {
