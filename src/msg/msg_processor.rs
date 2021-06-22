@@ -234,8 +234,8 @@ impl Processor {
     fn check_order_sig(&mut self, order_to_put: &mut OrderInput) {
         if self.enable_check_order_sig {
             // TODO: if order has no sig, deny
-        } else {
-            // if order has no sig, auto fill a sig
+        } else if *crate::params::OVERWRITE_SIGNATURE {
+            // overwrite order sig
             let order_hash = order_to_put.hash();
             let account = self.accounts.get(&order_to_put.account_id).unwrap();
             //println!("hash {} {} {} {}", account_id, order_state.order_id, order_hash, account.bjj_pub_key());
@@ -244,6 +244,8 @@ impl Processor {
                 account.sign_hash(order_hash).unwrap()
             });
             order_to_put.sig = sig;
+        } else {
+            // use original signature, do nothing
         }
     }
 

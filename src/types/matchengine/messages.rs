@@ -49,6 +49,8 @@ pub struct Order {
     pub finished_base: Decimal,
     pub finished_quote: Decimal,
     pub finished_fee: Decimal,
+    // TODO: remove Option once migration is done
+    pub signature: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
