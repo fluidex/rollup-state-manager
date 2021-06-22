@@ -62,6 +62,31 @@ impl<'c> From<&'c matchengine::messages::Order> for crate::account::Signature {
 
         let sig_packed_vec = hex::decode(&order.signature).unwrap();
         let sig_unpacked = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
+
+
+        // safe
+        // let b = self.priv_key.sign(fr_to_bigint(&hash))?.compress();
+        // let r_b8_bytes: [u8; 32] = *array_ref!(b[..32], 0, 32);
+        // let s = bigint_to_fr(BigInt::from_bytes_le(num_bigint::Sign::Plus, &b[32..]));
+        // let r_b8 = decompress_point(r_b8_bytes);
+        // match r_b8 {
+        //     Result::Err(err) => Err(err),
+        //     Result::Ok(Point { x: r8x, y: r8y }) => Ok(Signature { hash, s, r8x, r8y }),
+        // }
+
+        // unsafe
+        // let sig_orig: babyjubjub_rs::Signature = self.priv_key.sign(fr_to_bigint(&hash))?;
+        // let sig: SignatureBJJ = unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_orig) };
+        // let s = bigint_to_fr(sig.s);
+        // Ok(Signature {
+        //     hash,
+        //     s,
+        //     r8x: sig.r_b8.x,
+        //     r8y: sig.r_b8.y,
+        // })
+
+
+
         Self {
             hash: str_to_fr(&order_hash),
         }
