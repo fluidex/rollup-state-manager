@@ -1,4 +1,4 @@
-use crate::types::primitives::{bigint_to_fr, fr_to_bigint, str_to_fr, u32_to_fr, Fr};
+use crate::types::primitives::{bigint_to_fr, fr_to_bigint, u32_to_fr, Fr};
 use anyhow::Result;
 use arrayref::array_ref;
 use babyjubjub_rs::{self, decompress_point, Point, PrivateKey};
@@ -32,7 +32,6 @@ use lazy_static::lazy_static;
 use num_bigint::BigInt;
 use rand::Rng;
 use std::str::FromStr;
-use std::convert::TryInto;
 
 /// Derault derivation path.
 /// Copied from https://github.com/gakonst/ethers-rs/blob/01cc80769c291fc80f5b1e9173b7b580ae6b6413/ethers-signers/src/wallet/mnemonic.rs#L16
@@ -53,25 +52,6 @@ impl Default for Signature {
             s: Fr::zero(),
             r8x: Fr::zero(),
             r8y: Fr::zero(),
-        }
-    }
-}
-
-fn hash_order(order: &crate::types::matchengine::messages::Order) -> String {
-    unimplemented!()
-}
-
-
-// TODO: move to msg_utils
-impl Signature {
-    // without 0x_prefix
-    pub fn from_order_msg(order: &crate::types::matchengine::messages::Order) -> Self {
-        let order_hash = hash_order(order);
-
-        let sig_packed_vec = hex::decode(&order.signature).unwrap();
-        let sig_unpacked = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
-        Self {
-            hash: str_to_fr(&order_hash),
         }
     }
 }

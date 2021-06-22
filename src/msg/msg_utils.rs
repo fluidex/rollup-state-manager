@@ -2,7 +2,7 @@ use crate::account::Signature;
 use crate::state::WitnessGenerator;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, OrderSide};
-use crate::types::primitives::{fr_to_decimal, u32_to_fr};
+use crate::types::primitives::{fr_to_decimal, str_to_fr, u32_to_fr};
 use crate::types::{self, fixnum, matchengine};
 use num::Zero;
 use rust_decimal::Decimal;
@@ -50,6 +50,24 @@ impl From<String> for TokenIdPair {
     }
 }
 
+fn hash_order(order: &crate::types::matchengine::messages::Order) -> String {
+    unimplemented!()
+}
+
+// TODO: opt lifetime?
+use std::convert::TryInto;
+impl<'c> From<&'c matchengine::messages::Order> for crate::account::Signature {
+    fn from(order: &'c matchengine::messages::Order) -> Self {
+        let order_hash = hash_order(order);
+
+        let sig_packed_vec = hex::decode(&order.signature).unwrap();
+        let sig_unpacked = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
+        Self {
+            hash: str_to_fr(&order_hash),
+        }
+    }
+}
+
 pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> l2::OrderInput {
     assert!(origin.finished_base.is_zero());
     assert!(origin.finished_quote.is_zero());
@@ -67,7 +85,7 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
                 total_sell: fixnum::decimal_to_amount(&origin.amount, base_prec).to_fr(),
                 total_buy: fixnum::decimal_to_amount(&(origin.amount * origin.price), quote_prec).to_fr(),
                 // sig: Signature::default(),
-                sig: Signature::from_order_msg(&origin),
+                sig: origin.into(),
                 account_id: origin.user,
                 side: OrderSide::Sell,
             }
@@ -82,7 +100,7 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
                 total_sell: fixnum::decimal_to_amount(&(origin.amount * origin.price), quote_prec).to_fr(),
                 total_buy: fixnum::decimal_to_amount(&origin.amount, base_prec).to_fr(),
                 // sig: Signature::default(),
-                sig: Signature::from_order_msg(&origin),
+                sig: origin.into(),
                 account_id: origin.user,
                 side: OrderSide::Buy,
             }
