@@ -3083,6 +3083,7 @@ dependencies = [
  "arrayref",
  "babyjubjub-rs",
  "bincode",
+ "cfg-if",
  "coins-bip32",
  "config",
  "crossbeam-channel",

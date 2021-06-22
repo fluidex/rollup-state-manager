@@ -56,4 +56,4 @@ jobs:
           node-version: '16'
 
       - name: Test export_circuit
-        run: bash tests/export_circuit/test.sh
+        run: bash tests/circuit_tests/test.sh
