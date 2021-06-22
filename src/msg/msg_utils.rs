@@ -63,7 +63,6 @@ impl From<&matchengine::messages::Order> for crate::account::Signature {
 
         let sig_packed_vec = hex::decode(&order.signature).unwrap();
         let sig_unpacked: babyjubjub_rs::Signature = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
-
         // unsafe
         let sig: SignatureBJJ = unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_unpacked) };
         Self {
