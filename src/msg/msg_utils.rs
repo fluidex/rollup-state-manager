@@ -2,7 +2,7 @@ use crate::account::Signature;
 use crate::state::WitnessGenerator;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, OrderSide};
-use crate::types::primitives::{fr_to_decimal, str_to_fr, u32_to_fr};
+use crate::types::primitives::{bigint_to_fr, fr_to_decimal, str_to_fr, u32_to_fr};
 use crate::types::{self, fixnum, matchengine};
 use num::Zero;
 use rust_decimal::Decimal;
@@ -50,45 +50,27 @@ impl From<String> for TokenIdPair {
     }
 }
 
-fn hash_order(order: &crate::types::matchengine::messages::Order) -> String {
+fn hash_order(_order: &crate::types::matchengine::messages::Order) -> String {
     unimplemented!()
 }
 
-// TODO: opt lifetime?
+use crate::account::SignatureBJJ;
 use std::convert::TryInto;
+// TODO: opt lifetime?
 impl<'c> From<&'c matchengine::messages::Order> for crate::account::Signature {
     fn from(order: &'c matchengine::messages::Order) -> Self {
         let order_hash = hash_order(order);
 
         let sig_packed_vec = hex::decode(&order.signature).unwrap();
-        let sig_unpacked = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
-
-
-        // safe
-        // let b = self.priv_key.sign(fr_to_bigint(&hash))?.compress();
-        // let r_b8_bytes: [u8; 32] = *array_ref!(b[..32], 0, 32);
-        // let s = bigint_to_fr(BigInt::from_bytes_le(num_bigint::Sign::Plus, &b[32..]));
-        // let r_b8 = decompress_point(r_b8_bytes);
-        // match r_b8 {
-        //     Result::Err(err) => Err(err),
-        //     Result::Ok(Point { x: r8x, y: r8y }) => Ok(Signature { hash, s, r8x, r8y }),
-        // }
+        let sig_unpacked: babyjubjub_rs::Signature = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
 
         // unsafe
-        // let sig_orig: babyjubjub_rs::Signature = self.priv_key.sign(fr_to_bigint(&hash))?;
-        // let sig: SignatureBJJ = unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_orig) };
-        // let s = bigint_to_fr(sig.s);
-        // Ok(Signature {
-        //     hash,
-        //     s,
-        //     r8x: sig.r_b8.x,
-        //     r8y: sig.r_b8.y,
-        // })
-
-
-
+        let sig: SignatureBJJ = unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_unpacked) };
         Self {
             hash: str_to_fr(&order_hash),
+            s: bigint_to_fr(sig.s),
+            r8x: sig.r_b8.x,
+            r8y: sig.r_b8.y,
         }
     }
 }
