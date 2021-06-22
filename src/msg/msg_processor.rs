@@ -126,8 +126,8 @@ impl Processor {
             messages::OrderEventType::PUT => {
                 let is_new_order = order.order.finished_base == Decimal::zero() && order.order.finished_quote == Decimal::zero();
                 debug_assert!(is_new_order);
-                let order_input = Self::parse_order_from_msg(&order);
-                self.cache_order(&order_input);
+                let mut order_input = Self::parse_order_from_msg(&order);
+                self.cache_order(&mut order_input);
             }
             _ => {
                 log::debug!("skip order msg {:?}", order.event);
@@ -264,10 +264,9 @@ impl Processor {
     //        witgen.update_order_state(order.account_id, order);
     //    }
     //}
-    fn cache_order(&mut self, order_input: &OrderInput) {
-        let mut order_input = *order_input;
-        self.check_order_sig(&mut order_input);
-        self.order_cache.insert((order_input.account_id, order_input.order_id), order_input);
+    fn cache_order(&mut self, order_input: &mut OrderInput) {
+        self.check_order_sig(order_input);
+        self.order_cache.insert((order_input.account_id, order_input.order_id), order_input.clone());
         //println!("store order {} {}", order_input.account_id, order_input.order_id);
     }
     fn check_state(&self, witgen: &WitnessGenerator, trade_state: &Option<messages::VerboseTradeState>, trade: &messages::TradeMessage) {
