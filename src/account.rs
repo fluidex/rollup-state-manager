@@ -403,6 +403,7 @@ mod tests {
     use std::str::FromStr;
 
     use super::*;
+    use crate::types::l2::*;
     use crate::types::primitives::fr_to_string;
     use ff::PrimeField;
 
@@ -506,5 +507,17 @@ mod tests {
             acc.l2_account.bjj_pub_key,
             "5d182c51bcfe99583d7075a7a0c10d96bef82b8a059c4bf8c5f6e7124cf2bba3"
         );
+
+        let mut order: l2::OrderInput = l2::OrderInput {
+            account_id: 1,
+            order_id: 1,
+            side: l2::order::OrderSide::Buy,
+            token_buy: u32_to_fr(1),
+            token_sell: u32_to_fr(2),
+            total_buy: u32_to_fr(999),
+            total_sell: u32_to_fr(888),
+            sig: SignatureBJJ::default(),
+        };
+        order.sign_with(&acc).unwrap();
     }
 }
