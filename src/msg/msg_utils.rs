@@ -2,7 +2,7 @@ use crate::account::{Signature, SignatureBJJ};
 use crate::state::WitnessGenerator;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, OrderSide};
-use crate::types::primitives::{bigint_to_fr, fr_to_decimal, u32_to_fr, Fr};
+use crate::types::primitives::*;
 use crate::types::{self, fixnum, matchengine};
 use num::Zero;
 use rust_decimal::Decimal;
@@ -54,35 +54,28 @@ impl From<String> for TokenIdPair {
 fn hash_order(order: &crate::types::matchengine::messages::Order) -> Fr {
     let TokenIdPair(base_token_id, quote_token_id) = order.market.clone().into();
     let token_buy = match order.side {
-        matchengine::messages::OrderSide::ASK => token_buy: types::primitives::u32_to_fr(quote_token_id),
-        matchengine::messages::OrderSide::BID => token_buy: types::primitives::u32_to_fr(base_token_id),
+        matchengine::messages::OrderSide::ASK => u32_to_fr(quote_token_id),
+        matchengine::messages::OrderSide::BID => u32_to_fr(base_token_id),
     };
     let token_sell = match order.side {
-        matchengine::messages::OrderSide::ASK => token_buy: types::primitives::u32_to_fr(base_token_id),
-        matchengine::messages::OrderSide::BID => token_buy: types::primitives::u32_to_fr(quote_token_id),
+        matchengine::messages::OrderSide::ASK => u32_to_fr(base_token_id),
+        matchengine::messages::OrderSide::BID => u32_to_fr(quote_token_id),
     };
     let base_prec = prec_token_id(base_token_id);
     let quote_prec = prec_token_id(quote_token_id);
     let total_buy = match order.side {
         matchengine::messages::OrderSide::ASK => fixnum::decimal_to_amount(&(order.amount * order.price), quote_prec).to_fr(),
-        matchengine::messages::OrderSide::BID => fixnum::decimal_to_amount(&origin.amount, base_prec).to_fr(),
+        matchengine::messages::OrderSide::BID => fixnum::decimal_to_amount(&order.amount, base_prec).to_fr(),
     };
     let total_sell = match order.side {
         matchengine::messages::OrderSide::ASK => fixnum::decimal_to_amount(&order.amount, base_prec).to_fr(),
-        matchengine::messages::OrderSide::BID => fixnum::decimal_to_amount(&(origin.amount * origin.price), quote_prec).to_fr(),
+        matchengine::messages::OrderSide::BID => fixnum::decimal_to_amount(&(order.amount * order.price), quote_prec).to_fr(),
     };
 
     // copy from https://github.com/Fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/state-utils.ts#L38
     // TxType::PlaceOrder
-    let magic_head = primitives::u32_to_fr(4);
-    let data = hash(&[
-        magic_head,
-        primitives::u32_to_fr(order.id as u32),
-        token_sell,
-        token_buy,
-        total_sell,
-        total_buy,
-    ]);
+    let magic_head = u32_to_fr(4);
+    let data = hash(&[magic_head, u32_to_fr(order.id as u32), token_sell, token_buy, total_sell, total_buy]);
     //data = hash([data, accountID, nonce]);
     // nonce and orderID seems redundant?
 
