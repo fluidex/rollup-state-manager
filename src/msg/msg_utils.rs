@@ -1,3 +1,4 @@
+#![allow(clippy::let_and_return)]
 use crate::account::{Signature, SignatureBJJ};
 use crate::state::WitnessGenerator;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
