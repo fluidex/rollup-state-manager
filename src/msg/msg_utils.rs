@@ -137,7 +137,7 @@ pub fn trade_to_order_state(
             account_id: trade.ask_user_id,
             role: trade.ask_role,
             signature: match &trade.ask_order {
-                Some(o) => Some(o.signature.clone()),
+                Some(o) => Some(o.signature),
                 None => None,
             },
         },
@@ -153,7 +153,7 @@ pub fn trade_to_order_state(
             account_id: trade.bid_user_id,
             role: trade.bid_role,
             signature: match &trade.bid_order {
-                Some(o) => Some(o.signature.clone()),
+                Some(o) => Some(o.signature),
                 None => None,
             },
         },
@@ -186,7 +186,7 @@ impl OrderState {
                 account_id: trade.ask_user_id,
                 role: trade.ask_role,
                 signature: match &trade.ask_order {
-                    Some(o) => Some(o.signature.clone()),
+                    Some(o) => Some(o.signature),
                     None => None,
                 },
             },
@@ -204,7 +204,7 @@ impl OrderState {
                 account_id: trade.bid_user_id,
                 role: trade.bid_role,
                 signature: match &trade.bid_order {
-                    Some(o) => Some(o.signature.clone()),
+                    Some(o) => Some(o.signature),
                     None => None,
                 },
             },
