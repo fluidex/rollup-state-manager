@@ -57,11 +57,11 @@ impl From<String> for TokenIdPair {
 
 impl From<String> for SignatureBJJ {
     fn from(signature: String) -> SignatureBJJ {
-        if signature == Signature::default() {
+        if signature == String::default() {
             return SignatureBJJ::default();
         }
 
-        let sig_packed_vec = hex::decode(&(signature.unwrap())).unwrap();
+        let sig_packed_vec = hex::decode(signature).unwrap();
         let sig_unpacked: babyjubjub_rs::Signature = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
         unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_unpacked) }
     }
