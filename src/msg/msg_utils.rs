@@ -127,7 +127,7 @@ pub fn trade_to_order_state(
             role: trade.ask_role,
             signature: match &trade.ask_order {
                 Some(o) => o.signature.clone(),
-                None => None,
+                None => String::default(),
             },
         },
         OrderState {
@@ -143,7 +143,7 @@ pub fn trade_to_order_state(
             role: trade.bid_role,
             signature: match &trade.bid_order {
                 Some(o) => o.signature.clone(),
-                None => None,
+                None => String::default(),
             },
         },
     )
@@ -176,7 +176,7 @@ impl OrderState {
                 role: trade.ask_role,
                 signature: match &trade.ask_order {
                     Some(o) => o.signature.clone(),
-                    None => None,
+                    None => String::default(),
                 },
             },
             "BID" => OrderState {
@@ -194,7 +194,7 @@ impl OrderState {
                 role: trade.bid_role,
                 signature: match &trade.bid_order {
                     Some(o) => o.signature.clone(),
-                    None => None,
+                    None => String::default(),
                 },
             },
             _ => unreachable!(),
