@@ -1,4 +1,4 @@
-use crate::types::primitives::{bigint_to_fr, fr_to_bigint, u32_to_fr, Fr};
+use crate::types::primitives::{bigint_to_fr, fr_to_bigint, Fr};
 use anyhow::Result;
 use arrayref::array_ref;
 use babyjubjub_rs::{self, decompress_point, Point, PrivateKey};
@@ -65,6 +65,7 @@ pub struct L2Account {
     pub bjj_pub_key: String,
 }
 
+// don't change struct fields here!!!
 #[derive(Debug, Clone)]
 pub struct SignatureBJJ {
     pub r_b8: Point,
@@ -90,11 +91,7 @@ impl L2Account {
         let ax = pub_key.x;
         let ay = pub_key.y;
         let bjj_compressed = pub_key.compress();
-        let sign = if bjj_compressed[31] & 0x80 != 0x00 {
-            u32_to_fr(1)
-        } else {
-            Fr::zero()
-        };
+        let sign = if bjj_compressed[31] & 0x80 != 0x00 { Fr::one() } else { Fr::zero() };
         let bjj_pub_key = hex::encode(bjj_compressed);
         Ok(Self {
             priv_key,
@@ -156,14 +153,20 @@ impl L2Account {
         Ok(self.priv_key.sign(fr_to_bigint(&hash))?.compress())
     }
     pub fn verify(&self, sig: Signature) -> bool {
-        let msg = fr_to_bigint(&sig.hash);
+        Self::verify_using_pubkey(sig, &self.pub_key)
+    }
+    pub fn verify_raw_using_pubkey(msg: Fr, sig_bjj: SignatureBJJ, pub_key: &Point) -> bool {
+        let msg = fr_to_bigint(&msg);
+        let sig_final = unsafe { std::mem::transmute::<SignatureBJJ, babyjubjub_rs::Signature>(sig_bjj) };
+        babyjubjub_rs::verify(pub_key.clone(), sig_final, msg)
+    }
+    pub fn verify_using_pubkey(sig: Signature, pub_key: &Point) -> bool {
         let r_b8 = Point { x: sig.r8x, y: sig.r8y };
         let sig_bjj = SignatureBJJ {
             r_b8,
             s: fr_to_bigint(&sig.s),
         };
-        let sig_final = unsafe { std::mem::transmute::<SignatureBJJ, babyjubjub_rs::Signature>(sig_bjj) };
-        babyjubjub_rs::verify(self.pub_key.clone(), sig_final, msg)
+        Self::verify_raw_using_pubkey(sig.hash, sig_bjj, &pub_key)
     }
 }
 

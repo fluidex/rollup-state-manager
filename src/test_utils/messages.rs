@@ -6,6 +6,7 @@ pub enum WrappedMessage {
     BALANCE(types::matchengine::messages::BalanceMessage),
     TRADE(types::matchengine::messages::TradeMessage),
     ORDER(types::matchengine::messages::OrderMessage),
+    USER(types::matchengine::messages::UserMessage),
 }
 
 pub fn parse_msg(line: String) -> Result<WrappedMessage> {
@@ -25,6 +26,10 @@ pub fn parse_msg(line: String) -> Result<WrappedMessage> {
             "TradeMessage" => {
                 let data = serde_json::from_value(val).map_err(|e| anyhow!("wrong trade: {}", e))?;
                 Ok(WrappedMessage::TRADE(data))
+            }
+            "UserMessage" => {
+                let data = serde_json::from_value(val).map_err(|e| anyhow!("wrong user: {}", e))?;
+                Ok(WrappedMessage::USER(data))
             }
             other => Err(anyhow!("unrecognized type field {}", other)),
         }

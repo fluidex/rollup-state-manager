@@ -2,7 +2,7 @@
 set -uex
 
 export NTXS=2;
-export BALANCELEVELS=2;
+export BALANCELEVELS=3;
 export ORDERLEVELS=4;
 export ACCOUNTLEVELS=4;
 export VERBOSE=false;
@@ -16,7 +16,7 @@ cd $REPO_DIR
 # make sure submodule is correctly cloned!!
 git submodule update --init --recursive
 if [ -z ${CI+x} ]; then git pull --recurse-submodules; fi
-cargo run --features="persist_sled, fr_string_repr" --bin gen_global_state_testcase -- tests/global_state/testdata/data001.txt # debug mode for fast compile
+cargo run --features="persist_sled, fr_string_repr" --bin gen_global_state_testcase -- tests/global_state/testdata/data002.txt # debug mode for fast compile
 
 cd $REPO_DIR/circuits; npm i
 snarkit --version || npm -g install snarkit

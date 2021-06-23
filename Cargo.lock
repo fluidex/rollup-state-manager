@@ -3109,6 +3109,7 @@ dependencies = [
  "regex",
  "rust_decimal",
  "serde 1.0.125",
+ "serde-big-array",
  "serde_derive",
  "serde_json",
  "sha2 0.9.5",
@@ -3267,6 +3268,16 @@ checksum = "77eb8c83f6ebaedf5e8f970a8a44506b180b8e6268de03885c8547031ccaee00"
 dependencies = [
  "serde 1.0.125",
  "serde_json",
+]
+
+[[package]]
+name = "serde-big-array"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18b20e7752957bbe9661cff4e0bb04d183d0948cdab2ea58cdb9df36a61dfe62"
+dependencies = [
+ "serde 1.0.125",
+ "serde_derive",
 ]
 
 [[package]]

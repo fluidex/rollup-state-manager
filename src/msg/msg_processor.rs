@@ -1,14 +1,18 @@
-use crate::account::{Account, Signature, SignatureBJJ};
+use crate::account::{Account, L2Account, Signature, SignatureBJJ};
 use crate::state::WitnessGenerator;
 use crate::test_utils::types::{get_mnemonic_by_account_id, get_token_id_by_name, prec_token_id};
+use crate::types::fixnum::Float864;
 use crate::types::l2::{self, OrderInput, OrderSide};
-use crate::types::primitives::{fr_to_bigint, u32_to_fr, Fr};
+use crate::types::primitives::{fr_to_bigint, str_to_fr, u32_to_fr, Fr};
 use crate::types::{fixnum, matchengine::messages};
+
 use babyjubjub_rs::Point;
 use ethers::prelude::coins_bip39::English;
+use ff::Field;
 use num::Zero;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::time::Instant;
 
 use super::msg_utils::{
@@ -21,18 +25,24 @@ use super::msg_utils::{
 pub struct Processor {
     trade_tx_total_time: f32,
     balance_tx_total_time: f32,
-    accounts: HashMap<u32, Account>,
+
+    enable_check_order_sig: bool,
+    enable_handle_order: bool,
+
+    ////////////// below are for debug purpose ///////////////
+
+    // move this into witgen?
+    account_pubkeys: HashMap<u32, Point>,
 
     // (order_hash, bjj_key) -> sig
     // only useful in debug mode
+    auto_fill_sig: bool,
+    accounts: HashMap<u32, Account>,
     order_sig_cache: HashMap<(Fr, String), Signature>,
 
     // FIXME: we cache the order twice? here and inside witgen
     // (uid, order_id) -> Order
     order_cache: HashMap<(u32, u32), OrderInput>,
-
-    enable_check_order_sig: bool,
-    enable_handle_order: bool,
 }
 
 impl Default for Processor {
@@ -43,8 +53,10 @@ impl Default for Processor {
             accounts: Default::default(),
             order_sig_cache: Default::default(),
             order_cache: Default::default(),
-            enable_check_order_sig: false,
+            account_pubkeys: Default::default(),
+            enable_check_order_sig: true,
             enable_handle_order: false,
+            auto_fill_sig: false,
         }
     }
 }
@@ -61,16 +73,40 @@ impl Processor {
         //println!("set account {} {}", account_id, account. bjj_pub_key());
         self.accounts.insert(account_id, account);
     }
+    pub fn handle_user_msg(&mut self, witgen: &mut WitnessGenerator, user_info: messages::UserMessage) {
+        let account_id = user_info.user_id;
+        assert!(!witgen.has_account(account_id));
+        let l2_pubkey: String = user_info.l2_pubkey;
+        let l2_pubkey: Vec<u8> = hex::decode(l2_pubkey.trim_start_matches("0x")).unwrap();
+        let bjj_compressed: [u8; 32] = l2_pubkey.try_into().unwrap();
+        let l2_pubkey_point = babyjubjub_rs::decompress_point(bjj_compressed).unwrap();
+        self.account_pubkeys.insert(account_id, l2_pubkey_point.clone());
+        let fake_token_id = 0;
+        let fake_amount = Float864::from_decimal(&Decimal::zero(), prec_token_id(fake_token_id)).unwrap();
+        let eth_addr = str_to_fr(&user_info.l1_address);
+        let sign = if bjj_compressed[31] & 0x80 != 0x00 { Fr::one() } else { Fr::zero() };
+        // TODO: remove '0x' from eth addr?
+        witgen
+            .deposit(l2::DepositTx {
+                token_id: fake_token_id,
+                account_id,
+                amount: fake_amount,
+                l2key: Some(l2::L2Key {
+                    eth_addr,
+                    sign,
+                    ay: l2_pubkey_point.y,
+                }),
+            })
+            .unwrap();
+    }
     pub fn handle_balance_msg(&mut self, witgen: &mut WitnessGenerator, deposit: messages::BalanceMessage) {
         assert!(!deposit.change.is_sign_negative(), "only support deposit now");
         let token_id = get_token_id_by_name(&deposit.asset);
         let account_id = deposit.user_id;
         let is_old = witgen.has_account(account_id);
-        let account = self.accounts.entry(account_id).or_insert_with(|| {
-            // create deterministic keypair for debugging
-            let mnemonic = get_mnemonic_by_account_id(account_id);
-            Account::from_mnemonic::<English>(account_id, &mnemonic).unwrap()
-        });
+
+        // we now use UserMessage to create new user
+        assert!(is_old);
 
         let balance_before = deposit.balance - deposit.change;
         assert!(!balance_before.is_sign_negative(), "invalid balance {:?}", deposit);
@@ -82,8 +118,8 @@ impl Processor {
         );
 
         let timing = Instant::now();
-
         let amount = fixnum::decimal_to_amount(&deposit.change, prec_token_id(token_id));
+
         if is_old {
             witgen
                 .deposit(l2::DepositTx {
@@ -94,6 +130,13 @@ impl Processor {
                 })
                 .unwrap();
         } else {
+            let account = self.accounts.entry(account_id).or_insert_with(|| {
+                // create deterministic keypair for debugging
+                //println!("create debug account {}", account_id);
+                let mnemonic = get_mnemonic_by_account_id(account_id);
+                Account::from_mnemonic::<English>(account_id, &mnemonic).unwrap()
+            });
+
             witgen
                 .deposit(l2::DepositTx {
                     token_id,
@@ -234,7 +277,15 @@ impl Processor {
     }
     fn check_order_sig(&mut self, order_to_put: &mut OrderInput) {
         if self.enable_check_order_sig {
-            // TODO: if order has no sig, deny
+            if !L2Account::verify_raw_using_pubkey(
+                order_to_put.hash(),
+                order_to_put.sig.clone(),
+                self.account_pubkeys.get(&order_to_put.account_id).unwrap(),
+            ) {
+                panic!("invalid sig for order {:?}", order_to_put)
+            } else {
+                //println!("verify sig for order done {:?}", order_to_put);
+            }
         } else if *crate::params::OVERWRITE_SIGNATURE {
             // overwrite order sig
             let order_hash = order_to_put.hash();

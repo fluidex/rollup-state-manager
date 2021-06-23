@@ -57,6 +57,9 @@ fn replay_msgs(
                 WrappedMessage::ORDER(order) => {
                     processor.handle_order_msg(&mut witgen, order);
                 }
+                WrappedMessage::USER(user) => {
+                    processor.handle_user_msg(&mut witgen, user);
+                }
             }
 
             let new_block_num = witgen.get_block_generate_num();

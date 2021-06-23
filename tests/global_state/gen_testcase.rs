@@ -48,6 +48,9 @@ fn replay_msgs(
                 WrappedMessage::ORDER(order) => {
                     processor.handle_order_msg(&mut witgen, order);
                 }
+                WrappedMessage::USER(user) => {
+                    processor.handle_user_msg(&mut witgen, user);
+                }
                 _ => {
                     //other msg is omitted
                 }
