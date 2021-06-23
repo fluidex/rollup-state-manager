@@ -92,8 +92,8 @@ impl Processor {
                 account_id,
                 amount: fake_amount,
                 l2key: Some(l2::L2Key {
-                    eth_addr: eth_addr,
-                    sign: sign,
+                    eth_addr,
+                    sign,
                     ay: l2_pubkey_point.y,
                 }),
             })
