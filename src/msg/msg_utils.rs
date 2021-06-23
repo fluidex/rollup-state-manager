@@ -55,9 +55,9 @@ impl From<String> for TokenIdPair {
     }
 }
 
-impl From<Option<String>> for SignatureBJJ {
-    fn from(signature: Option<String>) -> SignatureBJJ {
-        if signature.is_none() {
+impl From<String> for SignatureBJJ {
+    fn from(signature: String) -> SignatureBJJ {
+        if signature == Signature::default() {
             return SignatureBJJ::default();
         }
 
