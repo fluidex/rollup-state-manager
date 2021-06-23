@@ -403,7 +403,8 @@ mod tests {
     use std::str::FromStr;
 
     use super::*;
-    use crate::types::primitives::fr_to_string;
+    use crate::types::l2::*;
+    use crate::types::primitives::*;
     use ff::PrimeField;
 
     #[test]
@@ -494,5 +495,67 @@ mod tests {
             acc.l2_account.bjj_pub_key,
             "7b70843a42114e88149e3961495c03f9a41292c8b97bd1e2026597d185478293"
         );
+    }
+
+    #[test]
+    fn test_order_signature() {
+        // https://github.com/Fluidex/rollup-state-manager/blob/master/tests/data/accounts.jsonl account id 1
+        let mnemonic = Mnemonic::<English>::new_from_phrase("olympic comfort palm large heavy verb acid lion attract vast dash memory olympic syrup announce sure body cruise flip merge fabric frame question result")
+            .expect("should generate mnemonic from phrase");
+        let acc = Account::from_mnemonic(0, &mnemonic).expect("should generate account from mnemonic");
+        assert_eq!(
+            acc.l2_account.bjj_pub_key,
+            "5d182c51bcfe99583d7075a7a0c10d96bef82b8a059c4bf8c5f6e7124cf2bba3"
+        );
+
+        let mut order: l2::OrderInput = l2::OrderInput {
+            account_id: 1,
+            order_id: 1,
+            side: l2::order::OrderSide::Buy,
+            token_buy: u32_to_fr(1),
+            token_sell: u32_to_fr(2),
+            total_buy: u32_to_fr(999),
+            total_sell: u32_to_fr(888),
+            sig: SignatureBJJ::default(),
+        };
+        order.sign_with(&acc).unwrap();
+
+        assert_eq!(
+            fr_to_string(&order.hash()),
+            "8056692562185768785417295010793063162660984530596417435073781442183268221458",
+            "message (Fr) to sign"
+        );
+
+        assert_eq!(
+            hex::encode(fr_to_vec(&order.hash())), // big endian
+            "11cfed280efe7a90a79f3ff69ad6dafc57bfd03e24f176cd1149068268994212",
+            "message (hexdecimal string) to sign"
+        );
+
+        let sig_final = unsafe { std::mem::transmute::<SignatureBJJ, babyjubjub_rs::Signature>(order.sig.clone()) };
+        let sig_compressed = sig_final.compress();
+        assert_eq!(
+            hex::encode(sig_compressed),
+            "57e6cf2e5b8db0a90072d15bc49e737df2e10746e5f531a24d72557894f2c90964d77726505232a4c9e7631eed22ad9210dce2858642fdfe3e58e95d44b99002",
+        );
+
+        let mut b: Vec<u8> = Vec::new();
+        b.append(&mut order.sig.r_b8.compress().to_vec());
+        let (_, s_bytes) = order.sig.s.to_bytes_le();
+        let mut s_32bytes: [u8; 32] = [0; 32];
+        let len = std::cmp::min(s_bytes.len(), s_32bytes.len());
+        s_32bytes[..len].copy_from_slice(&s_bytes[..len]);
+        b.append(&mut s_32bytes.to_vec());
+        let mut buf: [u8; 64] = [0; 64];
+        buf[..].copy_from_slice(&b[..]);
+        assert_eq!(sig_compressed, buf, "different approaches to get sig_compressed");
+
+        let detailed_sig = Signature {
+            hash: order.hash(),
+            s: bigint_to_fr(order.sig.s),
+            r8x: order.sig.r_b8.x,
+            r8y: order.sig.r_b8.y,
+        };
+        assert!(acc.l2_account.verify(detailed_sig));
     }
 }
