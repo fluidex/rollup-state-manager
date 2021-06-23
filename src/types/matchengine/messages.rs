@@ -1,8 +1,18 @@
 #![allow(clippy::upper_case_acronyms)]
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use serde_big_array::big_array;
+
+big_array! { BigArray; }
 
 // TODO: reuse related types def in dingir-exchange
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserMessage {
+    pub user_id: u32,
+    pub l1_address: String,
+    pub l2_pubkey: String,
+}
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum MarketRole {
@@ -49,8 +59,12 @@ pub struct Order {
     pub finished_base: Decimal,
     pub finished_quote: Decimal,
     pub finished_fee: Decimal,
+    pub post_only: bool,
+
+    #[serde(with = "BigArray")]
+    pub signature: [u8; 64],
     // TODO: remove Option once migration is done
-    pub signature: Option<String>,
+    //pub signature: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

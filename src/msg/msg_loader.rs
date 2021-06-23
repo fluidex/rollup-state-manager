@@ -24,6 +24,7 @@ pub fn load_msgs_from_file(
 
 const UNIFY_TOPIC: &str = "unifyevents";
 const MSG_TYPE_BALANCES: &str = "balances";
+const MSG_TYPE_USERS: &str = "users";
 const MSG_TYPE_ORDERS: &str = "orders";
 const MSG_TYPE_TRADES: &str = "trades";
 
@@ -90,6 +91,10 @@ impl SimpleMessageHandler for &MessageWriter {
             MSG_TYPE_TRADES => {
                 let data = serde_json::from_str(msg_payload).unwrap();
                 WrappedMessage::TRADE(data)
+            }
+            MSG_TYPE_USERS => {
+                let data = serde_json::from_str(msg_payload).unwrap();
+                WrappedMessage::USER(data)
             }
             _ => unreachable!(),
         };

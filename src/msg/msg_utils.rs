@@ -28,7 +28,7 @@ pub struct OrderState {
     pub account_id: u32,
     pub role: matchengine::messages::MarketRole,
 
-    pub signature: Option<String>,
+    pub signature: Option<[u8; 64]>,
 }
 
 impl<'c> From<&'c str> for TokenPair<'c> {
@@ -63,6 +63,17 @@ impl From<Option<String>> for SignatureBJJ {
 
         let sig_packed_vec = hex::decode(&(signature.unwrap())).unwrap();
         let sig_unpacked: babyjubjub_rs::Signature = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
+        unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_unpacked) }
+    }
+}
+
+impl From<[u8; 64]> for SignatureBJJ {
+    fn from(signature: [u8; 64]) -> SignatureBJJ {
+        if signature == [0; 64] {
+            return SignatureBJJ::default();
+        }
+        //println!("SignatureBJJ {:?}", signature);
+        let sig_unpacked: babyjubjub_rs::Signature = babyjubjub_rs::decompress_signature(&signature).unwrap();
         unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_unpacked) }
     }
 }
@@ -126,7 +137,7 @@ pub fn trade_to_order_state(
             account_id: trade.ask_user_id,
             role: trade.ask_role,
             signature: match &trade.ask_order {
-                Some(o) => o.signature.clone(),
+                Some(o) => Some(o.signature.clone()),
                 None => None,
             },
         },
@@ -142,7 +153,7 @@ pub fn trade_to_order_state(
             account_id: trade.bid_user_id,
             role: trade.bid_role,
             signature: match &trade.bid_order {
-                Some(o) => o.signature.clone(),
+                Some(o) => Some(o.signature.clone()),
                 None => None,
             },
         },
@@ -175,7 +186,7 @@ impl OrderState {
                 account_id: trade.ask_user_id,
                 role: trade.ask_role,
                 signature: match &trade.ask_order {
-                    Some(o) => o.signature.clone(),
+                    Some(o) => Some(o.signature.clone()),
                     None => None,
                 },
             },
@@ -193,7 +204,7 @@ impl OrderState {
                 account_id: trade.bid_user_id,
                 role: trade.bid_role,
                 signature: match &trade.bid_order {
-                    Some(o) => o.signature.clone(),
+                    Some(o) => Some(o.signature.clone()),
                     None => None,
                 },
             },
@@ -225,6 +236,7 @@ impl From<OrderState> for l2::Order {
     }
 }
 
+// this function should not exist at all...
 impl From<OrderState> for l2::OrderInput {
     fn from(order_state: OrderState) -> Self {
         l2::OrderInput {
@@ -233,7 +245,7 @@ impl From<OrderState> for l2::OrderInput {
             token_buy: u32_to_fr(order_state.token_buy),
             total_sell: fixnum::decimal_to_fr(&order_state.total_sell, prec_token_id(order_state.token_sell)),
             total_buy: fixnum::decimal_to_fr(&order_state.total_buy, prec_token_id(order_state.token_buy)),
-            sig: order_state.signature.clone().into(),
+            sig: order_state.signature.unwrap().into(),
             account_id: order_state.account_id,
             side: if order_state.side.to_lowercase() == "buy" || order_state.side.to_lowercase() == "bid" {
                 OrderSide::Buy
