@@ -28,7 +28,7 @@ pub struct OrderState {
     pub account_id: u32,
     pub role: matchengine::messages::MarketRole,
 
-    pub signature: Option<String>,
+    pub signature: String,
 }
 
 impl<'c> From<&'c str> for TokenPair<'c> {

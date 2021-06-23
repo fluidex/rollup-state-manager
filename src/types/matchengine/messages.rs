@@ -30,6 +30,7 @@ pub enum OrderEventType {
     EXPIRED = 4,
 }
 
+#[serde_as]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Order {
     pub id: u64,
@@ -49,8 +50,8 @@ pub struct Order {
     pub finished_base: Decimal,
     pub finished_quote: Decimal,
     pub finished_fee: Decimal,
-    // TODO: remove Option once migration is done
-    pub signature: Option<String>,
+    #[serde_as(deserialize_as = "DefaultOnNull")]
+    pub signature: String,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
