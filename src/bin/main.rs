@@ -1,6 +1,7 @@
 #![allow(clippy::unnecessary_wraps)]
 #![allow(dead_code)]
 
+use crossbeam_channel::RecvTimeoutError;
 use rollup_state_manager::config;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
 use rollup_state_manager::params;
@@ -8,7 +9,7 @@ use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils::messages::WrappedMessage;
 use rollup_state_manager::types::l2::{L2Block, L2BlockSerde};
 use sqlx::postgres::PgPool;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 #[tokio::main]
 async fn main() {
@@ -36,44 +37,54 @@ fn replay_msgs(
             *params::ACCOUNTLEVELS,
             *params::VERBOSE,
         );
-        let mut witgen = WitnessGenerator::new(state, *params::NTXS, block_sender, *params::VERBOSE);
+        let mut witgen = WitnessGenerator::new(state, *params::NTXS, *params::VERBOSE);
 
         println!("genesis root {}", witgen.root());
 
         let mut processor = msg_processor::Processor::default();
 
-        let mut current_block_num = 0;
         let timing = Instant::now();
-        for msg in msg_receiver.iter() {
-            match msg {
-                WrappedMessage::BALANCE(balance) => {
-                    processor.handle_balance_msg(&mut witgen, balance);
-                }
-                WrappedMessage::TRADE(trade) => {
-                    let trade_id = trade.id;
-                    processor.handle_trade_msg(&mut witgen, trade);
-                    println!("trade {} test done", trade_id);
-                }
-                WrappedMessage::ORDER(order) => {
-                    processor.handle_order_msg(&mut witgen, order);
-                }
-                WrappedMessage::USER(user) => {
-                    processor.handle_user_msg(&mut witgen, user);
-                }
+        loop {
+            match msg_receiver.recv_timeout(Duration::from_secs(120)) {
+                Ok(msg) => match msg {
+                    WrappedMessage::BALANCE(balance) => {
+                        processor.handle_balance_msg(&mut witgen, balance);
+                    }
+                    WrappedMessage::TRADE(trade) => {
+                        let trade_id = trade.id;
+                        processor.handle_trade_msg(&mut witgen, trade);
+                        println!("trade {} test done", trade_id);
+                    }
+                    WrappedMessage::ORDER(order) => {
+                        processor.handle_order_msg(&mut witgen, order);
+                    }
+                    WrappedMessage::USER(user) => {
+                        processor.handle_user_msg(&mut witgen, user);
+                    }
+                },
+                Err(err) => match err {
+                    RecvTimeoutError::Timeout => {
+                        if witgen.has_raw_tx() {
+                            witgen.flush_with_nop();
+                        }
+                    }
+                    RecvTimeoutError::Disconnected => break,
+                },
+            };
+
+            for block in witgen.pop_all_blocks() {
+                block_sender.try_send(block).unwrap();
             }
 
-            let new_block_num = witgen.get_block_generate_num();
-            if new_block_num > current_block_num {
-                current_block_num = new_block_num;
-                let secs = timing.elapsed().as_secs_f32();
-                println!(
-                    "generate {} blocks with block_size {} in {}s: average TPS: {}",
-                    current_block_num,
-                    *params::NTXS,
-                    secs,
-                    (*params::NTXS * current_block_num) as f32 / secs
-                );
-            }
+            let block_num = witgen.get_block_generate_num();
+            let secs = timing.elapsed().as_secs_f32();
+            println!(
+                "generate {} blocks with block_size {} in {}s: average TPS: {}",
+                block_num,
+                *params::NTXS,
+                secs,
+                (*params::NTXS * block_num) as f32 / secs
+            );
         }
 
         Ok(())

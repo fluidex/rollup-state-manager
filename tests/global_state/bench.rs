@@ -75,7 +75,7 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
 
     let (sender, receiver) = crossbeam_channel::unbounded();
 
-    let mut witgen = WitnessGenerator::new(state, *params::NTXS, sender, *params::VERBOSE);
+    let mut witgen = WitnessGenerator::new(state, *params::NTXS, *params::VERBOSE);
 
     let timing = Instant::now();
     let mut inner_timing = Instant::now();
@@ -117,6 +117,11 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
             inner_timing = Instant::now();
         }
     }
+
+    for block in witgen.pop_all_blocks() {
+        sender.try_send(block).unwrap();
+    }
+
     drop(witgen); // to close sender
     let blocks: Vec<_> = receiver.iter().collect();
     println!(
