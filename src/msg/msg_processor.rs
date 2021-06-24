@@ -15,9 +15,7 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::time::Instant;
 
-use super::msg_utils::{
-    assert_balance_state, assert_order_state, exchange_order_to_rollup_order, trade_to_order_state, TokenIdPair, TokenPair,
-};
+use super::msg_utils::{check_state, exchange_order_to_rollup_order, TokenIdPair, TokenPair};
 
 // Preprocessor is used to attach order_sig for each order
 // it is only useful in development system
@@ -175,7 +173,9 @@ impl Processor {
         }
     }
     pub fn handle_trade_msg(&mut self, witgen: &mut WitnessGenerator, trade: messages::TradeMessage) {
-        self.check_state(witgen, &trade.state_before, &trade);
+        if let Some(state_before) = &trade.state_before {
+            check_state(witgen, state_before, &trade);
+        }
 
         let timing = Instant::now();
         let mut taker_order: Option<l2::Order> = None;
@@ -215,7 +215,9 @@ impl Processor {
         };
         witgen.full_spot_trade(tx);
         self.trade_tx_total_time += timing.elapsed().as_secs_f32();
-        self.check_state(witgen, &trade.state_after, &trade);
+        if let Some(state_after) = &trade.state_after {
+            check_state(witgen, state_after, &trade);
+        }
     }
 
     fn trade_into_spot_tx(&self, trade: &messages::TradeMessage) -> l2::SpotTradeTx {
@@ -318,19 +320,13 @@ impl Processor {
             .insert((order_input.account_id, order_input.order_id), order_input.clone());
         //println!("store order {} {}", order_input.account_id, order_input.order_id);
     }
-    fn check_state(&self, witgen: &WitnessGenerator, trade_state: &Option<messages::VerboseTradeState>, trade: &messages::TradeMessage) {
-        let token_pair = TokenPair::from(trade.market.as_str());
-        let id_pair = TokenIdPair::from(token_pair);
-        if let Some(state) = trade_state {
-            assert_balance_state(&state.balance, witgen, trade.bid_user_id, trade.ask_user_id, id_pair);
-            let (ask_order_state, bid_order_state) = trade_to_order_state(&state, &trade);
-            assert_order_state(witgen, ask_order_state);
-            assert_order_state(witgen, bid_order_state);
-        }
-    }
+
     pub fn sign_orders(&mut self, trade: messages::TradeMessage) {
-        let (ask, bid) = trade_to_order_state(&trade.state_before.clone().unwrap(), &trade);
-        self.check_order_sig(&mut OrderInput::from(ask));
-        self.check_order_sig(&mut OrderInput::from(bid));
+        if let Some(bid) = trade.bid_order {
+            self.check_order_sig(&mut exchange_order_to_rollup_order(&bid));
+        }
+        if let Some(ask) = trade.ask_order {
+            self.check_order_sig(&mut exchange_order_to_rollup_order(&ask));
+        }
     }
 }
