@@ -3115,6 +3115,7 @@ dependencies = [
  "sha2 0.9.5",
  "sled",
  "sqlx",
+ "thiserror",
  "tokio",
 ]
 

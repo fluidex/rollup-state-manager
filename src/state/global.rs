@@ -7,6 +7,8 @@ use crate::types::merkle_tree::{MerkleProof, Tree};
 use crate::types::primitives::Fr;
 #[cfg(feature = "persist_sled")]
 use crate::types::primitives::FrWrapper;
+#[cfg(feature = "persist_sled")]
+use crate::r#const::sled_db::{ACCOUNTSTATES_KEY, ACCOUNTTREE_KEY, BALANCETREES_KEY, ORDERTREES_KEY};
 use anyhow::bail;
 use ff::Field;
 use fnv::FnvHashMap;
@@ -37,6 +39,20 @@ pub struct AccountUpdates {
     pub balance_updates: Vec<(u32, Fr)>,
     pub order_updates: Vec<(u32, Fr)>,
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum GlobalStateError {
+    #[error(transparent)]
+    #[cfg(feature = "persist_sled")]
+    SledError(#[from] sled::Error),
+    #[error(transparent)]
+    #[cfg(feature = "persist_sled")]
+    BincodeError(#[from] bincode::Error),
+    #[error("requested content not found in db")]
+    NotFound,
+}
+
+type Result<T, E = GlobalStateError> = std::result::Result<T, E>;
 
 // TODO: too many unwrap here
 // TODO: do we really need Arc/Mutex?
@@ -401,6 +417,60 @@ impl GlobalState {
     }
 
     #[cfg(feature = "persist_sled")]
+    pub fn load_persist(&mut self, db: &sled::Db) -> Result<()> {
+        self.account_tree = Arc::new(Mutex::new(self.load_account_tree(db)?));
+        let account_states = db.open_tree(ACCOUNTSTATES_KEY)?;
+        self.account_states = self.load_account_state(&account_states)?;
+        let balance_trees = db.open_tree(BALANCETREES_KEY)?;
+        self.balance_trees = self.load_trees(&balance_trees)?;
+        let order_trees = db.open_tree(ORDERTREES_KEY)?;
+        self.order_trees = self.load_trees(&order_trees)?;
+        Ok(())
+    }
+
+    #[cfg(feature = "persist_sled")]
+    pub fn load_account_tree(&mut self, db: &sled::Db) -> Result<Tree> {
+        Ok(bincode::deserialize(db.get(ACCOUNTTREE_KEY)?.ok_or(GlobalStateError::NotFound)?.as_ref())?)
+    }
+
+    #[cfg(feature = "persist_sled")]
+    pub fn load_account_state(&mut self, db: &sled::Tree) -> Result<FnvHashMap<u32, AccountState>> {
+        self.account_tree
+            .lock().unwrap()
+            .iter()
+            .map(|(_id, hash)| {
+                match bincode::serialize(&FrWrapper::from(hash)) {
+                    Ok(key) => db
+                        .get(key)
+                        .map_err(|e| GlobalStateError::from(e))
+                        .and_then(|v| v.ok_or(GlobalStateError::NotFound))
+                        .and_then(|v| bincode::deserialize::<(u32, AccountState)>(v.as_ref()).map_err(|e| GlobalStateError::from(e))),
+                    Err(e) => Err(GlobalStateError::from(e)),
+                }
+            })
+            .collect::<Result<FnvHashMap<u32, AccountState>>>()
+    }
+
+    #[cfg(feature = "persist_sled")]
+    pub fn load_trees(&mut self, db: &sled::Tree) -> Result<FnvHashMap<u32, Arc<Mutex<Tree>>>> {
+        self.account_states
+            .iter()
+            .map(|(id, _state)| {
+                match bincode::serialize(id) {
+                    Ok(key) => db
+                        .get(key)
+                        .map_err(|e| GlobalStateError::from(e))
+                        .and_then(|v| v.ok_or(GlobalStateError::NotFound))
+                        .and_then(|v| bincode::deserialize::<Tree>(v.as_ref()).map_err(|e| GlobalStateError::from(e)))
+                        .map(|tree| (*id, Arc::new(Mutex::new(tree)))),
+                    Err(e) => Err(GlobalStateError::from(e)),
+                }
+            })
+            .collect::<Result<FnvHashMap<u32, Arc<Mutex<Tree>>>>>()
+    }
+
+
+    #[cfg(feature = "persist_sled")]
     pub fn save_account_state(&self, db: &sled::Tree) {
         assert!(self
             .account_states
@@ -432,7 +502,7 @@ impl GlobalState {
 
     #[cfg(feature = "persist_sled")]
     pub fn save_account_tree(&self, db: &sled::Db) {
-        db.insert("account_tree", bincode::serialize(&*self.account_tree.clone()).unwrap())
+        db.insert(ACCOUNTTREE_KEY, bincode::serialize(&*self.account_tree.clone()).unwrap())
             .unwrap();
     }
 }
