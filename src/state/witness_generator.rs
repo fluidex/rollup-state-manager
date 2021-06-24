@@ -2,12 +2,14 @@
 #![allow(clippy::vec_init_then_push)]
 
 use super::global::{AccountUpdates, GlobalState};
+use crate::account::{L2Account, SignatureBJJ};
 #[cfg(feature = "persist_sled")]
 use crate::r#const::sled_db::{ACCOUNTSTATES_KEY, BALANCETREES_KEY, ORDERTREES_KEY};
 use crate::types::l2::{tx_detail_idx, DepositTx, FullSpotTradeTx, L2Block, Order, RawTx, TransferTx, TxType, WithdrawTx, TX_LENGTH};
 use crate::types::merkle_tree::Tree;
-use crate::types::primitives::{fr_add, fr_sub, u32_to_fr, Fr};
-use anyhow::bail;
+use crate::types::primitives::{fr_add, fr_sub, fr_to_bigint, u32_to_fr, Fr};
+use anyhow::{anyhow, bail};
+use babyjubjub_rs::Point;
 use ff::Field;
 
 // TODO: too many unwrap here
@@ -570,6 +572,20 @@ impl WitnessGenerator {
             cnt += 1;
         }
         log::debug!("flush with {} nop", cnt);
+    }
+
+    pub fn check_sig(&self, account_id: u32, msg: &Fr, sig: &SignatureBJJ) -> anyhow::Result<()> {
+        if !self.state.has_account(account_id) {
+            bail!("account not found");
+        }
+        let acc = self.state.get_account(account_id);
+        // TODO: it is stupid to recover point every time...
+        let pk = babyjubjub_rs::recover_point(fr_to_bigint(&acc.ay), acc.sign != Fr::zero());
+        let pub_key: Point = pk.map_err(|e| anyhow!(e))?;
+        if !L2Account::verify_raw_using_pubkey(*msg, sig.clone(), pub_key) {
+            bail!("verify sig failed");
+        }
+        Ok(())
     }
 
     pub fn pop_all_blocks(&mut self) -> Vec<L2Block> {
