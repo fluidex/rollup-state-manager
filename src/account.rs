@@ -65,6 +65,8 @@ pub struct L2Account {
     pub bjj_pub_key: String,
 }
 
+pub type SignatureBJJ = babyjubjub_rs::Signature;
+/*
 // don't change struct fields here!!!
 #[derive(Debug, Clone)]
 pub struct SignatureBJJ {
@@ -83,6 +85,7 @@ impl Default for SignatureBJJ {
         }
     }
 }
+*/
 
 impl L2Account {
     pub fn new(seed: Vec<u8>) -> Result<Self, String> {
@@ -135,9 +138,7 @@ impl L2Account {
         }
     }
     pub fn sign_hash_raw(&self, hash: Fr) -> Result<SignatureBJJ, String> {
-        let sig_orig: babyjubjub_rs::Signature = self.priv_key.sign(fr_to_bigint(&hash))?;
-        let sig: SignatureBJJ = unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_orig) };
-        Ok(sig)
+        Ok(self.priv_key.sign(fr_to_bigint(&hash))?)
     }
     pub fn sign_hash(&self, hash: Fr) -> Result<Signature, String> {
         let sig = self.sign_hash_raw(hash)?;
@@ -155,10 +156,9 @@ impl L2Account {
     pub fn verify(&self, sig: Signature) -> bool {
         Self::verify_using_pubkey(sig, &self.pub_key)
     }
-    pub fn verify_raw_using_pubkey(msg: Fr, sig_bjj: SignatureBJJ, pub_key: &Point) -> bool {
+    pub fn verify_raw_using_pubkey(msg: Fr, sig_bjj: SignatureBJJ, pub_key: Point) -> bool {
         let msg = fr_to_bigint(&msg);
-        let sig_final = unsafe { std::mem::transmute::<SignatureBJJ, babyjubjub_rs::Signature>(sig_bjj) };
-        babyjubjub_rs::verify(pub_key.clone(), sig_final, msg)
+        babyjubjub_rs::verify(pub_key, sig_bjj, msg)
     }
     pub fn verify_using_pubkey(sig: Signature, pub_key: &Point) -> bool {
         let r_b8 = Point { x: sig.r8x, y: sig.r8y };
@@ -166,7 +166,7 @@ impl L2Account {
             r_b8,
             s: fr_to_bigint(&sig.s),
         };
-        Self::verify_raw_using_pubkey(sig.hash, sig_bjj, &pub_key)
+        Self::verify_raw_using_pubkey(sig.hash, sig_bjj, pub_key.clone())
     }
 }
 
@@ -519,7 +519,7 @@ mod tests {
             token_sell: u32_to_fr(2),
             total_buy: u32_to_fr(999),
             total_sell: u32_to_fr(888),
-            sig: SignatureBJJ::default(),
+            sig: None,
         };
         order.sign_with(&acc).unwrap();
 
@@ -535,16 +535,16 @@ mod tests {
             "message (hexdecimal string) to sign"
         );
 
-        let sig_final = unsafe { std::mem::transmute::<SignatureBJJ, babyjubjub_rs::Signature>(order.sig.clone()) };
-        let sig_compressed = sig_final.compress();
+        let sig = order.clone().sig.unwrap();
+        let sig_compressed = sig.compress();
         assert_eq!(
             hex::encode(sig_compressed),
             "57e6cf2e5b8db0a90072d15bc49e737df2e10746e5f531a24d72557894f2c90964d77726505232a4c9e7631eed22ad9210dce2858642fdfe3e58e95d44b99002",
         );
 
         let mut b: Vec<u8> = Vec::new();
-        b.append(&mut order.sig.r_b8.compress().to_vec());
-        let (_, s_bytes) = order.sig.s.to_bytes_le();
+        b.append(&mut sig.r_b8.compress().to_vec());
+        let (_, s_bytes) = sig.s.to_bytes_le();
         let mut s_32bytes: [u8; 32] = [0; 32];
         let len = std::cmp::min(s_bytes.len(), s_32bytes.len());
         s_32bytes[..len].copy_from_slice(&s_bytes[..len]);
@@ -555,9 +555,9 @@ mod tests {
 
         let detailed_sig = Signature {
             hash: order.hash(),
-            s: bigint_to_fr(order.sig.s),
-            r8x: order.sig.r_b8.x,
-            r8y: order.sig.r_b8.y,
+            s: bigint_to_fr(sig.s),
+            r8x: sig.r_b8.x,
+            r8y: sig.r_b8.y,
         };
         assert!(acc.l2_account.verify(detailed_sig));
     }
