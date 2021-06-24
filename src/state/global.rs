@@ -2,13 +2,13 @@
 #![allow(clippy::vec_init_then_push)]
 
 use super::AccountState;
+#[cfg(feature = "persist_sled")]
+use crate::r#const::sled_db::{ACCOUNTSTATES_KEY, ACCOUNTTREE_KEY, BALANCETREES_KEY, ORDERTREES_KEY};
 use crate::types::l2::Order;
 use crate::types::merkle_tree::{MerkleProof, Tree};
 use crate::types::primitives::Fr;
 #[cfg(feature = "persist_sled")]
 use crate::types::primitives::FrWrapper;
-#[cfg(feature = "persist_sled")]
-use crate::r#const::sled_db::{ACCOUNTSTATES_KEY, ACCOUNTTREE_KEY, BALANCETREES_KEY, ORDERTREES_KEY};
 use anyhow::bail;
 use ff::Field;
 use fnv::FnvHashMap;
@@ -430,23 +430,24 @@ impl GlobalState {
 
     #[cfg(feature = "persist_sled")]
     pub fn load_account_tree(&mut self, db: &sled::Db) -> Result<Tree> {
-        Ok(bincode::deserialize(db.get(ACCOUNTTREE_KEY)?.ok_or(GlobalStateError::NotFound)?.as_ref())?)
+        Ok(bincode::deserialize(
+            db.get(ACCOUNTTREE_KEY)?.ok_or(GlobalStateError::NotFound)?.as_ref(),
+        )?)
     }
 
     #[cfg(feature = "persist_sled")]
     pub fn load_account_state(&mut self, db: &sled::Tree) -> Result<FnvHashMap<u32, AccountState>> {
         self.account_tree
-            .lock().unwrap()
+            .lock()
+            .unwrap()
             .iter()
-            .map(|(_id, hash)| {
-                match bincode::serialize(&FrWrapper::from(hash)) {
-                    Ok(key) => db
-                        .get(key)
-                        .map_err(GlobalStateError::from)
-                        .and_then(|v| v.ok_or(GlobalStateError::NotFound))
-                        .and_then(|v| bincode::deserialize::<(u32, AccountState)>(v.as_ref()).map_err(GlobalStateError::from)),
-                    Err(e) => Err(GlobalStateError::from(e)),
-                }
+            .map(|(_id, hash)| match bincode::serialize(&FrWrapper::from(hash)) {
+                Ok(key) => db
+                    .get(key)
+                    .map_err(GlobalStateError::from)
+                    .and_then(|v| v.ok_or(GlobalStateError::NotFound))
+                    .and_then(|v| bincode::deserialize::<(u32, AccountState)>(v.as_ref()).map_err(GlobalStateError::from)),
+                Err(e) => Err(GlobalStateError::from(e)),
             })
             .collect::<Result<FnvHashMap<u32, AccountState>>>()
     }
@@ -455,73 +456,51 @@ impl GlobalState {
     pub fn load_trees(&mut self, db: &sled::Tree) -> Result<FnvHashMap<u32, Arc<Mutex<Tree>>>> {
         self.account_states
             .iter()
-            .map(|(id, _state)| {
-                match bincode::serialize(id) {
-                    Ok(key) => db
-                        .get(key)
-                        .map_err(GlobalStateError::from)
-                        .and_then(|v| v.ok_or(GlobalStateError::NotFound))
-                        .and_then(|v| bincode::deserialize::<Tree>(v.as_ref()).map_err(GlobalStateError::from))
-                        .map(|tree| (*id, Arc::new(Mutex::new(tree)))),
-                    Err(e) => Err(GlobalStateError::from(e)),
-                }
+            .map(|(id, _state)| match bincode::serialize(id) {
+                Ok(key) => db
+                    .get(key)
+                    .map_err(GlobalStateError::from)
+                    .and_then(|v| v.ok_or(GlobalStateError::NotFound))
+                    .and_then(|v| bincode::deserialize::<Tree>(v.as_ref()).map_err(GlobalStateError::from))
+                    .map(|tree| (*id, Arc::new(Mutex::new(tree)))),
+                Err(e) => Err(GlobalStateError::from(e)),
             })
             .collect::<Result<FnvHashMap<u32, Arc<Mutex<Tree>>>>>()
     }
 
-
     #[cfg(feature = "persist_sled")]
     pub fn save_account_state(&self, db: &sled::Tree) -> Result<()> {
-        self
-            .account_states
-            .iter()
-            .try_for_each(|(id, state)| 
-                db
-                    .insert(
-                        bincode::serialize(&FrWrapper::from(state.hash()))?,
-                        bincode::serialize(&(id, state))?
-                    )
-                    .map(|_| ())
-                    .map_err(GlobalStateError::from)
+        self.account_states.iter().try_for_each(|(id, state)| {
+            db.insert(
+                bincode::serialize(&FrWrapper::from(state.hash()))?,
+                bincode::serialize(&(id, state))?,
             )
+            .map(|_| ())
+            .map_err(GlobalStateError::from)
+        })
     }
 
     #[cfg(feature = "persist_sled")]
     pub fn save_order_trees(&self, db: &sled::Tree) -> Result<()> {
-        self
-            .order_trees
-            .iter()
-            .try_for_each(|(id, tree)| 
-                db
-                    .insert(
-                            bincode::serialize(id)?, 
-                            bincode::serialize(&*tree.clone())?
-                    )
-                    .map(|_| ())
-                    .map_err(GlobalStateError::from)
-            )
+        self.order_trees.iter().try_for_each(|(id, tree)| {
+            db.insert(bincode::serialize(id)?, bincode::serialize(&*tree.clone())?)
+                .map(|_| ())
+                .map_err(GlobalStateError::from)
+        })
     }
 
     #[cfg(feature = "persist_sled")]
     pub fn save_balance_trees(&self, db: &sled::Tree) -> Result<()> {
-        self
-            .balance_trees
-            .iter()
-            .try_for_each(|(id, tree)| 
-                db
-                    .insert(
-                            bincode::serialize(id)?, 
-                            bincode::serialize(&*tree.clone())?
-                    )
-                    .map(|_| ())
-                    .map_err(GlobalStateError::from)
-            )
+        self.balance_trees.iter().try_for_each(|(id, tree)| {
+            db.insert(bincode::serialize(id)?, bincode::serialize(&*tree.clone())?)
+                .map(|_| ())
+                .map_err(GlobalStateError::from)
+        })
     }
 
     #[cfg(feature = "persist_sled")]
     pub fn save_account_tree(&self, db: &sled::Db) -> Result<()> {
-        db
-            .insert(ACCOUNTTREE_KEY, bincode::serialize(&*self.account_tree.clone())?)
+        db.insert(ACCOUNTTREE_KEY, bincode::serialize(&*self.account_tree.clone())?)
             .map(|_| ())?;
         Ok(())
     }
