@@ -39,27 +39,21 @@ impl From<String> for TokenIdPair {
     }
 }
 
-impl From<Option<String>> for SignatureBJJ {
-    fn from(signature: Option<String>) -> SignatureBJJ {
-        if signature.is_none() {
-            return SignatureBJJ::default();
-        }
-
-        let sig_packed_vec = hex::decode(&(signature.unwrap())).unwrap();
-        let sig_unpacked: babyjubjub_rs::Signature = babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap();
-        unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_unpacked) }
+pub fn string_to_sig(signature: String) -> SignatureBJJ {
+    if signature.is_empty() {
+        panic!("empty signature");
     }
+
+    let sig_packed_vec = hex::decode(&signature).unwrap();
+    babyjubjub_rs::decompress_signature(&sig_packed_vec.try_into().unwrap()).unwrap()
 }
 
-impl From<[u8; 64]> for SignatureBJJ {
-    fn from(signature: [u8; 64]) -> SignatureBJJ {
-        if signature == [0; 64] {
-            return SignatureBJJ::default();
-        }
-        //println!("SignatureBJJ {:?}", signature);
-        let sig_unpacked: babyjubjub_rs::Signature = babyjubjub_rs::decompress_signature(&signature).unwrap();
-        unsafe { std::mem::transmute::<babyjubjub_rs::Signature, SignatureBJJ>(sig_unpacked) }
+pub fn bytes_to_sig(signature: [u8; 64]) -> SignatureBJJ {
+    if signature == [0; 64] {
+        panic!("empty signature");
     }
+    //println!("SignatureBJJ {:?}", signature);
+    babyjubjub_rs::decompress_signature(&signature).unwrap()
 }
 
 pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> l2::OrderInput {
@@ -78,7 +72,7 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
                 //filled_buy: fixnum::decimal_to_fr(&origin.finished_quote, quote_token_id),
                 total_sell: fixnum::decimal_to_fr(&origin.amount, base_prec),
                 total_buy: fixnum::decimal_to_fr(&(origin.amount * origin.price), quote_prec),
-                sig: origin.signature.clone().into(),
+                sig: Some(bytes_to_sig(origin.signature)),
                 account_id: origin.user,
                 side: OrderSide::Sell,
             }
@@ -92,7 +86,7 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
                 //filled_buy: fixnum::decimal_to_fr(&origin.finished_base, base_token_id),
                 total_sell: fixnum::decimal_to_fr(&(origin.amount * origin.price), quote_prec),
                 total_buy: fixnum::decimal_to_fr(&origin.amount, base_prec),
-                sig: origin.signature.clone().into(),
+                sig: Some(bytes_to_sig(origin.signature)),
                 account_id: origin.user,
                 side: OrderSide::Buy,
             }
