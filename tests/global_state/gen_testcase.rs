@@ -62,7 +62,7 @@ fn replay_msgs(
             if #[cfg(feature = "persist_sled")] {
             if let Ok(path) = std::env::var("SLED_DB_PATH") {
                 let db = sled::open(&path).unwrap();
-                witgen.dump_to_sled(&db);
+                witgen.dump_to_sled(&db).unwrap();
             }
             }
         }
