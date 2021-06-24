@@ -138,7 +138,7 @@ impl L2Account {
         }
     }
     pub fn sign_hash_raw(&self, hash: Fr) -> Result<SignatureBJJ, String> {
-        Ok(self.priv_key.sign(fr_to_bigint(&hash))?)
+        self.priv_key.sign(fr_to_bigint(&hash))
     }
     pub fn sign_hash(&self, hash: Fr) -> Result<Signature, String> {
         let sig = self.sign_hash_raw(hash)?;

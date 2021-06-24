@@ -231,7 +231,7 @@ impl Processor {
             token_buy: u32_to_fr(tokenbuy),
             total_sell: fixnum::decimal_to_fr(&total_sell, prec_token_id(tokensell)),
             total_buy: fixnum::decimal_to_fr(&total_buy, prec_token_id(tokenbuy)),
-            sig: Some(bytes_to_sig(order.signature.clone())),
+            sig: Some(bytes_to_sig(order.signature)),
             account_id: order.user,
             side: if is_ask { OrderSide::Sell } else { OrderSide::Buy },
         }
@@ -241,7 +241,7 @@ impl Processor {
         let sig = order_to_put.sig.clone().unwrap();
         witgen
             .check_sig(order_to_put.account_id, &msg, &sig)
-            .expect(&format!("invalid sig for order {:?}", order_to_put));
+            .unwrap_or_else(|_| panic!("invalid sig for order {:?}", order_to_put));
     }
 
     pub fn take_bench(&mut self) -> (f32, f32) {
