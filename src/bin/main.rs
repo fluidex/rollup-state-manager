@@ -45,6 +45,7 @@ fn replay_msgs(
 
         let timing = Instant::now();
         loop {
+            // TODO: It is worst to delay for about 119 seconds to send a message since timeout.
             match msg_receiver.recv_timeout(Duration::from_secs(120)) {
                 Ok(msg) => match msg {
                     WrappedMessage::BALANCE(balance) => {
