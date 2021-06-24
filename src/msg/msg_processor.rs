@@ -10,30 +10,16 @@ use babyjubjub_rs::Point;
 use ff::Field;
 use num::Zero;
 use rust_decimal::Decimal;
-use std::collections::HashMap;
 use std::convert::TryInto;
 use std::time::Instant;
 
 use super::msg_utils::{check_state, exchange_order_to_rollup_order, TokenIdPair, TokenPair};
 
-// Preprocessor is used to attach order_sig for each order
-// it is only useful in development system
-// it should not be used in prod system
 pub struct Processor {
     trade_tx_total_time: f32,
     balance_tx_total_time: f32,
-
     enable_check_order_sig: bool,
     enable_handle_order: bool,
-
-    ////////////// below are for debug purpose ///////////////
-
-    // move this into witgen?
-    account_pubkeys: HashMap<u32, Point>,
-
-    // (order_hash, bjj_key) -> sig
-    // only useful in debug mode
-    auto_fill_sig: bool,
 }
 
 impl Default for Processor {
@@ -41,21 +27,13 @@ impl Default for Processor {
         Processor {
             trade_tx_total_time: 0.0,
             balance_tx_total_time: 0.0,
-            account_pubkeys: Default::default(),
             enable_check_order_sig: true,
             enable_handle_order: false,
-            auto_fill_sig: false,
         }
     }
 }
 
 impl Processor {
-    pub fn take_bench(&mut self) -> (f32, f32) {
-        let ret = (self.trade_tx_total_time, self.balance_tx_total_time);
-        self.trade_tx_total_time = 0.0;
-        self.balance_tx_total_time = 0.0;
-        ret
-    }
     pub fn handle_user_msg(&mut self, witgen: &mut WitnessGenerator, user_info: messages::UserMessage) {
         let account_id = user_info.user_id;
         assert!(!witgen.has_account(account_id));
@@ -63,7 +41,6 @@ impl Processor {
         let l2_pubkey: Vec<u8> = hex::decode(l2_pubkey.trim_start_matches("0x")).unwrap();
         let bjj_compressed: [u8; 32] = l2_pubkey.try_into().unwrap();
         let l2_pubkey_point: Point = babyjubjub_rs::decompress_point(bjj_compressed).unwrap();
-        self.account_pubkeys.insert(account_id, l2_pubkey_point.clone());
         let fake_token_id = 0;
         let fake_amount = Float864::from_decimal(&Decimal::zero(), prec_token_id(fake_token_id)).unwrap();
         let eth_addr = str_to_fr(&user_info.l1_address);
@@ -265,5 +242,12 @@ impl Processor {
         witgen
             .check_sig(order_to_put.account_id, &msg, &sig)
             .expect(&format!("invalid sig for order {:?}", order_to_put));
+    }
+
+    pub fn take_bench(&mut self) -> (f32, f32) {
+        let ret = (self.trade_tx_total_time, self.balance_tx_total_time);
+        self.trade_tx_total_time = 0.0;
+        self.balance_tx_total_time = 0.0;
+        ret
     }
 }

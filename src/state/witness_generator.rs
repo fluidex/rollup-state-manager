@@ -579,6 +579,7 @@ impl WitnessGenerator {
             bail!("account not found");
         }
         let acc = self.state.get_account(account_id);
+        // TODO: it is stupid to recover point every time...
         let pk = babyjubjub_rs::recover_point(fr_to_bigint(&acc.ay), acc.sign != Fr::zero());
         let pub_key: Point = pk.map_err(|e| anyhow!(e))?;
         if !L2Account::verify_raw_using_pubkey(*msg, sig.clone(), pub_key) {
