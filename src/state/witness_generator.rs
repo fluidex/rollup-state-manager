@@ -16,7 +16,6 @@ pub struct WitnessGenerator {
     n_tx: usize,
     // 0 <= len(buffered_txs) < n_tx
     buffered_txs: Vec<RawTx>,
-    block_sender: crossbeam_channel::Sender<L2Block>,
     block_generate_num: usize,
     //buffered_blocks: Vec<L2Block>,
     verbose: bool,
@@ -27,12 +26,11 @@ impl WitnessGenerator {
     pub fn print_config() {
         Tree::print_config();
     }
-    pub fn new(state: GlobalState, n_tx: usize, block_sender: crossbeam_channel::Sender<L2Block>, verbose: bool) -> Self {
+    pub fn new(state: GlobalState, n_tx: usize, verbose: bool) -> Self {
         Self {
             state,
             n_tx,
             buffered_txs: Vec::new(),
-            block_sender,
             block_generate_num: 0,
             //buffered_blocks: Vec::new(),
             verbose,
@@ -116,15 +114,11 @@ impl WitnessGenerator {
             new_account_roots,
         }
     }
+    pub fn has_raw_tx(&self) -> bool {
+        !self.buffered_txs.is_empty()
+    }
     pub fn add_raw_tx(&mut self, raw_tx: RawTx) {
-        debug_assert!(self.buffered_txs.len() < self.n_tx);
         self.buffered_txs.push(raw_tx);
-        if self.buffered_txs.len() == self.n_tx {
-            let block = Self::forge_with_txs(&self.buffered_txs);
-            self.block_sender.try_send(block).unwrap();
-            self.block_generate_num += 1;
-            self.buffered_txs.clear();
-        }
     }
     pub fn get_block_generate_num(&self) -> usize {
         self.block_generate_num
@@ -576,6 +570,20 @@ impl WitnessGenerator {
             cnt += 1;
         }
         log::debug!("flush with {} nop", cnt);
+    }
+
+    pub fn pop_all_blocks(&mut self) -> Vec<L2Block> {
+        let mut blocks = vec![];
+        let mut i = 0;
+        let len = self.buffered_txs.len();
+        while i + self.n_tx <= len {
+            let block = Self::forge_with_txs(&self.buffered_txs[i..i + self.n_tx]);
+            blocks.push(block);
+            self.block_generate_num += 1;
+            i += self.n_tx;
+        }
+        self.buffered_txs.drain(0..i);
+        blocks
     }
 
     #[cfg(feature = "persist_sled")]

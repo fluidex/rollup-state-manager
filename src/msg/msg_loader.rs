@@ -24,7 +24,7 @@ pub fn load_msgs_from_file(
 
 const UNIFY_TOPIC: &str = "unifyevents";
 const MSG_TYPE_BALANCES: &str = "balances";
-const MSG_TYPE_USERS: &str = "users";
+const MSG_TYPE_USERS: &str = "registeruser";
 const MSG_TYPE_ORDERS: &str = "orders";
 const MSG_TYPE_TRADES: &str = "trades";
 
