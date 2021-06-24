@@ -215,7 +215,7 @@ impl Processor {
         };
         witgen.full_spot_trade(tx);
         self.trade_tx_total_time += timing.elapsed().as_secs_f32();
-        if let Some(state_after) = &trade.state_before {
+        if let Some(state_after) = &trade.state_after {
             check_state(witgen, state_after, &trade);
         }
     }
