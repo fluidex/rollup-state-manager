@@ -132,7 +132,7 @@ async fn save_block_to_db(pool: &PgPool, block: L2Block) -> anyhow::Result<()> {
         .bind(task_id)
         .bind(CircuitType::Block)
         .bind(sqlx::types::Json(input))
-        .bind(TaskStatus::Ready)
+        .bind(TaskStatus::Inited)
         .execute(pool)
         .await?;
 
