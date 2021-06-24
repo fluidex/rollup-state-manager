@@ -576,13 +576,13 @@ impl WitnessGenerator {
         let mut blocks = vec![];
         let mut i = 0;
         let len = self.buffered_txs.len();
-        while i + self.n_tx < len {
+        while i + self.n_tx <= len {
             let block = Self::forge_with_txs(&self.buffered_txs[i..i + self.n_tx]);
             blocks.push(block);
             self.block_generate_num += 1;
             i += self.n_tx;
         }
-        self.buffered_txs.drain(0..=i);
+        self.buffered_txs.drain(0..i);
         blocks
     }
 
