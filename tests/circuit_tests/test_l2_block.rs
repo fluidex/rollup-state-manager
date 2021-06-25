@@ -211,7 +211,7 @@ impl Block {
             .enumerate()
             .map(|(i, block)| CircuitTestData {
                 name: format!("nonempty_block_{}", i),
-                input: json!(L2BlockSerde::from(block)),
+                input: json!(L2BlockSerde::from(block.witness)),
                 output: None,
             })
             .collect()
@@ -233,7 +233,7 @@ impl Block {
         let block = receiver.recv().unwrap();
         CircuitTestData {
             name: "empty_block".to_owned(),
-            input: json!(L2BlockSerde::from(block)),
+            input: json!(L2BlockSerde::from(block.witness)),
             output: None,
         }
     }

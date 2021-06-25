@@ -3,7 +3,7 @@ use crate::types::merkle_tree::MerklePath;
 use crate::types::primitives::Fr;
 
 #[derive(Clone)]
-pub struct L2Block {
+pub struct L2BlockWitness {
     pub old_root: Fr,
     pub new_root: Fr,
     pub txs_type: Vec<TxType>,
@@ -14,4 +14,10 @@ pub struct L2Block {
     pub order_roots: Vec<[Fr; 2]>,
     pub old_account_roots: Vec<Fr>,
     pub new_account_roots: Vec<Fr>,
+}
+
+#[derive(Clone)]
+pub struct L2Block {
+    pub block_id: usize,
+    pub witness: L2BlockWitness,
 }
