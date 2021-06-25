@@ -2,12 +2,16 @@
 #![allow(clippy::vec_init_then_push)]
 
 use super::global::{AccountUpdates, GlobalState};
+use crate::account::{L2Account, SignatureBJJ};
 #[cfg(feature = "persist_sled")]
 use crate::r#const::sled_db::{ACCOUNTSTATES_KEY, BALANCETREES_KEY, ORDERTREES_KEY};
-use crate::types::l2::{tx_detail_idx, DepositTx, FullSpotTradeTx, L2Block, Order, RawTx, TransferTx, TxType, WithdrawTx, TX_LENGTH};
+use crate::types::l2::{
+    tx_detail_idx, DepositTx, FullSpotTradeTx, L2Block, L2BlockWitness, Order, RawTx, TransferTx, TxType, WithdrawTx, TX_LENGTH,
+};
 use crate::types::merkle_tree::Tree;
-use crate::types::primitives::{fr_add, fr_sub, u32_to_fr, Fr};
-use anyhow::bail;
+use crate::types::primitives::{fr_add, fr_sub, fr_to_bigint, u32_to_fr, Fr};
+use anyhow::{anyhow, bail};
+use babyjubjub_rs::Point;
 use ff::Field;
 
 // TODO: too many unwrap here
@@ -16,7 +20,6 @@ pub struct WitnessGenerator {
     n_tx: usize,
     // 0 <= len(buffered_txs) < n_tx
     buffered_txs: Vec<RawTx>,
-    block_sender: crossbeam_channel::Sender<L2Block>,
     block_generate_num: usize,
     //buffered_blocks: Vec<L2Block>,
     verbose: bool,
@@ -27,12 +30,11 @@ impl WitnessGenerator {
     pub fn print_config() {
         Tree::print_config();
     }
-    pub fn new(state: GlobalState, n_tx: usize, block_sender: crossbeam_channel::Sender<L2Block>, verbose: bool) -> Self {
+    pub fn new(state: GlobalState, n_tx: usize, verbose: bool) -> Self {
         Self {
             state,
             n_tx,
             buffered_txs: Vec::new(),
-            block_sender,
             block_generate_num: 0,
             //buffered_blocks: Vec::new(),
             verbose,
@@ -78,7 +80,7 @@ impl WitnessGenerator {
         self.state.set_token_balance(account_id, token_id, balance);
     }
 
-    pub fn forge_with_txs(buffered_txs: &[RawTx]) -> L2Block {
+    pub fn forge_with_txs(block_id: usize, buffered_txs: &[RawTx]) -> L2Block {
         let txs_type = buffered_txs.iter().map(|tx| tx.tx_type).collect();
         let encoded_txs = buffered_txs.iter().map(|tx| tx.payload.clone()).collect();
         let balance_path_elements = buffered_txs
@@ -103,7 +105,7 @@ impl WitnessGenerator {
             .collect();
         let old_account_roots: Vec<Fr> = buffered_txs.iter().map(|tx| tx.root_before).collect();
         let new_account_roots: Vec<Fr> = buffered_txs.iter().map(|tx| tx.root_after).collect();
-        L2Block {
+        let witness = L2BlockWitness {
             old_root: *old_account_roots.first().unwrap(),
             new_root: *new_account_roots.last().unwrap(),
             txs_type,
@@ -114,17 +116,14 @@ impl WitnessGenerator {
             order_roots,
             old_account_roots,
             new_account_roots,
-        }
+        };
+        L2Block { block_id, witness }
+    }
+    pub fn has_raw_tx(&self) -> bool {
+        !self.buffered_txs.is_empty()
     }
     pub fn add_raw_tx(&mut self, raw_tx: RawTx) {
-        debug_assert!(self.buffered_txs.len() < self.n_tx);
         self.buffered_txs.push(raw_tx);
-        if self.buffered_txs.len() == self.n_tx {
-            let block = Self::forge_with_txs(&self.buffered_txs);
-            self.block_sender.try_send(block).unwrap();
-            self.block_generate_num += 1;
-            self.buffered_txs.clear();
-        }
     }
     pub fn get_block_generate_num(&self) -> usize {
         self.block_generate_num
@@ -576,6 +575,34 @@ impl WitnessGenerator {
             cnt += 1;
         }
         log::debug!("flush with {} nop", cnt);
+    }
+
+    pub fn check_sig(&self, account_id: u32, msg: &Fr, sig: &SignatureBJJ) -> anyhow::Result<()> {
+        if !self.state.has_account(account_id) {
+            bail!("account not found");
+        }
+        let acc = self.state.get_account(account_id);
+        // TODO: it is stupid to recover point every time...
+        let pk = babyjubjub_rs::recover_point(fr_to_bigint(&acc.ay), acc.sign != Fr::zero());
+        let pub_key: Point = pk.map_err(|e| anyhow!(e))?;
+        if !L2Account::verify_raw_using_pubkey(*msg, sig.clone(), pub_key) {
+            bail!("verify sig failed");
+        }
+        Ok(())
+    }
+
+    pub fn pop_all_blocks(&mut self) -> Vec<L2Block> {
+        let mut blocks = vec![];
+        let mut i = 0;
+        let len = self.buffered_txs.len();
+        while i + self.n_tx <= len {
+            let block = Self::forge_with_txs(self.block_generate_num, &self.buffered_txs[i..i + self.n_tx]);
+            blocks.push(block);
+            self.block_generate_num += 1;
+            i += self.n_tx;
+        }
+        self.buffered_txs.drain(0..i);
+        blocks
     }
 
     #[cfg(feature = "persist_sled")]

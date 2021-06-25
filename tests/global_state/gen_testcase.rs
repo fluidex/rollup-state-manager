@@ -28,7 +28,7 @@ fn replay_msgs(
             *params::ACCOUNTLEVELS,
             *params::VERBOSE,
         );
-        let mut witgen = WitnessGenerator::new(state, *params::NTXS, block_sender, *params::VERBOSE);
+        let mut witgen = WitnessGenerator::new(state, *params::NTXS, *params::VERBOSE);
 
         println!("genesis root {}", witgen.root());
 
@@ -57,6 +57,11 @@ fn replay_msgs(
             }
         }
         witgen.flush_with_nop();
+
+        for block in witgen.pop_all_blocks() {
+            block_sender.try_send(block).unwrap();
+        }
+
         let block_num = witgen.get_block_generate_num();
         cfg_if::cfg_if! {
             if #[cfg(feature = "persist_sled")] {
@@ -108,10 +113,9 @@ pub fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<L2Block>) ->
         },
         data: blocks
             .iter()
-            .enumerate()
-            .map(|(blk_idx, block)| CircuitTestData {
-                name: format!("{:04}", blk_idx),
-                input: serde_json::to_value(L2BlockSerde::from(block.clone())).unwrap(),
+            .map(|block| CircuitTestData {
+                name: format!("{:04}", block.block_id),
+                input: serde_json::to_value(L2BlockSerde::from(block.witness.clone())).unwrap(),
                 output: None,
             })
             .collect(),

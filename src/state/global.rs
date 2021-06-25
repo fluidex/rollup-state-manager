@@ -89,6 +89,7 @@ pub struct GlobalState {
     trivial_order_path_elements: Vec<[Fr; 1]>,
 
     verbose: bool,
+    allow_overwrite_order_leaf: bool,
 }
 
 impl GlobalState {
@@ -130,6 +131,7 @@ impl GlobalState {
             empty_order_tree,
             trivial_order_path_elements,
             verbose,
+            allow_overwrite_order_leaf: true,
         }
     }
     pub fn root(&self) -> Fr {
@@ -187,17 +189,38 @@ impl GlobalState {
     // find a position range 0..2**n where the slot is either empty or occupied by a close order
     // so we can place the new order here
     fn get_next_order_pos_for_user(&mut self, account_id: u32, order_id: u32) -> u32 {
-        let start_pos = *self.next_order_positions.get(&account_id).unwrap();
-        for i in 0..2u32.pow(self.order_levels as u32) {
-            let candidate_pos = (start_pos + i) % 2u32.pow(self.order_levels as u32);
-            let order = self.get_account_order_by_pos(account_id, candidate_pos);
-            let is_empty_or_filled = order.is_default() || order.is_filled();
-            if is_empty_or_filled {
-                // the order is already in the tree, so why here...
-                assert_ne!(order_id, order.order_id);
-                if order.order_id < order_id {
-                    self.next_order_positions.insert(account_id, candidate_pos + 1);
-                    return candidate_pos;
+        let order_state_tree = self.order_states.get(&account_id).unwrap();
+        let order_num = order_state_tree.len();
+        debug_assert!(order_num <= self.max_order_num_per_user as usize);
+        if order_num < self.max_order_num_per_user as usize {
+            if cfg!(debug_assertions) {
+                debug_assert!(order_state_tree.is_empty() || *order_state_tree.iter().rev().next().unwrap().0 == order_num as u32 - 1);
+            }
+            // return the last leaf location
+            return order_num as u32;
+        }
+        // now the tree is full
+        // we have to find a vicvim order to replace
+        if self.allow_overwrite_order_leaf {
+            let start_pos = *self.next_order_positions.get(&account_id).unwrap();
+            for i in 0..2u32.pow(self.order_levels as u32) {
+                let candidate_pos = (start_pos + i) % 2u32.pow(self.order_levels as u32);
+                let order = self.get_account_order_by_pos(account_id, candidate_pos);
+                debug_assert!(!order.is_default());
+                // TODO: replace cancelled order
+                if order.is_filled() {
+                    assert_ne!(order_id, order.order_id, "order already in tree, why search location for it?");
+                    if order.order_id < order_id {
+                        self.next_order_positions.insert(account_id, candidate_pos + 1);
+                        log::debug!(
+                            "replace order uid {} old order {} new order {} at {}",
+                            account_id,
+                            order.order_id,
+                            order_id,
+                            candidate_pos
+                        );
+                        return candidate_pos;
+                    }
                 }
             }
         }

@@ -1,9 +1,7 @@
 #![allow(dead_code)]
 #![allow(unreachable_patterns)]
 use anyhow::Result;
-use ethers::prelude::coins_bip39::English;
 use pprof::protos::Message;
-use rollup_state_manager::account::{self, Account};
 use rollup_state_manager::params;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils::messages::{parse_msg, WrappedMessage};
@@ -20,8 +18,8 @@ use rollup_state_manager::msg::msg_processor;
 fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     //let test_dir = circuit_repo.join("test").join("testdata");
     //let file = File::open(test_dir.join("msgs_float.jsonl"))?;
-    let filepath = "circuits/test/testdata/msgs_float.jsonl";
-    //let filepath = "tests/global_state/testdata/data001.txt";
+    //let filepath = "circuits/test/testdata/msgs_float.jsonl";
+    let filepath = "tests/global_state/testdata/data003.txt";
     let file = File::open(filepath)?;
     let messages: Vec<WrappedMessage> = BufReader::new(file)
         .lines()
@@ -50,32 +48,9 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     // by clone accounts with same trades
     let loop_num = 50;
 
-    let cache_order_sig = true;
-    if cache_order_sig {
-        for j in 0..account_num {
-            // let seed = account::rand_seed();
-            let mnemonic = account::random_mnemonic::<English>();
-            for i in 0..loop_num {
-                let account_id = i * account_num + j;
-                // since we cache order_sig by Map<(order_hash, bjj_key), Signature>
-                // we can make cache meet 100% by reusing seed
-                //let seed = if cache_order_sig { seed.clone() } else { account::rand_seed() };
-                // let seed = seed.clone();
-                let mnemonic = mnemonic.clone();
-                let acc = Account::from_mnemonic(account_id, &mnemonic).unwrap();
-                processor.set_account(account_id, acc);
-            }
-        }
-        for msg in messages.iter() {
-            if let WrappedMessage::TRADE(trade) = msg {
-                processor.sign_orders(trade.clone());
-            }
-        }
-    }
-
     let (sender, receiver) = crossbeam_channel::unbounded();
 
-    let mut witgen = WitnessGenerator::new(state, *params::NTXS, sender, *params::VERBOSE);
+    let mut witgen = WitnessGenerator::new(state, *params::NTXS, *params::VERBOSE);
 
     let timing = Instant::now();
     let mut inner_timing = Instant::now();
@@ -84,6 +59,11 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
         let account_offset = i * account_num;
         for msg in messages.iter() {
             match msg {
+                WrappedMessage::USER(user) => {
+                    let mut user = user.clone();
+                    user.user_id += account_offset;
+                    processor.handle_user_msg(&mut witgen, user);
+                }
                 WrappedMessage::BALANCE(balance) => {
                     let mut balance = balance.clone();
                     balance.user_id += account_offset;
@@ -117,6 +97,11 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
             inner_timing = Instant::now();
         }
     }
+
+    for block in witgen.pop_all_blocks() {
+        sender.try_send(block).unwrap();
+    }
+
     drop(witgen); // to close sender
     let blocks: Vec<_> = receiver.iter().collect();
     println!(

@@ -19,7 +19,7 @@ pub struct OrderInput {
     pub token_sell: Fr,
     pub total_sell: Fr,
     pub total_buy: Fr,
-    pub sig: SignatureBJJ,
+    pub sig: Option<SignatureBJJ>,
 }
 impl OrderInput {
     pub fn hash(&self) -> Fr {
@@ -44,7 +44,7 @@ impl OrderInput {
     }
     pub fn sign_with(&mut self, account: &Account) -> Result<(), String> {
         let hash = self.hash();
-        self.sig = account.sign_hash_raw(hash)?;
+        self.sig = Some(account.sign_hash_raw(hash)?);
         Ok(())
     }
 }
@@ -91,9 +91,9 @@ impl From<OrderInput> for Order {
             total_buy: order_input.total_buy,
             sig: Signature {
                 hash: order_input.hash(),
-                s: bigint_to_fr(order_input.sig.s.clone()),
-                r8x: order_input.sig.r_b8.x,
-                r8y: order_input.sig.r_b8.y,
+                s: bigint_to_fr(order_input.sig.clone().unwrap().s),
+                r8x: order_input.sig.clone().unwrap().r_b8.x,
+                r8y: order_input.sig.clone().unwrap().r_b8.y,
             },
             account_id: order_input.account_id,
             side: order_input.side,

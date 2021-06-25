@@ -54,7 +54,7 @@ impl Block {
         */
         let state = GlobalState::new(self.balance_levels, self.order_levels, self.account_levels, self.verbose);
         let (sender, receiver) = crossbeam_channel::bounded(100);
-        let mut witgen = WitnessGenerator::new(state, self.n_txs, sender, self.verbose);
+        let mut witgen = WitnessGenerator::new(state, self.n_txs, self.verbose);
 
         let token_id0 = 0;
         let token_id1 = 1;
@@ -201,12 +201,17 @@ impl Block {
         witgen.full_spot_trade(full_trade);
 
         witgen.flush_with_nop();
+
+        for block in witgen.pop_all_blocks() {
+            sender.try_send(block).unwrap();
+        }
+
         receiver
             .try_iter()
             .enumerate()
             .map(|(i, block)| CircuitTestData {
                 name: format!("nonempty_block_{}", i),
-                input: json!(L2BlockSerde::from(block)),
+                input: json!(L2BlockSerde::from(block.witness)),
                 output: None,
             })
             .collect()
@@ -215,15 +220,20 @@ impl Block {
     fn empty_block_case(&self) -> CircuitTestData {
         let state = GlobalState::new(self.balance_levels, self.order_levels, self.account_levels, self.verbose);
         let (sender, receiver) = crossbeam_channel::bounded(100);
-        let mut witgen = WitnessGenerator::new(state, self.n_txs, sender, self.verbose);
+        let mut witgen = WitnessGenerator::new(state, self.n_txs, self.verbose);
         // we need to have at least 1 account
         witgen.create_new_account(1).unwrap();
         witgen.nop();
         witgen.flush_with_nop();
+
+        for block in witgen.pop_all_blocks() {
+            sender.try_send(block).unwrap();
+        }
+
         let block = receiver.recv().unwrap();
         CircuitTestData {
             name: "empty_block".to_owned(),
-            input: json!(L2BlockSerde::from(block)),
+            input: json!(L2BlockSerde::from(block.witness)),
             output: None,
         }
     }

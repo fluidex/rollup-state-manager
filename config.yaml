@@ -1,2 +1,2 @@
 brokers: '127.0.0.1:9092'
-prover_cluster_db: postgres://coordinator:coordinator_AA9944@127.0.0.1/prover_cluster
+prover_cluster_db: postgres://coordinator:coordinator_AA9944@127.0.0.1:5433/prover_cluster
