@@ -125,7 +125,7 @@ enum TaskStatus {
 }
 
 async fn save_block_to_db(pool: &PgPool, block: L2Block) -> anyhow::Result<()> {
-    let input = L2BlockSerde::from(block);
+    let input = L2BlockSerde::from(block.witness);
     let task_id = unique_task_id();
 
     sqlx::query("insert into task (task_id, circuit, input, status) values ($1, $2, $3, $4)")

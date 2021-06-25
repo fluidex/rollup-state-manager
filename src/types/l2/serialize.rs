@@ -94,8 +94,8 @@ fn from_merkle<const N: usize>(origin: [MerklePath; N]) -> [MerklePathStr; N] {
     TryFrom::try_from(collector).ok().unwrap()
 }
 
-impl From<l2::L2Block> for L2BlockSerde {
-    fn from(origin: l2::L2Block) -> Self {
+impl From<l2::L2BlockWitness> for L2BlockSerde {
+    fn from(origin: l2::L2BlockWitness) -> Self {
         L2BlockSerde {
             old_root: origin.old_root.into(),
             new_root: origin.new_root.into(),
