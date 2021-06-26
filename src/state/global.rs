@@ -554,8 +554,8 @@ impl GlobalState {
     }
 
     #[cfg(feature = "persist_sled")]
-    fn save_order_trees(&self, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
-        self.order_trees.iter().try_for_each(|(id, tree)| {
+    fn save_trees(trees: &FnvHashMap<u32, Arc<Mutex<Tree>>>, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
+        trees.iter().try_for_each(|(id, tree)| {
             db.insert(bincode::serialize(id)?, bincode::serialize(&*tree.clone())?)
                 .map(|_| ())
                 .map_err(GlobalStateInternalError::from)
@@ -563,12 +563,13 @@ impl GlobalState {
     }
 
     #[cfg(feature = "persist_sled")]
+    fn save_order_trees(&self, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
+        Self::save_trees(&self.order_trees, db)
+    }
+
+    #[cfg(feature = "persist_sled")]
     fn save_balance_trees(&self, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
-        self.balance_trees.iter().try_for_each(|(id, tree)| {
-            db.insert(bincode::serialize(id)?, bincode::serialize(&*tree.clone())?)
-                .map(|_| ())
-                .map_err(GlobalStateInternalError::from)
-        })
+        Self::save_trees(&self.balance_trees, db)
     }
 
     #[cfg(feature = "persist_sled")]
