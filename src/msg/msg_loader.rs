@@ -43,7 +43,7 @@ pub fn load_msgs_from_mq(
                 .set("group.id", "unify_msg_dumper")
                 .set("enable.partition.eof", "false")
                 .set("session.timeout.ms", "6000")
-                .set("enable.auto.commit", "true")
+                .set("enable.auto.commit", "false")
                 .set("auto.offset.reset", "earliest")
                 .create()
                 .unwrap();

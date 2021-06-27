@@ -1,0 +1,14 @@
+version: '3.4'
+services:
+  rollup_state_manager_db:
+    image: timescale/timescaledb:2.1.0-pg13
+    container_name: rollup_state_manager_pq
+    restart: always
+    volumes:
+      - ./data/volumes/postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: rollup_state_manager
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_AA9944
