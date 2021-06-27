@@ -60,6 +60,7 @@ impl Processor {
             .unwrap();
     }
     pub fn handle_balance_msg(&mut self, witgen: &mut WitnessGenerator, deposit: messages::BalanceMessage) {
+        //log::debug!("handle_balance_msg {:#?}", deposit);
         assert!(!deposit.change.is_sign_negative(), "only support deposit now");
         let token_id = get_token_id_by_name(&deposit.asset);
         let account_id = deposit.user_id;
@@ -142,6 +143,7 @@ impl Processor {
         }
     }
     pub fn handle_trade_msg(&mut self, witgen: &mut WitnessGenerator, trade: messages::TradeMessage) {
+        //log::debug!("handle_trade_msg {:#?}", trade);
         if let Some(state_before) = &trade.state_before {
             check_state(witgen, state_before, &trade);
         }
