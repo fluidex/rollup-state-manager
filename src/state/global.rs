@@ -191,8 +191,7 @@ impl GlobalState {
                 let candidate_pos = (start_pos + i) % 2u32.pow(self.order_levels as u32);
                 let order = self.get_account_order_by_pos(account_id, candidate_pos);
                 debug_assert!(!order.is_default());
-                // TODO: replace cancelled order
-                if order.is_filled() {
+                if order.is_filled() || !order.is_active {
                     assert_ne!(order_id, order.order_id, "order already in tree, why search location for it?");
                     if order.order_id < order_id {
                         self.next_order_positions.insert(account_id, candidate_pos + 1);
@@ -276,12 +275,12 @@ impl GlobalState {
                 let pos = self.get_next_order_pos_for_user(account_id, order_id);
                 // old_order may be empty
                 let old_order = self.get_account_order_by_pos(account_id, pos);
-                self.link_order_pos_and_id(account_id, pos, order_id);
+                self.set_order_pos_for_id(account_id, pos, order_id);
                 (pos, old_order)
             }
         }
     }
-    pub fn link_order_pos_and_id(&mut self, account_id: u32, order_pos: u32, order_id: u32) {
+    fn set_order_pos_for_id(&mut self, account_id: u32, order_pos: u32, order_id: u32) {
         assert!(self.order_trees.contains_key(&account_id), "link_order_pos_and_id");
 
         if order_pos >= 2u32.pow(self.order_levels as u32) {
@@ -373,6 +372,21 @@ impl GlobalState {
     pub fn has_order(&self, account_id: u32, order_id: u32) -> bool {
         self.order_id_to_pos.contains_key(&(account_id, order_id))
         //self.order_map.contains_key(&account_id) && self.order_map.get(&account_id).unwrap().contains_key(&order_id)
+    }
+    pub fn cancel_order(&mut self, account_id: u32, order_id: u32) {
+        let order_pos = self.get_order_pos_by_id(account_id, order_id).unwrap();
+        log::debug!(
+            "cancel order account_id {} order_id {} order_pos {}",
+            account_id,
+            order_id,
+            order_pos
+        );
+        self.order_states
+            .get_mut(&account_id)
+            .unwrap()
+            .get_mut(&order_pos)
+            .unwrap()
+            .is_active = false;
     }
     fn get_account_order_by_pos(&self, account_id: u32, order_pos: u32) -> Order {
         *self

@@ -62,6 +62,7 @@ pub struct Order {
     //
     pub filled_sell: Fr,
     pub filled_buy: Fr,
+    pub is_active: bool,
 }
 
 impl Default for Order {
@@ -77,6 +78,7 @@ impl Default for Order {
             sig: Signature::default(),
             account_id: 0,
             side: OrderSide::Buy,
+            is_active: true,
         }
     }
 }
@@ -99,6 +101,7 @@ impl From<OrderInput> for Order {
             side: order_input.side,
             filled_sell: Fr::zero(),
             filled_buy: Fr::zero(),
+            is_active: true,
         }
     }
 }
