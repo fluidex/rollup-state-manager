@@ -116,10 +116,24 @@ impl Processor {
         self.balance_tx_total_time += timing.elapsed().as_secs_f32();
     }
 
-    pub fn handle_order_msg(&mut self, _witgen: &mut WitnessGenerator, order: messages::OrderMessage) {
+    pub fn handle_order_msg(&mut self, witgen: &mut WitnessGenerator, order: messages::OrderMessage) {
         match order.event {
             messages::OrderEventType::FINISH => {
-                // TODO: if the order is partial traded, we need to cancel it in witgen
+                debug_assert_eq!(order.order.finished_base.is_zero(), order.order.finished_quote.is_zero());
+                if order.order.finished_base.is_zero() {
+                    debug_assert!(
+                        !witgen.has_order(order.order.user, order.order.id as u32),
+                        "witgen should not have empty order"
+                    );
+                    return;
+                } else {
+                    debug_assert!(
+                        witgen.has_order(order.order.user, order.order.id as u32),
+                        "witgen should have traded order"
+                    );
+                    witgen.cancel_order(order.order.user, order.order.id as u32);
+                    return;
+                }
             }
             messages::OrderEventType::PUT => {}
             _ => {
