@@ -4,4 +4,5 @@ pub mod sled_db {
     pub const ACCOUNTSTATES_KEY: &str = "account_states";
     pub const BALANCETREES_KEY: &str = "balance_trees";
     pub const ORDERTREES_KEY: &str = "order_trees";
+    pub const ORDERSTATES_KEY: &str = "order_states";
 }

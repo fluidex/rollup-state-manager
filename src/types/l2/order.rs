@@ -1,9 +1,14 @@
 #![allow(clippy::let_and_return)]
 use crate::account::{Account, Signature, SignatureBJJ};
+#[cfg(not(feature = "fr_string_repr"))]
+use crate::types::primitives::fr_bytes as fr_serde;
+#[cfg(feature = "fr_string_repr")]
+use crate::types::primitives::fr_str as fr_serde;
 use crate::types::primitives::*;
 use ff::Field;
+use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum OrderSide {
     Buy,
     Sell,
@@ -48,19 +53,24 @@ impl OrderInput {
         Ok(())
     }
 }
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Order {
     // TODO: shoule we split these into a OrderInput instance?
     pub account_id: u32,
     pub order_id: u32,
     pub side: OrderSide,
+    #[serde(with = "fr_serde")]
     pub token_buy: Fr,
+    #[serde(with = "fr_serde")]
     pub token_sell: Fr,
+    #[serde(with = "fr_serde")]
     pub total_sell: Fr,
+    #[serde(with = "fr_serde")]
     pub total_buy: Fr,
     pub sig: Signature,
-    //
+    #[serde(with = "fr_serde")]
     pub filled_sell: Fr,
+    #[serde(with = "fr_serde")]
     pub filled_buy: Fr,
     pub is_active: bool,
 }

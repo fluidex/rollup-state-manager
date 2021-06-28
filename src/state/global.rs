@@ -2,6 +2,8 @@
 #![allow(clippy::vec_init_then_push)]
 
 use super::AccountState;
+#[cfg(feature = "persist_sled")]
+use crate::r#const::sled_db::*;
 use crate::types::l2::Order;
 use crate::types::merkle_tree::{MerkleProof, Tree};
 use crate::types::primitives::Fr;
@@ -11,6 +13,9 @@ use anyhow::bail;
 use ff::Field;
 use fnv::FnvHashMap;
 use rayon::prelude::*;
+use sled::transaction::ConflictableTransactionError;
+#[cfg(feature = "persist_sled")]
+use sled::transaction::{TransactionError, Transactional, TransactionalTree};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
@@ -37,6 +42,53 @@ pub struct AccountUpdates {
     pub balance_updates: Vec<(u32, Fr)>,
     pub order_updates: Vec<(u32, Fr)>,
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum GlobalStateError {
+    #[error(transparent)]
+    #[cfg(feature = "persist_sled")]
+    Sled(#[from] sled::Error),
+    #[error(transparent)]
+    #[cfg(feature = "persist_sled")]
+    Bincode(#[from] bincode::Error),
+    #[error("requested content not found in db")]
+    NotFound,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[cfg(feature = "persist_sled")]
+enum GlobalStateInternalError {
+    #[error(transparent)]
+    Unabortable(#[from] sled::transaction::UnabortableTransactionError),
+    #[error(transparent)]
+    Bincode(#[from] bincode::Error),
+    #[error("requested content not found in db")]
+    NotFound,
+}
+
+impl From<GlobalStateInternalError> for ConflictableTransactionError<GlobalStateError> {
+    fn from(e: GlobalStateInternalError) -> Self {
+        use GlobalStateInternalError::*;
+        match e {
+            Unabortable(ute) => ute.into(),
+            Bincode(e) => Self::Abort(e.into()),
+            NotFound => Self::Abort(GlobalStateError::NotFound),
+        }
+    }
+}
+
+impl From<TransactionError<GlobalStateError>> for GlobalStateError {
+    fn from(e: TransactionError<GlobalStateError>) -> Self {
+        use TransactionError::*;
+
+        match e {
+            Abort(e) => e,
+            Storage(e) => e.into(),
+        }
+    }
+}
+
+type Result<T, E = GlobalStateError> = std::result::Result<T, E>;
 
 // TODO: too many unwrap here
 // TODO: do we really need Arc/Mutex?
@@ -444,38 +496,145 @@ impl GlobalState {
     }
 
     #[cfg(feature = "persist_sled")]
-    pub fn save_account_state(&self, db: &sled::Tree) {
-        assert!(self
-            .account_states
+    pub fn load_persist(&mut self, db: &sled::Db) -> Result<()> {
+        let account_states = db.open_tree(ACCOUNTSTATES_KEY)?;
+        let balance_trees = db.open_tree(BALANCETREES_KEY)?;
+        let order_trees = db.open_tree(ORDERTREES_KEY)?;
+        let order_states = db.open_tree(ORDERSTATES_KEY)?;
+        let (account_tree, account_states, balance_trees, order_trees, order_states) =
+            (&**db, &account_states, &balance_trees, &order_trees, &order_states).transaction(
+                |(db, account_states, balance_trees, order_trees, order_states)| {
+                    let account_tree = Self::load_account_tree(db)?;
+                    let account_states = Self::load_account_state(&account_tree, account_states)?;
+                    let balance_trees = Self::load_trees::<Arc<Mutex<Tree>>>(&account_states, balance_trees)?;
+                    let order_trees = Self::load_trees::<Arc<Mutex<Tree>>>(&account_states, order_trees)?;
+                    let order_states = Self::load_trees::<BTreeMap<u32, Order>>(&account_states, order_states)?;
+                    Ok((account_tree, account_states, balance_trees, order_trees, order_states))
+                },
+            )?;
+        self.account_tree = Arc::new(Mutex::new(account_tree));
+        self.account_states = account_states;
+        self.balance_trees = balance_trees;
+        self.order_trees = order_trees;
+        self.order_states = order_states;
+        // order_id_to_pos[account_id][order_id] === order_pos and order_states[account_id][order_pos].order_id === order_id
+        self.order_id_to_pos = self
+            .order_states
             .iter()
-            .map(|(id, state)| db.insert(
-                bincode::serialize(&FrWrapper::from(state.hash())).unwrap(),
-                bincode::serialize(&(id, state)).unwrap()
-            ))
-            .all(|ret| ret.is_ok()))
+            .map(|(account_id, orders)| {
+                orders
+                    .iter()
+                    .map(move |(order_pos, order)| ((*account_id, order.order_id), *order_pos))
+            })
+            .flatten()
+            .collect();
+        Ok(())
     }
 
     #[cfg(feature = "persist_sled")]
-    pub fn save_order_trees(&self, db: &sled::Tree) {
-        assert!(self
-            .order_trees
-            .iter()
-            .map(|(id, tree)| db.insert(bincode::serialize(id).unwrap(), bincode::serialize(&*tree.clone()).unwrap()))
-            .all(|ret| ret.is_ok()))
+    fn load_account_tree(db: &TransactionalTree) -> Result<Tree, GlobalStateInternalError> {
+        Ok(bincode::deserialize(
+            db.get(ACCOUNTTREE_KEY)?.ok_or(GlobalStateInternalError::NotFound)?.as_ref(),
+        )?)
     }
 
     #[cfg(feature = "persist_sled")]
-    pub fn save_balance_trees(&self, db: &sled::Tree) {
-        assert!(self
-            .balance_trees
+    fn load_account_state(account_tree: &Tree, db: &TransactionalTree) -> Result<FnvHashMap<u32, AccountState>, GlobalStateInternalError> {
+        account_tree
             .iter()
-            .map(|(id, tree)| db.insert(bincode::serialize(id).unwrap(), bincode::serialize(&*tree.clone()).unwrap()))
-            .all(|ret| ret.is_ok()))
+            .map(|(_id, hash)| match bincode::serialize(&FrWrapper::from(hash)) {
+                Ok(key) => db
+                    .get(key)
+                    .map_err(GlobalStateInternalError::from)
+                    .and_then(|v| v.ok_or(GlobalStateInternalError::NotFound))
+                    .and_then(|v| bincode::deserialize::<(u32, AccountState)>(v.as_ref()).map_err(GlobalStateInternalError::from)),
+                Err(e) => Err(e.into()),
+            })
+            .collect::<Result<FnvHashMap<u32, AccountState>, GlobalStateInternalError>>()
     }
 
     #[cfg(feature = "persist_sled")]
-    pub fn save_account_tree(&self, db: &sled::Db) {
-        db.insert("account_tree", bincode::serialize(&*self.account_tree.clone()).unwrap())
-            .unwrap();
+    fn load_trees<T: serde::de::DeserializeOwned>(
+        account_states: &FnvHashMap<u32, AccountState>,
+        db: &TransactionalTree,
+    ) -> Result<FnvHashMap<u32, T>, GlobalStateInternalError> {
+        account_states
+            .iter()
+            .map(|(id, _state)| match bincode::serialize(id) {
+                Ok(key) => db
+                    .get(key)
+                    .map_err(GlobalStateInternalError::from)
+                    .and_then(|v| v.ok_or(GlobalStateInternalError::NotFound))
+                    .and_then(|v| bincode::deserialize::<T>(v.as_ref()).map_err(GlobalStateInternalError::from))
+                    .map(|tree| (*id, tree)),
+                Err(e) => Err(e.into()),
+            })
+            .collect::<Result<FnvHashMap<u32, T>, GlobalStateInternalError>>()
+    }
+
+    #[cfg(feature = "persist_sled")]
+    pub fn persist(&self, db: &sled::Db) -> Result<()> {
+        let account_states = db.open_tree(ACCOUNTSTATES_KEY)?;
+        let balance_trees = db.open_tree(BALANCETREES_KEY)?;
+        let order_trees = db.open_tree(ORDERTREES_KEY)?;
+        let order_states = db.open_tree(ORDERSTATES_KEY)?;
+        (&**db, &account_states, &balance_trees, &order_trees, &order_states).transaction(
+            |(db, account_states, balance_trees, order_trees, order_states)| {
+                self.save_account_tree(db)?;
+                self.save_account_state(account_states)?;
+                self.save_balance_trees(balance_trees)?;
+                self.save_order_trees(order_trees)?;
+                self.save_order_states(order_states)?;
+                Ok(())
+            },
+        )?;
+        Ok(())
+    }
+
+    #[cfg(feature = "persist_sled")]
+    fn save_account_state(&self, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
+        self.account_states.iter().try_for_each(|(id, state)| {
+            db.insert(
+                bincode::serialize(&FrWrapper::from(state.hash()))?,
+                bincode::serialize(&(id, state))?,
+            )
+            .map(|_| ())
+            .map_err(GlobalStateInternalError::from)
+        })
+    }
+
+    #[cfg(feature = "persist_sled")]
+    fn save_trees(trees: &FnvHashMap<u32, Arc<Mutex<Tree>>>, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
+        trees.iter().try_for_each(|(id, tree)| {
+            db.insert(bincode::serialize(id)?, bincode::serialize(&*tree.clone())?)
+                .map(|_| ())
+                .map_err(GlobalStateInternalError::from)
+        })
+    }
+
+    #[cfg(feature = "persist_sled")]
+    fn save_order_states(&self, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
+        self.order_states.iter().try_for_each(|(id, order)| {
+            db.insert(bincode::serialize(id)?, bincode::serialize(order)?)
+                .map(|_| ())
+                .map_err(GlobalStateInternalError::from)
+        })
+    }
+
+    #[cfg(feature = "persist_sled")]
+    fn save_order_trees(&self, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
+        Self::save_trees(&self.order_trees, db)
+    }
+
+    #[cfg(feature = "persist_sled")]
+    fn save_balance_trees(&self, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
+        Self::save_trees(&self.balance_trees, db)
+    }
+
+    #[cfg(feature = "persist_sled")]
+    fn save_account_tree(&self, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
+        db.insert(ACCOUNTTREE_KEY, bincode::serialize(&*self.account_tree.clone())?)
+            .map(|_| ())?;
+        Ok(())
     }
 }
