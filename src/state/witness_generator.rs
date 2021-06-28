@@ -50,6 +50,9 @@ impl WitnessGenerator {
     pub fn has_account(&self, account_id: u32) -> bool {
         self.state.has_account(account_id)
     }
+    pub fn cancel_order(&mut self, account_id: u32, order_id: u32) {
+        self.state.cancel_order(account_id, order_id)
+    }
     pub fn get_token_balance(&self, account_id: u32, token_id: u32) -> Fr {
         self.state.get_token_balance(account_id, token_id)
     }

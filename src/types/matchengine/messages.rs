@@ -26,7 +26,7 @@ pub enum OrderSide {
     BID,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub enum OrderType {
     LIMIT,
     MARKET,
@@ -40,7 +40,7 @@ pub enum OrderEventType {
     EXPIRED = 4,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Order {
     pub id: u64,
     pub market: String,
@@ -67,7 +67,7 @@ pub struct Order {
     //pub signature: Option<String>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct OrderMessage {
     pub event: OrderEventType,
     pub order: Order,
@@ -105,7 +105,7 @@ pub struct VerboseTradeState {
     pub balance_states: Vec<VerboseBalanceState>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct TradeMessage {
     pub id: u64,
     pub timestamp: f64, // unix epoch timestamp,

@@ -60,6 +60,7 @@ impl Processor {
             .unwrap();
     }
     pub fn handle_balance_msg(&mut self, witgen: &mut WitnessGenerator, deposit: messages::BalanceMessage) {
+        //log::debug!("handle_balance_msg {:#?}", deposit);
         assert!(!deposit.change.is_sign_negative(), "only support deposit now");
         let token_id = get_token_id_by_name(&deposit.asset);
         let account_id = deposit.user_id;
@@ -116,10 +117,24 @@ impl Processor {
         self.balance_tx_total_time += timing.elapsed().as_secs_f32();
     }
 
-    pub fn handle_order_msg(&mut self, _witgen: &mut WitnessGenerator, order: messages::OrderMessage) {
+    pub fn handle_order_msg(&mut self, witgen: &mut WitnessGenerator, order: messages::OrderMessage) {
         match order.event {
             messages::OrderEventType::FINISH => {
-                // TODO: if the order is partial traded, we need to cancel it in witgen
+                debug_assert_eq!(order.order.finished_base.is_zero(), order.order.finished_quote.is_zero());
+                if order.order.finished_base.is_zero() {
+                    debug_assert!(
+                        !witgen.has_order(order.order.user, order.order.id as u32),
+                        "witgen should not have empty order"
+                    );
+                    return;
+                } else {
+                    debug_assert!(
+                        witgen.has_order(order.order.user, order.order.id as u32),
+                        "witgen should have traded order"
+                    );
+                    witgen.cancel_order(order.order.user, order.order.id as u32);
+                    return;
+                }
             }
             messages::OrderEventType::PUT => {}
             _ => {
@@ -128,6 +143,7 @@ impl Processor {
         }
     }
     pub fn handle_trade_msg(&mut self, witgen: &mut WitnessGenerator, trade: messages::TradeMessage) {
+        //log::debug!("handle_trade_msg {:#?}", trade);
         if let Some(state_before) = &trade.state_before {
             check_state(witgen, state_before, &trade);
         }
