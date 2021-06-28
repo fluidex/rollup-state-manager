@@ -62,6 +62,8 @@ enum GlobalStateInternalError {
     Unabortable(#[from] sled::transaction::UnabortableTransactionError),
     #[error(transparent)]
     Bincode(#[from] bincode::Error),
+    #[error("requested content not found in db")]
+    NotFound,
 }
 
 impl From<GlobalStateInternalError> for ConflictableTransactionError<GlobalStateError> {
@@ -69,7 +71,8 @@ impl From<GlobalStateInternalError> for ConflictableTransactionError<GlobalState
         use GlobalStateInternalError::*;
         match e {
             Unabortable(ute) => ute.into(),
-            Bincode(e) => Self::Abort(e.into())
+            Bincode(e) => Self::Abort(e.into()),
+            NotFound => Self::Abort(GlobalStateError::NotFound),
         }
     }
 }
@@ -474,54 +477,62 @@ impl GlobalState {
 
     #[cfg(feature = "persist_sled")]
     pub fn load_persist(&mut self, db: &sled::Db) -> Result<()> {
-        self.account_tree = Arc::new(Mutex::new(self.load_account_tree(db)?));
         let account_states = db.open_tree(ACCOUNTSTATES_KEY)?;
-        self.account_states = self.load_account_state(&account_states)?;
         let balance_trees = db.open_tree(BALANCETREES_KEY)?;
-        self.balance_trees = self.load_trees(&balance_trees)?;
         let order_trees = db.open_tree(ORDERTREES_KEY)?;
-        self.order_trees = self.load_trees(&order_trees)?;
+        let (account_tree, account_states, balance_trees, order_trees) =
+            (&**db, &account_states, &balance_trees, &order_trees).transaction(
+            |(db, account_states, balance_trees, order_trees)| {
+                let account_tree = Self::load_account_tree(db)?;
+                let account_states = Self::load_account_state(&account_tree, account_states)?;
+                let balance_trees = Self::load_trees(&account_states, balance_trees)?;
+                let order_trees = Self::load_trees(&account_states, order_trees)?;
+                Ok((account_tree, account_states, balance_trees, order_trees))
+            }
+        )?;
+        self.account_tree = Arc::new(Mutex::new(account_tree));
+        self.account_states = account_states;
+        self.balance_trees = balance_trees;
+        self.order_trees = order_trees;
         Ok(())
     }
 
     #[cfg(feature = "persist_sled")]
-    pub fn load_account_tree(&mut self, db: &sled::Db) -> Result<Tree> {
+    fn load_account_tree(db: &TransactionalTree) -> Result<Tree, GlobalStateInternalError> {
         Ok(bincode::deserialize(
-            db.get(ACCOUNTTREE_KEY)?.ok_or(GlobalStateError::NotFound)?.as_ref(),
+            db.get(ACCOUNTTREE_KEY)?.ok_or(GlobalStateInternalError::NotFound)?.as_ref(),
         )?)
     }
 
     #[cfg(feature = "persist_sled")]
-    pub fn load_account_state(&mut self, db: &sled::Tree) -> Result<FnvHashMap<u32, AccountState>> {
-        self.account_tree
-            .lock()
-            .unwrap()
+    fn load_account_state(account_tree: &Tree, db: &TransactionalTree) -> Result<FnvHashMap<u32, AccountState>, GlobalStateInternalError> {
+        account_tree
             .iter()
             .map(|(_id, hash)| match bincode::serialize(&FrWrapper::from(hash)) {
                 Ok(key) => db
                     .get(key)
-                    .map_err(GlobalStateError::from)
-                    .and_then(|v| v.ok_or(GlobalStateError::NotFound))
-                    .and_then(|v| bincode::deserialize::<(u32, AccountState)>(v.as_ref()).map_err(GlobalStateError::from)),
-                Err(e) => Err(GlobalStateError::from(e)),
+                    .map_err(GlobalStateInternalError::from)
+                    .and_then(|v| v.ok_or(GlobalStateInternalError::NotFound))
+                    .and_then(|v| bincode::deserialize::<(u32, AccountState)>(v.as_ref()).map_err(GlobalStateInternalError::from)),
+                Err(e) => Err(e.into()),
             })
-            .collect::<Result<FnvHashMap<u32, AccountState>>>()
+            .collect::<Result<FnvHashMap<u32, AccountState>, GlobalStateInternalError>>()
     }
 
     #[cfg(feature = "persist_sled")]
-    pub fn load_trees(&mut self, db: &sled::Tree) -> Result<FnvHashMap<u32, Arc<Mutex<Tree>>>> {
-        self.account_states
+    fn load_trees(account_states: &FnvHashMap<u32, AccountState>, db: &TransactionalTree) -> Result<FnvHashMap<u32, Arc<Mutex<Tree>>>, GlobalStateInternalError> {
+        account_states
             .iter()
             .map(|(id, _state)| match bincode::serialize(id) {
                 Ok(key) => db
                     .get(key)
-                    .map_err(GlobalStateError::from)
-                    .and_then(|v| v.ok_or(GlobalStateError::NotFound))
-                    .and_then(|v| bincode::deserialize::<Tree>(v.as_ref()).map_err(GlobalStateError::from))
+                    .map_err(GlobalStateInternalError::from)
+                    .and_then(|v| v.ok_or(GlobalStateInternalError::NotFound))
+                    .and_then(|v| bincode::deserialize::<Tree>(v.as_ref()).map_err(GlobalStateInternalError::from))
                     .map(|tree| (*id, Arc::new(Mutex::new(tree)))),
-                Err(e) => Err(GlobalStateError::from(e)),
+                Err(e) => Err(e.into()),
             })
-            .collect::<Result<FnvHashMap<u32, Arc<Mutex<Tree>>>>>()
+            .collect::<Result<FnvHashMap<u32, Arc<Mutex<Tree>>>, GlobalStateInternalError>>()
     }
 
     #[cfg(feature = "persist_sled")]
