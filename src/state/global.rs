@@ -524,7 +524,7 @@ impl GlobalState {
             .map(|(account_id, orders)| {
                 orders
                     .iter()
-                    .map(move |(order_pos, order)| ((*account_id, order.account_id), *order_pos))
+                    .map(move |(order_pos, order)| ((*account_id, order.order_id), *order_pos))
             })
             .flatten()
             .collect();
