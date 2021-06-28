@@ -13,11 +13,11 @@ use anyhow::bail;
 use ff::Field;
 use fnv::FnvHashMap;
 use rayon::prelude::*;
+use sled::transaction::ConflictableTransactionError;
 #[cfg(feature = "persist_sled")]
-use sled::transaction::{Transactional, TransactionalTree, TransactionError};
+use sled::transaction::{TransactionError, Transactional, TransactionalTree};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
-use sled::transaction::ConflictableTransactionError;
 
 pub struct BalanceProof {
     pub leaf: Fr,
@@ -83,7 +83,7 @@ impl From<TransactionError<GlobalStateError>> for GlobalStateError {
 
         match e {
             Abort(e) => e,
-            Storage(e) => e.into()
+            Storage(e) => e.into(),
         }
     }
 }
@@ -480,16 +480,14 @@ impl GlobalState {
         let account_states = db.open_tree(ACCOUNTSTATES_KEY)?;
         let balance_trees = db.open_tree(BALANCETREES_KEY)?;
         let order_trees = db.open_tree(ORDERTREES_KEY)?;
-        let (account_tree, account_states, balance_trees, order_trees) =
-            (&**db, &account_states, &balance_trees, &order_trees).transaction(
-            |(db, account_states, balance_trees, order_trees)| {
+        let (account_tree, account_states, balance_trees, order_trees) = (&**db, &account_states, &balance_trees, &order_trees)
+            .transaction(|(db, account_states, balance_trees, order_trees)| {
                 let account_tree = Self::load_account_tree(db)?;
                 let account_states = Self::load_account_state(&account_tree, account_states)?;
                 let balance_trees = Self::load_trees(&account_states, balance_trees)?;
                 let order_trees = Self::load_trees(&account_states, order_trees)?;
                 Ok((account_tree, account_states, balance_trees, order_trees))
-            }
-        )?;
+            })?;
         self.account_tree = Arc::new(Mutex::new(account_tree));
         self.account_states = account_states;
         self.balance_trees = balance_trees;
@@ -520,7 +518,10 @@ impl GlobalState {
     }
 
     #[cfg(feature = "persist_sled")]
-    fn load_trees(account_states: &FnvHashMap<u32, AccountState>, db: &TransactionalTree) -> Result<FnvHashMap<u32, Arc<Mutex<Tree>>>, GlobalStateInternalError> {
+    fn load_trees(
+        account_states: &FnvHashMap<u32, AccountState>,
+        db: &TransactionalTree,
+    ) -> Result<FnvHashMap<u32, Arc<Mutex<Tree>>>, GlobalStateInternalError> {
         account_states
             .iter()
             .map(|(id, _state)| match bincode::serialize(id) {
@@ -540,15 +541,13 @@ impl GlobalState {
         let account_states = db.open_tree(ACCOUNTSTATES_KEY)?;
         let balance_trees = db.open_tree(BALANCETREES_KEY)?;
         let order_trees = db.open_tree(ORDERTREES_KEY)?;
-        (&**db, &account_states, &balance_trees, &order_trees).transaction(
-            |(db, account_states, balance_trees, order_trees)| {
-                self.save_account_tree(db)?;
-                self.save_account_state(account_states)?;
-                self.save_balance_trees(balance_trees)?;
-                self.save_order_trees(order_trees)?;
-                Ok(())
-            }
-        )?;
+        (&**db, &account_states, &balance_trees, &order_trees).transaction(|(db, account_states, balance_trees, order_trees)| {
+            self.save_account_tree(db)?;
+            self.save_account_state(account_states)?;
+            self.save_balance_trees(balance_trees)?;
+            self.save_order_trees(order_trees)?;
+            Ok(())
+        })?;
         Ok(())
     }
 
