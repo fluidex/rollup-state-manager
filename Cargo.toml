@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.39"
 arrayref = "0.3.6"
-babyjubjub-rs = { git = "https://github.com/lispc/babyjubjub-rs", features = [ "aarch64" ], default-features = false }
+babyjubjub-rs = { git = "https://github.com/Fluidex/babyjubjub-rs" }
 bincode = { version = "1.3.3", optional = true }
 cfg-if = "1.0.0"
 coins-bip32 = "0.2.2"
@@ -16,9 +16,9 @@ crossbeam-channel = "0.5.1"
 dotenv = "0.15.0"
 env_logger = "0.5"
 ethers = { git = "https://github.com/gakonst/ethers-rs" }
-ff = { package = "ff_ce", version = "0.11", features = [ "derive" ] }
+ff = { git = "https://github.com/Fluidex/ff", package = "ff_ce", features = [ "derive" ] }
 fnv = "1.0.7"
-franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch = "beta" }
+franklin_crypto = { package = "franklin-crypto", git = "https://github.com/Fluidex/franklin-crypto.git" }
 futures = "0.3.13"
 hex = "0.4.3"
 itertools = "0.10.0"
@@ -26,15 +26,15 @@ lazy_static = "1.4.0"
 log = "0.4"
 num = "0.4.0"
 # don't upgrade bigint until you know what you are doing. bigint of all deps should have same version 
-num-bigint = { version = "0.2.2", features = [ "rand" ] }
-num-traits = "0.2.14"
-poseidon-rs = { version = "0.0.8" }
+num-bigint = { version = "0.4", features = [ "rand" ] }
+num-traits = "0.2"
+poseidon-rs = { git = "https://github.com/Fluidex/poseidon-rs" }
 pprof = { version = "0.4", features = [ "flamegraph", "protobuf" ] }
 rand = "0.8.3"
 rayon = "1.5.0"
 rdkafka = { version = "0.25.0", features = [ "cmake-build" ] }
 regex = "1"
-rust_decimal = { version = "1.10.3", features = [ "serde_json" ] }
+rust_decimal = { version = "1.14", features = [ "maths", "serde_json" ] }
 serde = { version = "1.0.124", features = [ "derive" ] }
 serde-big-array = "0.3.2"
 serde_derive = "1.0.90"

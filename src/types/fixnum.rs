@@ -1,7 +1,6 @@
 use super::primitives::{bigint_to_fr, u64_to_fr, Fr};
 use num_traits::pow::Pow;
 use rust_decimal::prelude::ToPrimitive;
-use rust_decimal::prelude::Zero;
 use rust_decimal::Decimal;
 use std::convert::TryInto;
 
@@ -10,7 +9,7 @@ use anyhow::Result;
 use num_bigint::BigInt;
 
 pub fn decimal_to_u64(num: &Decimal, prec: u32) -> u64 {
-    let prec_mul = Decimal::new(10, 0).powi(prec as u64);
+    let prec_mul = Decimal::new(10, 0).pow(prec as u64);
     let adjusted = num * prec_mul;
     adjusted.floor().to_u64().unwrap()
 }
@@ -64,7 +63,7 @@ impl Float864 {
     pub fn to_decimal(&self, prec: u32) -> Decimal {
         // for example, (significand:1, exponent:17) means 10**17, when prec is 18,
         // it is 0.1 (ETH)
-        Decimal::new(self.significand as i64, 0) * Decimal::new(10, 0).powi(self.exponent as u64) / Decimal::new(10, 0).powi(prec as u64)
+        Decimal::new(self.significand as i64, 0) * Decimal::new(10, 0).pow(self.exponent as u64) / Decimal::new(10, 0).pow(prec as u64)
     }
     pub fn from_decimal(d: &Decimal, prec: u32) -> Result<Self> {
         // if d is "0.1" and prec is 18, result is (significand:1, exponent:17)
@@ -75,7 +74,7 @@ impl Float864 {
             });
         }
         let ten = Decimal::new(10, 0);
-        let exp = ten.powi(prec as u64);
+        let exp = ten.pow(prec as u64);
         let mut n = d * exp;
         if n != n.floor() {
             bail!("decimal precision error {} {}", d, prec);
