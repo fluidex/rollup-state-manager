@@ -3,7 +3,7 @@
 
 use super::AccountState;
 #[cfg(feature = "persist_sled")]
-use crate::r#const::sled_db::{ACCOUNTSTATES_KEY, ACCOUNTTREE_KEY, BALANCETREES_KEY, ORDERTREES_KEY};
+use crate::r#const::sled_db::*;
 use crate::types::l2::Order;
 use crate::types::merkle_tree::{MerkleProof, Tree};
 use crate::types::primitives::Fr;
@@ -494,18 +494,34 @@ impl GlobalState {
         let account_states = db.open_tree(ACCOUNTSTATES_KEY)?;
         let balance_trees = db.open_tree(BALANCETREES_KEY)?;
         let order_trees = db.open_tree(ORDERTREES_KEY)?;
-        let (account_tree, account_states, balance_trees, order_trees) = (&**db, &account_states, &balance_trees, &order_trees)
-            .transaction(|(db, account_states, balance_trees, order_trees)| {
-                let account_tree = Self::load_account_tree(db)?;
-                let account_states = Self::load_account_state(&account_tree, account_states)?;
-                let balance_trees = Self::load_trees(&account_states, balance_trees)?;
-                let order_trees = Self::load_trees(&account_states, order_trees)?;
-                Ok((account_tree, account_states, balance_trees, order_trees))
-            })?;
+        let order_states = db.open_tree(ORDERSTATES_KEY)?;
+        let (account_tree, account_states, balance_trees, order_trees, order_states) =
+            (&**db, &account_states, &balance_trees, &order_trees, &order_states).transaction(
+                |(db, account_states, balance_trees, order_trees, order_states)| {
+                    let account_tree = Self::load_account_tree(db)?;
+                    let account_states = Self::load_account_state(&account_tree, account_states)?;
+                    let balance_trees = Self::load_trees::<Arc<Mutex<Tree>>>(&account_states, balance_trees)?;
+                    let order_trees = Self::load_trees::<Arc<Mutex<Tree>>>(&account_states, order_trees)?;
+                    let order_states = Self::load_trees::<BTreeMap<u32, Order>>(&account_states, order_states)?;
+                    Ok((account_tree, account_states, balance_trees, order_trees, order_states))
+                },
+            )?;
         self.account_tree = Arc::new(Mutex::new(account_tree));
         self.account_states = account_states;
         self.balance_trees = balance_trees;
         self.order_trees = order_trees;
+        self.order_states = order_states;
+        // order_id_to_pos[account_id][order_id] === order_pos and order_states[account_id][order_pos].order_id === order_id
+        self.order_id_to_pos = self
+            .order_states
+            .iter()
+            .map(|(account_id, orders)| {
+                orders
+                    .iter()
+                    .map(move |(order_pos, order)| ((*account_id, order.account_id), *order_pos))
+            })
+            .flatten()
+            .collect();
         Ok(())
     }
 
@@ -532,10 +548,10 @@ impl GlobalState {
     }
 
     #[cfg(feature = "persist_sled")]
-    fn load_trees(
+    fn load_trees<T: serde::de::DeserializeOwned>(
         account_states: &FnvHashMap<u32, AccountState>,
         db: &TransactionalTree,
-    ) -> Result<FnvHashMap<u32, Arc<Mutex<Tree>>>, GlobalStateInternalError> {
+    ) -> Result<FnvHashMap<u32, T>, GlobalStateInternalError> {
         account_states
             .iter()
             .map(|(id, _state)| match bincode::serialize(id) {
@@ -543,11 +559,11 @@ impl GlobalState {
                     .get(key)
                     .map_err(GlobalStateInternalError::from)
                     .and_then(|v| v.ok_or(GlobalStateInternalError::NotFound))
-                    .and_then(|v| bincode::deserialize::<Tree>(v.as_ref()).map_err(GlobalStateInternalError::from))
-                    .map(|tree| (*id, Arc::new(Mutex::new(tree)))),
+                    .and_then(|v| bincode::deserialize::<T>(v.as_ref()).map_err(GlobalStateInternalError::from))
+                    .map(|tree| (*id, tree)),
                 Err(e) => Err(e.into()),
             })
-            .collect::<Result<FnvHashMap<u32, Arc<Mutex<Tree>>>, GlobalStateInternalError>>()
+            .collect::<Result<FnvHashMap<u32, T>, GlobalStateInternalError>>()
     }
 
     #[cfg(feature = "persist_sled")]
@@ -555,13 +571,17 @@ impl GlobalState {
         let account_states = db.open_tree(ACCOUNTSTATES_KEY)?;
         let balance_trees = db.open_tree(BALANCETREES_KEY)?;
         let order_trees = db.open_tree(ORDERTREES_KEY)?;
-        (&**db, &account_states, &balance_trees, &order_trees).transaction(|(db, account_states, balance_trees, order_trees)| {
-            self.save_account_tree(db)?;
-            self.save_account_state(account_states)?;
-            self.save_balance_trees(balance_trees)?;
-            self.save_order_trees(order_trees)?;
-            Ok(())
-        })?;
+        let order_states = db.open_tree(ORDERSTATES_KEY)?;
+        (&**db, &account_states, &balance_trees, &order_trees, &order_states).transaction(
+            |(db, account_states, balance_trees, order_trees, order_states)| {
+                self.save_account_tree(db)?;
+                self.save_account_state(account_states)?;
+                self.save_balance_trees(balance_trees)?;
+                self.save_order_trees(order_trees)?;
+                self.save_order_states(order_states)?;
+                Ok(())
+            },
+        )?;
         Ok(())
     }
 
@@ -581,6 +601,15 @@ impl GlobalState {
     fn save_trees(trees: &FnvHashMap<u32, Arc<Mutex<Tree>>>, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
         trees.iter().try_for_each(|(id, tree)| {
             db.insert(bincode::serialize(id)?, bincode::serialize(&*tree.clone())?)
+                .map(|_| ())
+                .map_err(GlobalStateInternalError::from)
+        })
+    }
+
+    #[cfg(feature = "persist_sled")]
+    fn save_order_states(&self, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
+        self.order_states.iter().try_for_each(|(id, order)| {
+            db.insert(bincode::serialize(id)?, bincode::serialize(order)?)
                 .map(|_| ())
                 .map_err(GlobalStateInternalError::from)
         })

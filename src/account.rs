@@ -1,3 +1,7 @@
+#[cfg(not(feature = "fr_string_repr"))]
+use crate::types::primitives::fr_bytes as fr_serde;
+#[cfg(feature = "fr_string_repr")]
+use crate::types::primitives::fr_str as fr_serde;
 use crate::types::primitives::{bigint_to_fr, fr_to_bigint, Fr};
 use anyhow::Result;
 use arrayref::array_ref;
@@ -31,17 +35,22 @@ use ff::Field;
 use lazy_static::lazy_static;
 use num_bigint::BigInt;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 /// Derault derivation path.
 /// Copied from https://github.com/gakonst/ethers-rs/blob/01cc80769c291fc80f5b1e9173b7b580ae6b6413/ethers-signers/src/wallet/mnemonic.rs#L16
 const DEFAULT_DERIVATION_PATH_PREFIX: &str = "m/44'/60'/0'/0/";
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Signature {
+    #[serde(with = "fr_serde")]
     pub hash: Fr,
+    #[serde(with = "fr_serde")]
     pub s: Fr,
+    #[serde(with = "fr_serde")]
     pub r8x: Fr,
+    #[serde(with = "fr_serde")]
     pub r8y: Fr,
 }
 
