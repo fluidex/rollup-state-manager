@@ -1,4 +1,5 @@
 /target
 *orig
+*.bak
 nohup.out
 rollup_state_manager.log
