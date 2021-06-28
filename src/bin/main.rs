@@ -49,22 +49,23 @@ fn replay_msgs(
         loop {
             // TODO: It is worst to delay for about 119 seconds to send a message since timeout.
             match msg_receiver.recv_timeout(Duration::from_secs(120)) {
-                Ok(msg) => match msg {
-                    WrappedMessage::BALANCE(balance) => {
-                        processor.handle_balance_msg(&mut witgen, balance);
+                Ok(msg) => {
+                    log::debug!("recv new msg {:?}", msg);
+                    match msg {
+                        WrappedMessage::BALANCE(balance) => {
+                            processor.handle_balance_msg(&mut witgen, balance);
+                        }
+                        WrappedMessage::TRADE(trade) => {
+                            processor.handle_trade_msg(&mut witgen, trade);
+                        }
+                        WrappedMessage::ORDER(order) => {
+                            processor.handle_order_msg(&mut witgen, order);
+                        }
+                        WrappedMessage::USER(user) => {
+                            processor.handle_user_msg(&mut witgen, user);
+                        }
                     }
-                    WrappedMessage::TRADE(trade) => {
-                        let trade_id = trade.id;
-                        processor.handle_trade_msg(&mut witgen, trade);
-                        println!("trade {} test done", trade_id);
-                    }
-                    WrappedMessage::ORDER(order) => {
-                        processor.handle_order_msg(&mut witgen, order);
-                    }
-                    WrappedMessage::USER(user) => {
-                        processor.handle_user_msg(&mut witgen, user);
-                    }
-                },
+                }
                 Err(err) => match err {
                     RecvTimeoutError::Timeout => {
                         if witgen.has_raw_tx() {
@@ -126,10 +127,15 @@ async fn is_present_block(pool: &PgPool, block: &L2Block) -> anyhow::Result<bool
     {
         Ok(row) => {
             let new_root: String = row.get(0);
-            if new_root == fr_to_string(&block.witness.new_root) {
+            let old_root: String = fr_to_string(&block.witness.new_root);
+            if new_root == old_root {
                 log::debug!("skip same l2 block {} {}", block.block_id, new_root);
             } else {
-                panic!("l2 block generation must be deterministic!");
+                assert_eq!(
+                    new_root, old_root,
+                    "l2 block generation must be deterministic! Error for block {}",
+                    block.block_id
+                );
             }
 
             Ok(true)

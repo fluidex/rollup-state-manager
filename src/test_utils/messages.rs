@@ -2,6 +2,7 @@ use crate::types;
 use anyhow::{anyhow, Result};
 use serde_json::Value;
 
+#[derive(Debug)]
 pub enum WrappedMessage {
     BALANCE(types::matchengine::messages::BalanceMessage),
     TRADE(types::matchengine::messages::TradeMessage),

@@ -194,12 +194,13 @@ impl WitnessGenerator {
         balance.add_assign(&tx.amount.to_fr());
         self.state.set_token_balance(tx.account_id, tx.token_id, balance);
         if deposit_to_new {
-            let l2key = tx.l2key.unwrap();
+            let l2key = tx.l2key.clone().unwrap();
             self.state.set_account_l2_addr(tx.account_id, l2key.sign, l2key.ay, l2key.eth_addr);
         }
 
         raw_tx.root_after = self.state.root();
         self.add_raw_tx(raw_tx);
+        log::debug!("finish deposit tx {:?} new root {}", tx, self.state.root());
         Ok(())
     }
     pub fn fill_withdraw_tx(&self, tx: &mut WithdrawTx) {

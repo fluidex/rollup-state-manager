@@ -134,6 +134,12 @@ impl GlobalState {
     }
 
     pub fn new(balance_levels: usize, order_levels: usize, account_levels: usize, verbose: bool) -> Self {
+        log::debug!(
+            "create GlobalState account_levels {} balance_levels {} order_levels {}",
+            account_levels,
+            balance_levels,
+            order_levels
+        );
         let empty_balance_tree = Tree::new(balance_levels, Fr::zero());
         let default_balance_root = empty_balance_tree.get_root();
 
