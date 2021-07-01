@@ -30,4 +30,28 @@ impl Settings {
     pub fn get() -> &'static Self {
         SETTINGS.get().unwrap()
     }
+
+    /// Shortcut of `Self::get().brokers.as_str()`
+    #[inline(always)]
+    pub fn brokers() -> &'static str {
+        Self::get().brokers.as_str()
+    }
+
+    /// Shortcut of `Self::get().prover_cluster_db.as_str()`
+    #[inline(always)]
+    pub fn prover_cluster_db() -> &'static str {
+        Self::get().prover_cluster_db.as_str()
+    }
+
+    /// Shortcut of `Self::get().rollup_state_manager_db.as_str()`
+    #[inline(always)]
+    pub fn rollup_state_manager_db() -> &'static str {
+        Self::get().rollup_state_manager_db.as_str()
+    }
+
+    /// Shortcut of `Self::get().persist_every_n_block`
+    #[inline(always)]
+    pub fn persist_every_n_block() -> u64 {
+        Self::get().persist_every_n_block
+    }
 }
