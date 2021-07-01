@@ -9,7 +9,7 @@ pub struct Settings {
     brokers: String,
     prover_cluster_db: String,
     rollup_state_manager_db: String,
-    persist_every_n_block: u64,
+    persist_every_n_block: usize,
 }
 
 impl Settings {
@@ -51,7 +51,7 @@ impl Settings {
 
     /// Shortcut of `Self::get().persist_every_n_block`
     #[inline(always)]
-    pub fn persist_every_n_block() -> u64 {
+    pub fn persist_every_n_block() -> usize {
         Self::get().persist_every_n_block
     }
 }
