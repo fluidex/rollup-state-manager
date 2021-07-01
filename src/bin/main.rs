@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 
 use crossbeam_channel::RecvTimeoutError;
-use rollup_state_manager::config;
+use rollup_state_manager::config::Settings;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
 use rollup_state_manager::params;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
@@ -22,11 +22,11 @@ async fn main() {
     let mut conf = config_rs::Config::new();
     let config_file = dotenv::var("CONFIG").unwrap();
     conf.merge(config_rs::File::with_name(&config_file)).unwrap();
-    let settings = config::Settings::set(conf.try_into().unwrap());
+    let settings = Settings::set(conf.try_into().unwrap());
 
     log::debug!("{:?}", settings);
 
-    run(settings).await;
+    run().await;
 }
 
 fn replay_msgs(
@@ -96,15 +96,15 @@ fn replay_msgs(
     }))
 }
 
-async fn run(settings: &config::Settings) {
+async fn run() {
     let (msg_sender, msg_receiver) = crossbeam_channel::unbounded();
     let (blk_sender, blk_receiver) = crossbeam_channel::unbounded();
 
-    let loader_thread = msg_loader::load_msgs_from_mq(&settings.brokers, msg_sender);
+    let loader_thread = msg_loader::load_msgs_from_mq(Settings::brokers(), msg_sender);
     let replay_thread = replay_msgs(msg_receiver, blk_sender);
 
-    let prover_cluster_db_pool = PgPool::connect(&settings.prover_cluster_db).await.unwrap();
-    let rollup_state_manager_db_pool = PgPool::connect(&settings.rollup_state_manager_db).await.unwrap();
+    let prover_cluster_db_pool = PgPool::connect(Settings::prover_cluster_db()).await.unwrap();
+    let rollup_state_manager_db_pool = PgPool::connect(Settings::rollup_state_manager_db()).await.unwrap();
     let mut check_old_block = true;
     for block in blk_receiver.iter() {
         if check_old_block {

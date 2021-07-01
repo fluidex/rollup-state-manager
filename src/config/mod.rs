@@ -6,10 +6,10 @@ static SETTINGS: OnceCell<Settings> = OnceCell::new();
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Settings {
-    pub brokers: String,
-    pub prover_cluster_db: String,
-    pub rollup_state_manager_db: String,
-    pub persist_every_n_block: u64,
+    brokers: String,
+    prover_cluster_db: String,
+    rollup_state_manager_db: String,
+    persist_every_n_block: u64,
 }
 
 impl Settings {
