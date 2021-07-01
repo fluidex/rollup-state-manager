@@ -22,10 +22,11 @@ async fn main() {
     let mut conf = config_rs::Config::new();
     let config_file = dotenv::var("CONFIG").unwrap();
     conf.merge(config_rs::File::with_name(&config_file)).unwrap();
-    let settings: config::Settings = conf.try_into().unwrap();
+    let settings = config::Settings::set(conf.try_into().unwrap());
+
     log::debug!("{:?}", settings);
 
-    run(&settings).await;
+    run(settings).await;
 }
 
 fn replay_msgs(
