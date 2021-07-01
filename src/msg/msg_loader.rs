@@ -4,6 +4,7 @@ use rdkafka::consumer::StreamConsumer;
 use rdkafka::message::{BorrowedMessage, Message};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use crate::types::matchengine::messages::{BalanceMessage, OrderMessage, TradeMessage, UserMessage};
 
 pub fn load_msgs_from_file(
     filepath: &str,
@@ -79,22 +80,23 @@ impl SimpleMessageHandler for &MessageWriter {
     fn on_message(&self, msg: &BorrowedMessage<'_>) {
         let msg_type = std::str::from_utf8(msg.key().unwrap()).unwrap();
         let msg_payload = std::str::from_utf8(msg.payload().unwrap()).unwrap();
+        let offset = msg.offset();
         let message = match msg_type {
             MSG_TYPE_BALANCES => {
-                let data = serde_json::from_str(msg_payload).unwrap();
-                WrappedMessage::BALANCE(data)
+                let data: BalanceMessage = serde_json::from_str(msg_payload).unwrap();
+                WrappedMessage::BALANCE((data, offset).into())
             }
             MSG_TYPE_ORDERS => {
-                let data = serde_json::from_str(msg_payload).unwrap();
-                WrappedMessage::ORDER(data)
+                let data: OrderMessage = serde_json::from_str(msg_payload).unwrap();
+                WrappedMessage::ORDER((data, offset).into())
             }
             MSG_TYPE_TRADES => {
-                let data = serde_json::from_str(msg_payload).unwrap();
-                WrappedMessage::TRADE(data)
+                let data: TradeMessage = serde_json::from_str(msg_payload).unwrap();
+                WrappedMessage::TRADE((data, offset).into())
             }
             MSG_TYPE_USERS => {
-                let data = serde_json::from_str(msg_payload).unwrap();
-                WrappedMessage::USER(data)
+                let data: UserMessage = serde_json::from_str(msg_payload).unwrap();
+                WrappedMessage::USER((data, offset).into())
             }
             _ => unreachable!(),
         };

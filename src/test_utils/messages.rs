@@ -1,13 +1,13 @@
-use crate::types;
+use crate::types::matchengine::messages::{Message, BalanceMessage, TradeMessage, OrderMessage, UserMessage};
 use anyhow::{anyhow, Result};
 use serde_json::Value;
 
 #[derive(Debug)]
 pub enum WrappedMessage {
-    BALANCE(types::matchengine::messages::BalanceMessage),
-    TRADE(types::matchengine::messages::TradeMessage),
-    ORDER(types::matchengine::messages::OrderMessage),
-    USER(types::matchengine::messages::UserMessage),
+    BALANCE(Message<BalanceMessage>),
+    TRADE(Message<TradeMessage>),
+    ORDER(Message<OrderMessage>),
+    USER(Message<UserMessage>),
 }
 
 pub fn parse_msg(line: String) -> Result<WrappedMessage> {
@@ -17,20 +17,20 @@ pub fn parse_msg(line: String) -> Result<WrappedMessage> {
 
         match typestr.as_str() {
             "BalanceMessage" => {
-                let data = serde_json::from_value(val).map_err(|e| anyhow!("wrong balance: {}", e))?;
-                Ok(WrappedMessage::BALANCE(data))
+                let data: BalanceMessage = serde_json::from_value(val).map_err(|e| anyhow!("wrong balance: {}", e))?;
+                Ok(WrappedMessage::BALANCE(data.into()))
             }
             "OrderMessage" => {
-                let data = serde_json::from_value(val).map_err(|e| anyhow!("wrong order: {}", e))?;
-                Ok(WrappedMessage::ORDER(data))
+                let data: OrderMessage = serde_json::from_value(val).map_err(|e| anyhow!("wrong order: {}", e))?;
+                Ok(WrappedMessage::ORDER(data.into()))
             }
             "TradeMessage" => {
-                let data = serde_json::from_value(val).map_err(|e| anyhow!("wrong trade: {}", e))?;
-                Ok(WrappedMessage::TRADE(data))
+                let data: TradeMessage = serde_json::from_value(val).map_err(|e| anyhow!("wrong trade: {}", e))?;
+                Ok(WrappedMessage::TRADE(data.into()))
             }
             "UserMessage" => {
-                let data = serde_json::from_value(val).map_err(|e| anyhow!("wrong user: {}", e))?;
-                Ok(WrappedMessage::USER(data))
+                let data: UserMessage = serde_json::from_value(val).map_err(|e| anyhow!("wrong user: {}", e))?;
+                Ok(WrappedMessage::USER(data.into()))
             }
             other => Err(anyhow!("unrecognized type field {}", other)),
         }

@@ -83,7 +83,7 @@ impl Block {
                 account_id: account_id0,
                 amount: decimal_to_amount(&Decimal::new(300, 0), prec_token_id(token_id0)),
                 l2key: None,
-            })
+            }, None)
             .unwrap();
 
         let mut transfer_tx0 = TransferTx::new(
@@ -100,7 +100,7 @@ impl Block {
         transfer_tx0.from_nonce = witgen.get_account_nonce(account_id0);
         let hash = transfer_tx0.hash();
         transfer_tx0.sig = account0.sign_hash(hash).unwrap();
-        witgen.transfer(transfer_tx0);
+        witgen.transfer(transfer_tx0, None);
 
         let mut transfer_tx1 = TransferTx::new(
             account_id1,
@@ -111,7 +111,7 @@ impl Block {
         transfer_tx1.from_nonce = witgen.get_account_nonce(account_id1);
         let hash = transfer_tx1.hash();
         transfer_tx1.sig = account1.sign_hash(hash).unwrap();
-        witgen.transfer(transfer_tx1);
+        witgen.transfer(transfer_tx1, None);
 
         let mut withdraw_tx = WithdrawTx::new(
             account_id0,
@@ -122,7 +122,7 @@ impl Block {
         let hash = withdraw_tx.hash();
         // hash = common.hashWithdraw(fullWithdrawTx);
         withdraw_tx.sig = account0.sign_hash(hash).unwrap();
-        witgen.withdraw(withdraw_tx);
+        witgen.withdraw(withdraw_tx, None);
 
         // trade amount
         let amount_1to2 = 120;
@@ -134,7 +134,7 @@ impl Block {
                 token_id: token_id0,
                 amount: decimal_to_amount(&Decimal::new(199, 0), prec_token_id(token_id0)),
                 l2key: None,
-            })
+            }, None)
             .unwrap();
         witgen
             .deposit(DepositTx {
@@ -146,7 +146,7 @@ impl Block {
                     sign: account2.sign(),
                     ay: account2.ay(),
                 }),
-            })
+            }, None)
             .unwrap();
 
         // order1
@@ -198,7 +198,7 @@ impl Block {
             maker_order: Some(order1.into()),
             taker_order: Some(order2.into()),
         };
-        witgen.full_spot_trade(full_trade);
+        witgen.full_spot_trade(full_trade, None);
 
         witgen.flush_with_nop();
 

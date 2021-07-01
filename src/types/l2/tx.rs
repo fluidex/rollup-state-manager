@@ -34,6 +34,7 @@ pub struct RawTx {
     pub account_path1: MerklePath,
     pub root_before: Fr,
     pub root_after: Fr,
+    pub offset: Option<i64>,
     // debug info
     // extra: any;
 }

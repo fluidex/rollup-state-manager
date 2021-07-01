@@ -129,7 +129,7 @@ impl WitnessGenerator {
     pub fn get_block_generate_num(&self) -> usize {
         self.block_generate_num
     }
-    pub fn deposit(&mut self, tx: DepositTx) -> anyhow::Result<()> {
+    pub fn deposit(&mut self, tx: DepositTx, offset: Option<i64>) -> anyhow::Result<()> {
         let deposit_to_new = tx.l2key.is_some();
         if deposit_to_new && self.has_account(tx.account_id) {
             bail!("deposit to new, but account already existed");
@@ -188,6 +188,7 @@ impl WitnessGenerator {
             account_path1: proof.account_path,
             root_before: proof.root,
             root_after: Fr::zero(),
+            offset,
         };
 
         let mut balance = old_balance;
@@ -207,7 +208,7 @@ impl WitnessGenerator {
         tx.nonce = self.state.get_account(tx.account_id).nonce;
         tx.old_balance = self.get_token_balance(tx.account_id, tx.token_id);
     }
-    pub fn transfer(&mut self, tx: TransferTx) {
+    pub fn transfer(&mut self, tx: TransferTx, offset: Option<i64>) {
         if !self.state.has_account(tx.from) {
             panic!("invalid account {:?}", tx);
         }
@@ -283,11 +284,12 @@ impl WitnessGenerator {
             account_path1: proof_to.account_path,
             root_before: proof_from.root,
             root_after: self.root(),
+            offset,
         };
 
         self.add_raw_tx(raw_tx);
     }
-    pub fn withdraw(&mut self, tx: WithdrawTx) {
+    pub fn withdraw(&mut self, tx: WithdrawTx, offset: Option<i64>) {
         // assert(this.accounts.get(tx.accountID).ethAddr != 0n, 'Withdraw');
         let account_id = tx.account_id;
         let token_id = tx.token_id;
@@ -344,6 +346,7 @@ impl WitnessGenerator {
             account_path1: proof.account_path,
             root_before: proof.root,
             root_after: Fr::zero(),
+            offset,
         };
 
         self.state.set_token_balance(account_id, token_id, new_balance);
@@ -358,7 +361,7 @@ impl WitnessGenerator {
     // case3: old order has same order id, we will modify it
     // tx.xxx_order is_none: xxx_order should be already put into the GlobalState tree
     // tx.xxx_order is_some: xxx_order should be new for the GlobalState
-    pub fn full_spot_trade(&mut self, full_tx: FullSpotTradeTx) {
+    pub fn full_spot_trade(&mut self, full_tx: FullSpotTradeTx, offset: Option<i64>) {
         // Step1: basic tx check
         // check account ids exist
         let trade = full_tx.trade;
@@ -492,6 +495,7 @@ impl WitnessGenerator {
             account_path1: Default::default(),
             root_before: old_root,
             root_after: Default::default(),
+            offset,
         };
 
         order1.trade_with(&trade.amount_1to2.to_fr(), &trade.amount_2to1.to_fr());
@@ -566,6 +570,7 @@ impl WitnessGenerator {
             account_path1: trivial_proof.account_path,
             root_before: self.state.root(),
             root_after: self.state.root(),
+            offset: None,
         };
         self.add_raw_tx(raw_tx);
     }

@@ -34,7 +34,8 @@ impl Default for Processor {
 }
 
 impl Processor {
-    pub fn handle_user_msg(&mut self, witgen: &mut WitnessGenerator, user_info: messages::UserMessage) {
+    pub fn handle_user_msg(&mut self, witgen: &mut WitnessGenerator, message: messages::Message<messages::UserMessage>) {
+        let (user_info, offset) = message.into_parts();
         let account_id = user_info.user_id;
         assert!(!witgen.has_account(account_id));
         let l2_pubkey: String = user_info.l2_pubkey;
@@ -56,11 +57,12 @@ impl Processor {
                     sign,
                     ay: l2_pubkey_point.y,
                 }),
-            })
+            }, offset)
             .unwrap();
     }
-    pub fn handle_balance_msg(&mut self, witgen: &mut WitnessGenerator, deposit: messages::BalanceMessage) {
+    pub fn handle_balance_msg(&mut self, witgen: &mut WitnessGenerator, message: messages::Message<messages::BalanceMessage>) {
         //log::debug!("handle_balance_msg {:#?}", deposit);
+        let (deposit, offset) = message.into_parts();
         assert!(!deposit.change.is_sign_negative(), "only support deposit now");
         let token_id = get_token_id_by_name(&deposit.asset);
         let account_id = deposit.user_id;
@@ -88,7 +90,7 @@ impl Processor {
                     account_id,
                     amount,
                     l2key: None,
-                })
+                }, offset)
                 .unwrap();
         } else {
             /*
@@ -117,7 +119,8 @@ impl Processor {
         self.balance_tx_total_time += timing.elapsed().as_secs_f32();
     }
 
-    pub fn handle_order_msg(&mut self, witgen: &mut WitnessGenerator, order: messages::OrderMessage) {
+    pub fn handle_order_msg(&mut self, witgen: &mut WitnessGenerator, message: messages::Message<messages::OrderMessage>) {
+        let (order, _) = message.into_parts();
         match order.event {
             messages::OrderEventType::FINISH => {
                 debug_assert_eq!(order.order.finished_base.is_zero(), order.order.finished_quote.is_zero());
@@ -142,7 +145,8 @@ impl Processor {
             }
         }
     }
-    pub fn handle_trade_msg(&mut self, witgen: &mut WitnessGenerator, trade: messages::TradeMessage) {
+    pub fn handle_trade_msg(&mut self, witgen: &mut WitnessGenerator, message: messages::Message<messages::TradeMessage>) {
+        let (trade, offset) = message.into_parts();
         //log::debug!("handle_trade_msg {:#?}", trade);
         if let Some(state_before) = &trade.state_before {
             check_state(witgen, state_before, &trade);
@@ -188,7 +192,7 @@ impl Processor {
             taker_order,
             maker_order,
         };
-        witgen.full_spot_trade(tx);
+        witgen.full_spot_trade(tx, offset);
         self.trade_tx_total_time += timing.elapsed().as_secs_f32();
         if let Some(state_after) = &trade.state_after {
             check_state(witgen, state_after, &trade);
