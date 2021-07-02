@@ -14,6 +14,7 @@ use crate::types::primitives::{fr_add, fr_sub, fr_to_bigint, u32_to_fr, Fr};
 use anyhow::{anyhow, bail};
 use babyjubjub_rs::Point;
 use ff::Field;
+use std::time::Instant;
 
 // TODO: too many unwrap here
 pub struct WitnessGenerator {
@@ -612,6 +613,8 @@ impl WitnessGenerator {
             #[cfg(feature = "persist_sled")]
             // TODO: fix unwrap
             if self.block_generate_num % Settings::persist_every_n_block() == 0 {
+                log::info!("start to dump #{}", self.block_generate_num);
+                let start = Instant::now();
                 let last_offset = self.buffered_txs[i..i + self.n_tx]
                     .iter()
                     .rev()
@@ -622,6 +625,8 @@ impl WitnessGenerator {
                 let db = sled::open(db_path).unwrap();
                 db.insert(KAFKA_OFFSET_KEY, bincode::serialize(&last_offset).unwrap()).unwrap();
                 self.dump_to_sled(&db).unwrap();
+                let elapsed = Instant::now() - start;
+                log::info!("dump #{} completed, duration: {:.3}s", self.block_generate_num, elapsed.as_secs_f32())
             }
 
             self.block_generate_num += 1;
