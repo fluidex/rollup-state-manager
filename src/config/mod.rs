@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use once_cell::sync::OnceCell;
 use serde::Deserialize;
 
@@ -9,6 +11,7 @@ pub struct Settings {
     brokers: String,
     prover_cluster_db: String,
     rollup_state_manager_db: String,
+    persist_dir: Box<Path>,
     persist_every_n_block: usize,
 }
 
@@ -47,6 +50,10 @@ impl Settings {
     #[inline(always)]
     pub fn rollup_state_manager_db() -> &'static str {
         Self::get().rollup_state_manager_db.as_str()
+    }
+
+    pub fn persist_dir() -> &'static Path {
+        Self::get().persist_dir.as_ref()
     }
 
     /// Shortcut of `Self::get().persist_every_n_block`
