@@ -3,6 +3,9 @@
 
 use super::global::{AccountUpdates, GlobalState};
 use crate::account::{L2Account, SignatureBJJ};
+use crate::config::Settings;
+#[cfg(feature = "persist_sled")]
+use crate::r#const::sled_db::*;
 use crate::types::l2::{
     tx_detail_idx, DepositTx, FullSpotTradeTx, L2Block, L2BlockWitness, Order, RawTx, TransferTx, TxType, WithdrawTx, TX_LENGTH,
 };
@@ -605,6 +608,22 @@ impl WitnessGenerator {
         while i + self.n_tx <= len {
             let block = Self::forge_with_txs(self.block_generate_num, &self.buffered_txs[i..i + self.n_tx]);
             blocks.push(block);
+
+            #[cfg(feature = "persist_sled")]
+            // TODO: fix unwrap
+            if self.block_generate_num % Settings::persist_every_n_block() == 0 {
+                let last_offset = self.buffered_txs[i..i + self.n_tx]
+                    .iter()
+                    .rev()
+                    .filter_map(|tx| tx.offset)
+                    .next()
+                    .unwrap();
+                let db_path = Settings::persist_dir().join(format!("{}.db", self.block_generate_num));
+                let db = sled::open(db_path).unwrap();
+                db.insert(KAFKA_OFFSET_KEY, bincode::serialize(&last_offset).unwrap()).unwrap();
+                self.dump_to_sled(&db).unwrap();
+            }
+
             self.block_generate_num += 1;
             i += self.n_tx;
         }
