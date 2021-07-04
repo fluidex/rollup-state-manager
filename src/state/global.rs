@@ -254,18 +254,22 @@ impl GlobalState {
                     if order.order_id < order_id {
                         self.next_order_positions.insert(account_id, candidate_pos + 1);
                         log::debug!(
-                            "replace order uid {} old order {} new order {} at {}",
+                            "replace order uid {} old order {} new order {} at {}. reason: {}",
                             account_id,
                             order.order_id,
                             order_id,
-                            candidate_pos
+                            candidate_pos,
+                            if order.is_filled() { "filled" } else { "cancelled" }
                         );
                         return candidate_pos;
                     }
                 }
             }
         }
-        panic!("Cannot find order pos, please use larger order tree height");
+        panic!(
+            "Cannot find order pos, please use larger order tree height. account_id {} order_id {}",
+            account_id, order_id
+        );
     }
     pub fn get_next_account_id(&self) -> anyhow::Result<u32> {
         let account_id = self.balance_trees.len() as u32;

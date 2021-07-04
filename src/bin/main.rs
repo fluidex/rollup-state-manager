@@ -104,9 +104,17 @@ async fn run(settings: &config::Settings) {
 
     let prover_cluster_db_pool = PgPool::connect(&settings.prover_cluster_db).await.unwrap();
     let rollup_state_manager_db_pool = PgPool::connect(&settings.rollup_state_manager_db).await.unwrap();
+    let mut check_old_block = true;
     for block in blk_receiver.iter() {
-        if is_present_block(&rollup_state_manager_db_pool, &block).await.unwrap() {
-            continue;
+        if check_old_block {
+            let is_present = is_present_block(&rollup_state_manager_db_pool, &block).await.unwrap();
+            if is_present {
+                // skip saving to db
+                continue;
+            } else {
+                // once the old block is not in db, we don't need checking any longer
+                check_old_block = false;
+            }
         }
         save_block_to_rollup_state_manager_db(&rollup_state_manager_db_pool, &block)
             .await
@@ -131,6 +139,10 @@ async fn is_present_block(pool: &PgPool, block: &L2Block) -> anyhow::Result<bool
             if new_root == old_root {
                 log::debug!("skip same l2 block {} {}", block.block_id, new_root);
             } else {
+                log::error!(
+                    "new block {}",
+                    serde_json::to_string_pretty(&L2BlockSerde::from(block.witness.clone())).unwrap()
+                );
                 assert_eq!(
                     new_root, old_root,
                     "l2 block generation must be deterministic! Error for block {}",
