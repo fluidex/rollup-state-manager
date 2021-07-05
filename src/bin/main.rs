@@ -10,7 +10,6 @@ use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils::messages::WrappedMessage;
 use rollup_state_manager::types::l2::{L2Block, L2BlockSerde};
 use rollup_state_manager::types::primitives::fr_to_string;
-use sled::Db;
 use sqlx::postgres::PgPool;
 use sqlx::Row;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
