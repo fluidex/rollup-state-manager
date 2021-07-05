@@ -626,7 +626,11 @@ impl WitnessGenerator {
                 db.insert(KAFKA_OFFSET_KEY, bincode::serialize(&last_offset).unwrap()).unwrap();
                 self.dump_to_sled(&db).unwrap();
                 let elapsed = Instant::now() - start;
-                log::info!("dump #{} completed, duration: {:.3}s", self.block_generate_num, elapsed.as_secs_f32())
+                log::info!(
+                    "dump #{} completed, duration: {:.3}s",
+                    self.block_generate_num,
+                    elapsed.as_secs_f32()
+                )
             }
 
             self.block_generate_num += 1;

@@ -157,12 +157,11 @@ impl TxMessage for TradeMessage {}
 impl TxMessage for OrderMessage {}
 impl TxMessage for UserMessage {}
 
-
 impl<T: TxMessage> Message<T> {
     pub fn new(message: T, offset: i64) -> Self {
         Self {
             message,
-            offset: Some(offset)
+            offset: Some(offset),
         }
     }
 
@@ -177,10 +176,7 @@ impl<T: TxMessage> Message<T> {
 
 impl<T: TxMessage> From<T> for Message<T> {
     fn from(message: T) -> Self {
-        Self {
-            message,
-            offset: None
-        }
+        Self { message, offset: None }
     }
 }
 
@@ -188,7 +184,7 @@ impl<T: TxMessage> From<(T, i64)> for Message<T> {
     fn from((message, offset): (T, i64)) -> Self {
         Self {
             message,
-            offset: Some(offset)
+            offset: Some(offset),
         }
     }
 }

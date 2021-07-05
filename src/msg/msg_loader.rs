@@ -1,10 +1,12 @@
 use super::msg_consumer::{Simple, SimpleConsumer, SimpleMessageHandler};
 use crate::test_utils::messages::{parse_msg, WrappedMessage};
-use rdkafka::consumer::StreamConsumer;
+use crate::types::matchengine::messages::{BalanceMessage, OrderMessage, TradeMessage, UserMessage};
+use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::message::{BorrowedMessage, Message};
+use rdkafka::Offset;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use crate::types::matchengine::messages::{BalanceMessage, OrderMessage, TradeMessage, UserMessage};
+use std::time::Duration;
 
 pub fn load_msgs_from_file(
     filepath: &str,
@@ -31,6 +33,7 @@ const MSG_TYPE_TRADES: &str = "trades";
 
 pub fn load_msgs_from_mq(
     brokers: &str,
+    offset: Option<i64>,
     sender: crossbeam_channel::Sender<WrappedMessage>,
 ) -> Option<std::thread::JoinHandle<anyhow::Result<()>>> {
     let brokers = brokers.to_owned();
@@ -48,6 +51,12 @@ pub fn load_msgs_from_mq(
                 .set("auto.offset.reset", "earliest")
                 .create()
                 .unwrap();
+
+            if let Some(offset) = offset {
+                consumer
+                    .seek(UNIFY_TOPIC, 0, Offset::Offset(offset), Duration::from_millis(1000))
+                    .unwrap();
+            }
 
             let consumer = std::sync::Arc::new(consumer);
             loop {

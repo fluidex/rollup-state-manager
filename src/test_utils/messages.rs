@@ -1,4 +1,4 @@
-use crate::types::matchengine::messages::{Message, BalanceMessage, TradeMessage, OrderMessage, UserMessage};
+use crate::types::matchengine::messages::{BalanceMessage, Message, OrderMessage, TradeMessage, UserMessage};
 use anyhow::{anyhow, Result};
 use serde_json::Value;
 

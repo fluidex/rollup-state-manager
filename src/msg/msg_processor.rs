@@ -48,16 +48,19 @@ impl Processor {
         let sign = if bjj_compressed[31] & 0x80 != 0x00 { Fr::one() } else { Fr::zero() };
         // TODO: remove '0x' from eth addr?
         witgen
-            .deposit(l2::DepositTx {
-                token_id: fake_token_id,
-                account_id,
-                amount: fake_amount,
-                l2key: Some(l2::L2Key {
-                    eth_addr,
-                    sign,
-                    ay: l2_pubkey_point.y,
-                }),
-            }, offset)
+            .deposit(
+                l2::DepositTx {
+                    token_id: fake_token_id,
+                    account_id,
+                    amount: fake_amount,
+                    l2key: Some(l2::L2Key {
+                        eth_addr,
+                        sign,
+                        ay: l2_pubkey_point.y,
+                    }),
+                },
+                offset,
+            )
             .unwrap();
     }
     pub fn handle_balance_msg(&mut self, witgen: &mut WitnessGenerator, message: messages::Message<messages::BalanceMessage>) {
@@ -85,12 +88,15 @@ impl Processor {
 
         if is_old {
             witgen
-                .deposit(l2::DepositTx {
-                    token_id,
-                    account_id,
-                    amount,
-                    l2key: None,
-                }, offset)
+                .deposit(
+                    l2::DepositTx {
+                        token_id,
+                        account_id,
+                        amount,
+                        l2key: None,
+                    },
+                    offset,
+                )
                 .unwrap();
         } else {
             /*

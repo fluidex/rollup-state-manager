@@ -78,12 +78,15 @@ impl Block {
 
         // assert(witgen.accounts.get(account_id0).eth_addr() == 0, 'account0 should be empty');
         witgen
-            .deposit(DepositTx {
-                token_id: token_id0,
-                account_id: account_id0,
-                amount: decimal_to_amount(&Decimal::new(300, 0), prec_token_id(token_id0)),
-                l2key: None,
-            }, None)
+            .deposit(
+                DepositTx {
+                    token_id: token_id0,
+                    account_id: account_id0,
+                    amount: decimal_to_amount(&Decimal::new(300, 0), prec_token_id(token_id0)),
+                    l2key: None,
+                },
+                None,
+            )
             .unwrap();
 
         let mut transfer_tx0 = TransferTx::new(
@@ -129,24 +132,30 @@ impl Block {
         let amount_2to1 = 1200;
         // ensure balance to trade
         witgen
-            .deposit(DepositTx {
-                account_id: account_id1,
-                token_id: token_id0,
-                amount: decimal_to_amount(&Decimal::new(199, 0), prec_token_id(token_id0)),
-                l2key: None,
-            }, None)
+            .deposit(
+                DepositTx {
+                    account_id: account_id1,
+                    token_id: token_id0,
+                    amount: decimal_to_amount(&Decimal::new(199, 0), prec_token_id(token_id0)),
+                    l2key: None,
+                },
+                None,
+            )
             .unwrap();
         witgen
-            .deposit(DepositTx {
-                account_id: account_id2,
-                token_id: token_id1,
-                amount: decimal_to_amount(&Decimal::new(1990, 0), prec_token_id(token_id1)),
-                l2key: Some(L2Key {
-                    eth_addr: account2.eth_addr(),
-                    sign: account2.sign(),
-                    ay: account2.ay(),
-                }),
-            }, None)
+            .deposit(
+                DepositTx {
+                    account_id: account_id2,
+                    token_id: token_id1,
+                    amount: decimal_to_amount(&Decimal::new(1990, 0), prec_token_id(token_id1)),
+                    l2key: Some(L2Key {
+                        eth_addr: account2.eth_addr(),
+                        sign: account2.sign(),
+                        ay: account2.ay(),
+                    }),
+                },
+                None,
+            )
             .unwrap();
 
         // order1
