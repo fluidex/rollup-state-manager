@@ -610,20 +610,22 @@ impl WitnessGenerator {
             let block = Self::forge_with_txs(self.block_generate_num, &self.buffered_txs[i..i + self.n_tx]);
             blocks.push(block);
 
+            self.block_generate_num += 1;
+            i += self.n_tx;
+
             #[cfg(feature = "persist_sled")]
             // TODO: fix unwrap
             if self.block_generate_num % Settings::persist_every_n_block() == 0 {
                 log::info!("start to dump #{}", self.block_generate_num);
                 let start = Instant::now();
-                let last_offset = self.buffered_txs[i..i + self.n_tx]
-                    .iter()
-                    .rev()
-                    .filter_map(|tx| tx.offset)
-                    .next()
-                    .unwrap();
+                let last_offset = self.buffered_txs[i..i + self.n_tx].iter().rev().filter_map(|tx| tx.offset).next();
+                if last_offset.is_none() {
+                    log::warn!("kafka offset not exist, is this block belongs to a test_case?")
+                }
                 let db_path = Settings::persist_dir().join(format!("{}.db", self.block_generate_num));
                 let db = sled::open(db_path).unwrap();
-                db.insert(KAFKA_OFFSET_KEY, bincode::serialize(&last_offset).unwrap()).unwrap();
+                db.insert(KAFKA_OFFSET_KEY, bincode::serialize(&last_offset.unwrap()).unwrap())
+                    .unwrap();
                 self.dump_to_sled(&db).unwrap();
                 let elapsed = Instant::now() - start;
                 log::info!(
@@ -632,9 +634,6 @@ impl WitnessGenerator {
                     elapsed.as_secs_f32()
                 )
             }
-
-            self.block_generate_num += 1;
-            i += self.n_tx;
         }
         self.buffered_txs.drain(0..i);
         blocks

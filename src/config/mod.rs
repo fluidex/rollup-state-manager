@@ -1,3 +1,4 @@
+use std::env;
 use std::path::Path;
 
 use once_cell::sync::OnceCell;
@@ -16,6 +17,17 @@ pub struct Settings {
 }
 
 impl Settings {
+    /// Initializes with parsing config file in env var `CONFIG`.
+    ///
+    /// # panics
+    /// if the `CONFIG` env var not exist or the file is corrupt, it panics.
+    pub fn init_default() {
+        let mut conf = config_rs::Config::new();
+        let config_file = env::var("CONFIG").unwrap();
+        conf.merge(config_rs::File::with_name(&config_file)).unwrap();
+        Self::set(conf.try_into().unwrap());
+    }
+
     /// Sets the contents of this cell to the singleton `Settings`
     /// and returns the reference to it.
     ///

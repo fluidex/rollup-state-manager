@@ -15,6 +15,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use rollup_state_manager::config::Settings;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
 
 fn replay_msgs(
@@ -133,6 +134,8 @@ pub fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<L2Block>) ->
  */
 
 fn main() {
+    dotenv::dotenv().ok();
+    Settings::init_default();
     let default_test_file = "circuits/test/testdata/msgs_float.jsonl";
     //let default_test_file = "tests/global_state/testdata/data001.txt";
     let test_file = std::env::args().nth(1).unwrap_or_else(|| default_test_file.into());

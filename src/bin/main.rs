@@ -21,12 +21,8 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
     log::info!("state_keeper started");
 
-    let mut conf = config_rs::Config::new();
-    let config_file = dotenv::var("CONFIG")?;
-    conf.merge(config_rs::File::with_name(&config_file))?;
-    let settings = Settings::set(conf.try_into()?);
-
-    log::debug!("{:?}", settings);
+    Settings::init_default();
+    log::debug!("{:?}", Settings::get());
 
     let last_dump = get_latest_dump()?;
     if let Some(id) = last_dump {
