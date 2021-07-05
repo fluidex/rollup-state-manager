@@ -37,12 +37,34 @@ pub fn get_mnemonic_by_account_id(account_id: u32) -> Mnemonic<English> {
 #[cfg(test)]
 #[test]
 fn print_test_accounts() {
+    use std::str::FromStr;
+
+    use coins_bip32::{path::DerivationPath, prelude::SigningKey};
+    use ethers::utils::{secret_key_to_address, to_checksum};
+    use serde::Serialize;
+
+    #[derive(Serialize)]
+    struct AccInfo {
+        account_id: u32,
+        mnemonic: String,
+        priv_key: String,
+        eth_addr: String,
+    }
     let num = 20;
-    for i in 0..num {
-        println!(
-            "{{\"account_id\": {}, \"mnemonic\": \"{}\"}}",
-            i,
-            get_mnemonic_by_account_id(i).to_phrase().unwrap()
-        );
+    for account_id in 0..num {
+        let mnemonic = get_mnemonic_by_account_id(account_id);
+        let mnemonic_str = mnemonic.to_phrase().unwrap();
+        let path = DerivationPath::from_str("m/44'/60'/0'/0/0").unwrap();
+        let priv_key = mnemonic.derive_key(path, None).unwrap();
+        let priv_key_ref: &SigningKey = priv_key.as_ref();
+        let priv_key_bytes = priv_key_ref.to_bytes();
+        let eth_addr = secret_key_to_address(priv_key_ref);
+        let acc = AccInfo {
+            mnemonic: mnemonic_str,
+            account_id,
+            priv_key: format!("0x{:x}", priv_key_bytes),
+            eth_addr: to_checksum(&eth_addr, None),
+        };
+        println!("{}", serde_json::to_string(&acc).unwrap());
     }
 }
