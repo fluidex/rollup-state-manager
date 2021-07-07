@@ -4,7 +4,7 @@ use crate::types::matchengine::messages::{BalanceMessage, OrderMessage, TradeMes
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::message::{BorrowedMessage, Message};
 use rdkafka::util::Timeout;
-use rdkafka::Offset;
+use rdkafka::{Offset, TopicPartitionList};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
@@ -52,6 +52,13 @@ pub fn load_msgs_from_mq(
                 .create()
                 .unwrap();
 
+            let mut partitions = TopicPartitionList::new();
+            partitions.add_partition(UNIFY_TOPIC, 0);
+            if let Some(offset) = offset {
+                partitions.set_partition_offset(UNIFY_TOPIC, 0, Offset::Offset(offset)).unwrap();
+            }
+            consumer.assign(&partitions).unwrap();
+
             let consumer = std::sync::Arc::new(consumer);
             loop {
                 let cr_main = SimpleConsumer::new(consumer.as_ref())
@@ -64,13 +71,7 @@ pub fn load_msgs_from_mq(
                         break;
                     },
 
-                    err = cr_main.run_stream(|cr| {
-                        if let Some(offset) = offset {
-                            cr.seek(UNIFY_TOPIC, 0, Offset::Offset(offset), Timeout::Never).unwrap();
-                            log::info!("seek {} onto offset {}", UNIFY_TOPIC, offset);
-                        }
-                        cr.stream()
-                    }) => {
+                    err = cr_main.run_stream(|cr| cr.stream()) => {
                         log::error!("Kafka consumer error: {}", err);
                     }
                 }
