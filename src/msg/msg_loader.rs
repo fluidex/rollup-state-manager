@@ -52,10 +52,12 @@ pub fn load_msgs_from_mq(
                 .create()
                 .unwrap();
 
+            // FIXME: this should be done inside the consumer.
             if let Some(offset) = offset {
-                consumer
-                    .seek(UNIFY_TOPIC, 0, Offset::Offset(offset), Duration::from_millis(1000))
-                    .unwrap();
+                consumer.subscribe(&[UNIFY_TOPIC]).unwrap();
+                let mut topic_partition = consumer.position().unwrap();
+                // we only have one topic and one partition
+                topic_partition.set_all_offsets(Offset::Offset(offset)).unwrap();
             }
 
             let consumer = std::sync::Arc::new(consumer);
