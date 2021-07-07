@@ -618,6 +618,10 @@ impl WitnessGenerator {
                 log::info!("start to dump #{}", self.block_generate_num);
                 let start = Instant::now();
                 let last_offset = self.buffered_txs[i..i + self.n_tx].iter().rev().filter_map(|tx| tx.offset).next();
+                if log::log_enabled!(log::Level::Debug) {
+                    let offsets: Vec<Option<i64>> = self.buffered_txs[i..i + self.n_tx].iter().map(|tx| tx.offset).collect();
+                    log::debug!("block #{}, offsets: {:?}", self.block_generate_num, offsets);
+                }
                 if last_offset.is_none() {
                     log::warn!("kafka offset not exist, is this block belongs to a test_case?")
                 }
