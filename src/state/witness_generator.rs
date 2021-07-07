@@ -611,7 +611,6 @@ impl WitnessGenerator {
             blocks.push(block);
 
             self.block_generate_num += 1;
-            i += self.n_tx;
 
             #[cfg(feature = "persist_sled")]
             // TODO: fix unwrap
@@ -634,6 +633,8 @@ impl WitnessGenerator {
                     elapsed.as_secs_f32()
                 )
             }
+
+            i += self.n_tx;
         }
         self.buffered_txs.drain(0..i);
         blocks
