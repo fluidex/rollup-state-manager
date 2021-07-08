@@ -3,7 +3,6 @@ use crate::test_utils::messages::{parse_msg, WrappedMessage};
 use crate::types::matchengine::messages::{BalanceMessage, OrderMessage, TradeMessage, UserMessage};
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::message::{BorrowedMessage, Message};
-use rdkafka::util::Timeout;
 use rdkafka::{Offset, TopicPartitionList};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
