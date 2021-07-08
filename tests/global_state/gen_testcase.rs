@@ -17,6 +17,7 @@ use std::time::Instant;
 
 use rollup_state_manager::config::Settings;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
+use std::option::Option::None;
 
 fn replay_msgs(
     msg_receiver: crossbeam_channel::Receiver<WrappedMessage>,
@@ -29,7 +30,7 @@ fn replay_msgs(
             *params::ACCOUNTLEVELS,
             *params::VERBOSE,
         );
-        let mut witgen = WitnessGenerator::new(state, *params::NTXS, *params::VERBOSE);
+        let mut witgen = WitnessGenerator::new(state, *params::NTXS, None, *params::VERBOSE);
 
         println!("genesis root {}", witgen.root());
 

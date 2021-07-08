@@ -10,6 +10,7 @@ use rust_decimal::Decimal;
 use serde_json::json;
 
 use rollup_state_manager::params;
+use std::option::Option::None;
 
 pub struct Block {
     n_txs: usize,
@@ -54,7 +55,7 @@ impl Block {
         */
         let state = GlobalState::new(self.balance_levels, self.order_levels, self.account_levels, self.verbose);
         let (sender, receiver) = crossbeam_channel::bounded(100);
-        let mut witgen = WitnessGenerator::new(state, self.n_txs, self.verbose);
+        let mut witgen = WitnessGenerator::new(state, self.n_txs, None, self.verbose);
 
         let token_id0 = 0;
         let token_id1 = 1;
@@ -229,7 +230,7 @@ impl Block {
     fn empty_block_case(&self) -> CircuitTestData {
         let state = GlobalState::new(self.balance_levels, self.order_levels, self.account_levels, self.verbose);
         let (sender, receiver) = crossbeam_channel::bounded(100);
-        let mut witgen = WitnessGenerator::new(state, self.n_txs, self.verbose);
+        let mut witgen = WitnessGenerator::new(state, self.n_txs, None, self.verbose);
         // we need to have at least 1 account
         witgen.create_new_account(1).unwrap();
         witgen.nop();

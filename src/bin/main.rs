@@ -12,6 +12,7 @@ use rollup_state_manager::types::l2::{L2Block, L2BlockSerde};
 use rollup_state_manager::types::primitives::fr_to_string;
 use sqlx::postgres::PgPool;
 use sqlx::Row;
+use std::option::Option::None;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::{fs, io};
 
@@ -50,10 +51,13 @@ fn replay_msgs(
             *params::ACCOUNTLEVELS,
             *params::VERBOSE,
         );
-        if let Some(db) = db {
+        let block_offset: Option<usize> = if let Some(db) = db {
             state.load_persist(&db).unwrap();
-        }
-        let mut witgen = WitnessGenerator::new(state, *params::NTXS, *params::VERBOSE);
+            db.get(KAFKA_OFFSET_KEY).ok().flatten().and_then(|v| bincode::deserialize(&v).ok())
+        } else {
+            None
+        };
+        let mut witgen = WitnessGenerator::new(state, *params::NTXS, block_offset, *params::VERBOSE);
 
         println!("genesis root {}", witgen.root());
 

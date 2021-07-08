@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use rollup_state_manager::msg::msg_processor;
+use std::option::Option::None;
 
 //if we use nightly build, we are able to use bench test ...
 fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
@@ -50,7 +51,7 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
 
     let (sender, receiver) = crossbeam_channel::unbounded();
 
-    let mut witgen = WitnessGenerator::new(state, *params::NTXS, *params::VERBOSE);
+    let mut witgen = WitnessGenerator::new(state, *params::NTXS, None, *params::VERBOSE);
 
     let timing = Instant::now();
     let mut inner_timing = Instant::now();

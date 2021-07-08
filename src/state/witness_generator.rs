@@ -32,12 +32,12 @@ impl WitnessGenerator {
     pub fn print_config() {
         Tree::print_config();
     }
-    pub fn new(state: GlobalState, n_tx: usize, verbose: bool) -> Self {
+    pub fn new(state: GlobalState, n_tx: usize, block_offset: Option<usize>, verbose: bool) -> Self {
         Self {
             state,
             n_tx,
             buffered_txs: Vec::new(),
-            block_generate_num: 0,
+            block_generate_num: block_offset.unwrap_or(0),
             //buffered_blocks: Vec::new(),
             verbose,
             verify_sig: true,
@@ -627,6 +627,8 @@ impl WitnessGenerator {
                 }
                 let db_path = Settings::persist_dir().join(format!("{}.db", self.block_generate_num));
                 let db = sled::open(db_path).unwrap();
+                db.insert(BLOCK_OFFSET_KEY, bincode::serialize(&self.block_generate_num).unwrap())
+                    .unwrap();
                 db.insert(KAFKA_OFFSET_KEY, bincode::serialize(&last_offset.unwrap()).unwrap())
                     .unwrap();
                 self.dump_to_sled(&db).unwrap();
