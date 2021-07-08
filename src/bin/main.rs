@@ -53,7 +53,7 @@ fn replay_msgs(
         );
         let block_offset: Option<usize> = if let Some(db) = db {
             state.load_persist(&db).unwrap();
-            db.get(KAFKA_OFFSET_KEY).ok().flatten().and_then(|v| bincode::deserialize(&v).ok())
+            db.get(BLOCK_OFFSET_KEY).ok().flatten().and_then(|v| bincode::deserialize(&v).ok())
         } else {
             None
         };
