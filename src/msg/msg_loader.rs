@@ -55,7 +55,8 @@ pub fn load_msgs_from_mq(
             let mut partitions = TopicPartitionList::new();
             partitions.add_partition(UNIFY_TOPIC, 0);
             if let Some(offset) = offset {
-                partitions.set_partition_offset(UNIFY_TOPIC, 0, Offset::Offset(offset)).unwrap();
+                // FIXME: this might panic if there is no new message, fallback in this scenario
+                partitions.set_partition_offset(UNIFY_TOPIC, 0, Offset::Offset(offset + 1)).unwrap();
             }
             consumer.assign(&partitions).unwrap();
 
