@@ -47,7 +47,7 @@ pub fn load_msgs_from_mq(
                 .set("enable.partition.eof", "false")
                 .set("session.timeout.ms", "6000")
                 .set("enable.auto.commit", "false")
-                .set("auto.offset.reset", "earliest")
+                .set("auto.offset.reset", "none")
                 .create()
                 .unwrap();
 
@@ -56,6 +56,8 @@ pub fn load_msgs_from_mq(
             if let Some(offset) = offset {
                 // FIXME: this might panic if there is no new message, fallback in this scenario
                 partitions.set_partition_offset(UNIFY_TOPIC, 0, Offset::Offset(offset + 1)).unwrap();
+            } else {
+                partitions.set_partition_offset(UNIFY_TOPIC, 0, Offset::Beginning).unwrap();
             }
             consumer.assign(&partitions).unwrap();
 
