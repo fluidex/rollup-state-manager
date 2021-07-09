@@ -47,7 +47,7 @@ fn replay_msgs(
 
         let timing = Instant::now();
         loop {
-            // In the worst case we wait for about 119 seconds timeout until we try to 
+            // In the worst case we wait for about 119 seconds timeout until we try to
             // generate a block, if there's any tx.
             // TODO: dynamic timeout
             match msg_receiver.recv_timeout(Duration::from_secs(120)) {
