@@ -32,37 +32,26 @@ pub fn load_msgs_from_mq(
     brokers: &str,
     sender: crossbeam_channel::Sender<WrappedMessage>,
 ) -> Option<std::thread::JoinHandle<anyhow::Result<()>>> {
-    let brokers = brokers.to_owned();
+    let consumer: StreamConsumer = rdkafka::config::ClientConfig::new()
+        .set("bootstrap.servers", brokers)
+        .set("group.id", "rollup_msg_consumer")
+        .set("enable.partition.eof", "false")
+        .set("session.timeout.ms", "6000")
+        .set("enable.auto.commit", "true")
+        .set("auto.offset.reset", "earliest")
+        .create()
+        .unwrap();
+    let writer = MessageWriter { sender };
+
     Some(std::thread::spawn(move || {
         let rt: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap();
-
-        let writer = MessageWriter { sender };
         rt.block_on(async move {
-            let consumer: StreamConsumer = rdkafka::config::ClientConfig::new()
-                .set("bootstrap.servers", brokers)
-                .set("group.id", "rollup_msg_consumer")
-                .set("enable.partition.eof", "false")
-                .set("session.timeout.ms", "6000")
-                .set("enable.auto.commit", "false")
-                .set("auto.offset.reset", "earliest")
-                .create()
+            let cr_main = SimpleConsumer::new(&consumer)
+                .add_topic(UNIFY_TOPIC, Simple::from(&writer))
                 .unwrap();
-
-            let consumer = std::sync::Arc::new(consumer);
-            loop {
-                let cr_main = SimpleConsumer::new(consumer.as_ref())
-                    .add_topic(UNIFY_TOPIC, Simple::from(&writer))
-                    .unwrap();
-
-                tokio::select! {
-                    _ = tokio::signal::ctrl_c() => {
-                        log::info!("Ctrl-c received, shutting down");
-                        break;
-                    },
-
-                    err = cr_main.run_stream(|cr|cr.stream()) => {
-                        log::error!("Kafka consumer error: {}", err);
-                    }
+            tokio::select! {
+                err = cr_main.run_stream(|cr|cr.stream()) => {
+                    log::error!("Kafka consumer error: {}", err);
                 }
             }
         });
