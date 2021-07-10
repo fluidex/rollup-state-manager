@@ -73,3 +73,6 @@ default = ["persist_sled"]
 windows_build = [ "rdkafka/dynamic_linking" ]
 fr_string_repr = [ ]
 persist_sled = [ "sled", "bincode" ]
+
+[profile.release]
+debug-assertions = true
