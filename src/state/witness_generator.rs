@@ -615,35 +615,39 @@ impl WitnessGenerator {
             #[cfg(feature = "persist_sled")]
             // TODO: fix unwrap
             if self.block_generate_num % Settings::persist_every_n_block() == 0 {
-                log::info!("start to dump #{}", self.block_generate_num);
-                let start = Instant::now();
-                let last_offset = self.buffered_txs[i..i + self.n_tx].iter().rev().filter_map(|tx| tx.offset).next();
-                if log::log_enabled!(log::Level::Debug) {
-                    let offsets: Vec<Option<i64>> = self.buffered_txs[i..i + self.n_tx].iter().map(|tx| tx.offset).collect();
-                    log::debug!("block #{}, offsets: {:?}", self.block_generate_num, offsets);
-                }
-                if last_offset.is_none() {
-                    log::warn!("kafka offset not exist, is this block belongs to a test_case?")
-                }
-                let db_path = Settings::persist_dir().join(format!("{}.db", self.block_generate_num));
-                let db = sled::open(db_path).unwrap();
-                db.insert(BLOCK_OFFSET_KEY, bincode::serialize(&self.block_generate_num).unwrap())
-                    .unwrap();
-                db.insert(KAFKA_OFFSET_KEY, bincode::serialize(&last_offset.unwrap()).unwrap())
-                    .unwrap();
-                self.dump_to_sled(&db).unwrap();
-                let elapsed = Instant::now() - start;
-                log::info!(
-                    "dump #{} completed, duration: {:.3}s",
-                    self.block_generate_num,
-                    elapsed.as_secs_f32()
-                )
+                self.persist(i)
             }
 
             i += self.n_tx;
         }
         self.buffered_txs.drain(0..i);
         blocks
+    }
+
+    fn persist(&mut self, i: usize) {
+        log::info!("start to dump #{}", self.block_generate_num);
+        let start = Instant::now();
+        let last_offset = self.buffered_txs[i..i + self.n_tx].iter().rev().filter_map(|tx| tx.offset).next();
+        if log::log_enabled!(log::Level::Debug) {
+            let offsets: Vec<Option<i64>> = self.buffered_txs[i..i + self.n_tx].iter().map(|tx| tx.offset).collect();
+            log::debug!("block #{}, offsets: {:?}", self.block_generate_num, offsets);
+        }
+        if last_offset.is_none() {
+            log::warn!("kafka offset not exist, is this block belongs to a test_case?")
+        }
+        let db_path = Settings::persist_dir().join(format!("{}.db", self.block_generate_num));
+        let db = sled::open(db_path).unwrap();
+        db.insert(BLOCK_OFFSET_KEY, bincode::serialize(&self.block_generate_num).unwrap())
+            .unwrap();
+        db.insert(KAFKA_OFFSET_KEY, bincode::serialize(&last_offset.unwrap()).unwrap())
+            .unwrap();
+        self.dump_to_sled(&db).unwrap();
+        let elapsed = Instant::now() - start;
+        log::info!(
+            "dump #{} completed, duration: {:.3}s",
+            self.block_generate_num,
+            elapsed.as_secs_f32()
+        )
     }
 
     #[cfg(feature = "persist_sled")]

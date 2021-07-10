@@ -2943,6 +2943,7 @@ dependencies = [
  "num",
  "num-bigint 0.4.0",
  "num-traits 0.2.14",
+ "once_cell",
  "poseidon-rs",
  "pprof",
  "rand 0.8.4",
