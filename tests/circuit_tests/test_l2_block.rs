@@ -10,6 +10,7 @@ use rust_decimal::Decimal;
 use serde_json::json;
 
 use rollup_state_manager::params;
+use std::option::Option::None;
 
 pub struct Block {
     n_txs: usize,
@@ -54,7 +55,7 @@ impl Block {
         */
         let state = GlobalState::new(self.balance_levels, self.order_levels, self.account_levels, self.verbose);
         let (sender, receiver) = crossbeam_channel::bounded(100);
-        let mut witgen = WitnessGenerator::new(state, self.n_txs, self.verbose);
+        let mut witgen = WitnessGenerator::new(state, self.n_txs, None, self.verbose);
 
         let token_id0 = 0;
         let token_id1 = 1;
@@ -78,12 +79,15 @@ impl Block {
 
         // assert(witgen.accounts.get(account_id0).eth_addr() == 0, 'account0 should be empty');
         witgen
-            .deposit(DepositTx {
-                token_id: token_id0,
-                account_id: account_id0,
-                amount: decimal_to_amount(&Decimal::new(300, 0), prec_token_id(token_id0)),
-                l2key: None,
-            })
+            .deposit(
+                DepositTx {
+                    token_id: token_id0,
+                    account_id: account_id0,
+                    amount: decimal_to_amount(&Decimal::new(300, 0), prec_token_id(token_id0)),
+                    l2key: None,
+                },
+                None,
+            )
             .unwrap();
 
         let mut transfer_tx0 = TransferTx::new(
@@ -100,7 +104,7 @@ impl Block {
         transfer_tx0.from_nonce = witgen.get_account_nonce(account_id0);
         let hash = transfer_tx0.hash();
         transfer_tx0.sig = account0.sign_hash(hash).unwrap();
-        witgen.transfer(transfer_tx0);
+        witgen.transfer(transfer_tx0, None);
 
         let mut transfer_tx1 = TransferTx::new(
             account_id1,
@@ -111,7 +115,7 @@ impl Block {
         transfer_tx1.from_nonce = witgen.get_account_nonce(account_id1);
         let hash = transfer_tx1.hash();
         transfer_tx1.sig = account1.sign_hash(hash).unwrap();
-        witgen.transfer(transfer_tx1);
+        witgen.transfer(transfer_tx1, None);
 
         let mut withdraw_tx = WithdrawTx::new(
             account_id0,
@@ -122,31 +126,37 @@ impl Block {
         let hash = withdraw_tx.hash();
         // hash = common.hashWithdraw(fullWithdrawTx);
         withdraw_tx.sig = account0.sign_hash(hash).unwrap();
-        witgen.withdraw(withdraw_tx);
+        witgen.withdraw(withdraw_tx, None);
 
         // trade amount
         let amount_1to2 = 120;
         let amount_2to1 = 1200;
         // ensure balance to trade
         witgen
-            .deposit(DepositTx {
-                account_id: account_id1,
-                token_id: token_id0,
-                amount: decimal_to_amount(&Decimal::new(199, 0), prec_token_id(token_id0)),
-                l2key: None,
-            })
+            .deposit(
+                DepositTx {
+                    account_id: account_id1,
+                    token_id: token_id0,
+                    amount: decimal_to_amount(&Decimal::new(199, 0), prec_token_id(token_id0)),
+                    l2key: None,
+                },
+                None,
+            )
             .unwrap();
         witgen
-            .deposit(DepositTx {
-                account_id: account_id2,
-                token_id: token_id1,
-                amount: decimal_to_amount(&Decimal::new(1990, 0), prec_token_id(token_id1)),
-                l2key: Some(L2Key {
-                    eth_addr: account2.eth_addr(),
-                    sign: account2.sign(),
-                    ay: account2.ay(),
-                }),
-            })
+            .deposit(
+                DepositTx {
+                    account_id: account_id2,
+                    token_id: token_id1,
+                    amount: decimal_to_amount(&Decimal::new(1990, 0), prec_token_id(token_id1)),
+                    l2key: Some(L2Key {
+                        eth_addr: account2.eth_addr(),
+                        sign: account2.sign(),
+                        ay: account2.ay(),
+                    }),
+                },
+                None,
+            )
             .unwrap();
 
         // order1
@@ -198,7 +208,7 @@ impl Block {
             maker_order: Some(order1.into()),
             taker_order: Some(order2.into()),
         };
-        witgen.full_spot_trade(full_trade);
+        witgen.full_spot_trade(full_trade, None);
 
         witgen.flush_with_nop();
 
@@ -220,7 +230,7 @@ impl Block {
     fn empty_block_case(&self) -> CircuitTestData {
         let state = GlobalState::new(self.balance_levels, self.order_levels, self.account_levels, self.verbose);
         let (sender, receiver) = crossbeam_channel::bounded(100);
-        let mut witgen = WitnessGenerator::new(state, self.n_txs, self.verbose);
+        let mut witgen = WitnessGenerator::new(state, self.n_txs, None, self.verbose);
         // we need to have at least 1 account
         witgen.create_new_account(1).unwrap();
         witgen.nop();

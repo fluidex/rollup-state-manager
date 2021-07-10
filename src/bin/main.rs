@@ -2,44 +2,62 @@
 #![allow(dead_code)]
 
 use crossbeam_channel::RecvTimeoutError;
-use rollup_state_manager::config;
+use rollup_state_manager::config::Settings;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
 use rollup_state_manager::params;
+use rollup_state_manager::r#const::sled_db::*;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils::messages::WrappedMessage;
 use rollup_state_manager::types::l2::{L2Block, L2BlockSerde};
 use rollup_state_manager::types::primitives::fr_to_string;
 use sqlx::postgres::PgPool;
 use sqlx::Row;
+use std::option::Option::None;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::{fs, io};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
     env_logger::init();
     log::info!("state_keeper started");
 
-    let mut conf = config_rs::Config::new();
-    let config_file = dotenv::var("CONFIG").unwrap();
-    conf.merge(config_rs::File::with_name(&config_file)).unwrap();
-    let settings: config::Settings = conf.try_into().unwrap();
-    log::debug!("{:?}", settings);
+    Settings::init_default();
+    log::debug!("{:?}", Settings::get());
 
-    run(&settings).await;
+    let last_dump = get_latest_dump()?;
+    if let Some(id) = last_dump {
+        log::info!("found dump #{}", id);
+        let db = sled::open(Settings::persist_dir().join(format!("{}.db", id)))?;
+        let last_offset = db.get(KAFKA_OFFSET_KEY)?.unwrap();
+        let last_offset: i64 = bincode::deserialize(&last_offset)?;
+        run(Some(last_offset), Some(db)).await;
+    } else {
+        run(None, None).await;
+    }
+
+    Ok(())
 }
 
 fn replay_msgs(
     msg_receiver: crossbeam_channel::Receiver<WrappedMessage>,
     block_sender: crossbeam_channel::Sender<L2Block>,
+    db: Option<sled::Db>,
 ) -> Option<std::thread::JoinHandle<anyhow::Result<()>>> {
     Some(std::thread::spawn(move || {
-        let state = GlobalState::new(
+        let mut state = GlobalState::new(
             *params::BALANCELEVELS,
             *params::ORDERLEVELS,
             *params::ACCOUNTLEVELS,
             *params::VERBOSE,
         );
-        let mut witgen = WitnessGenerator::new(state, *params::NTXS, *params::VERBOSE);
+        let block_offset: Option<usize> = if let Some(db) = db {
+            state.load_persist(&db).unwrap();
+            db.get(BLOCK_OFFSET_KEY).ok().flatten().and_then(|v| bincode::deserialize(&v).ok())
+        } else {
+            None
+        };
+        let mut witgen = WitnessGenerator::new(state, *params::NTXS, block_offset, *params::VERBOSE);
 
         println!("genesis root {}", witgen.root());
 
@@ -97,15 +115,15 @@ fn replay_msgs(
     }))
 }
 
-async fn run(settings: &config::Settings) {
+async fn run(offset: Option<i64>, db: Option<sled::Db>) {
     let (msg_sender, msg_receiver) = crossbeam_channel::unbounded();
     let (blk_sender, blk_receiver) = crossbeam_channel::unbounded();
 
-    let loader_thread = msg_loader::load_msgs_from_mq(&settings.brokers, msg_sender);
-    let replay_thread = replay_msgs(msg_receiver, blk_sender);
+    let loader_thread = msg_loader::load_msgs_from_mq(Settings::brokers(), offset, msg_sender);
+    let replay_thread = replay_msgs(msg_receiver, blk_sender, db);
 
-    let prover_cluster_db_pool = PgPool::connect(&settings.prover_cluster_db).await.unwrap();
-    let rollup_state_manager_db_pool = PgPool::connect(&settings.rollup_state_manager_db).await.unwrap();
+    let prover_cluster_db_pool = PgPool::connect(Settings::prover_cluster_db()).await.unwrap();
+    let rollup_state_manager_db_pool = PgPool::connect(Settings::rollup_state_manager_db()).await.unwrap();
     let mut check_old_block = true;
     for block in blk_receiver.iter() {
         if check_old_block {
@@ -206,4 +224,16 @@ async fn save_task_to_prover_cluster_db(pool: &PgPool, block: L2Block) -> anyhow
 fn unique_task_id() -> String {
     let current_millis = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
     format!("task_{}", current_millis)
+}
+
+fn get_latest_dump() -> anyhow::Result<Option<usize>> {
+    let mut dumps = std::fs::read_dir(Settings::persist_dir())?
+        .map(|entry| entry.and_then(|e| e.metadata().map(|meta| (meta, e.file_name().into_string().unwrap()))))
+        .collect::<io::Result<Vec<(fs::Metadata, String)>>>()?
+        .into_iter()
+        .filter_map(|(meta, name)| if meta.is_dir() && name.ends_with(".db") { Some(name) } else { None })
+        .map(|path| path.strip_suffix(".db").unwrap().parse::<usize>())
+        .collect::<Result<Vec<usize>, _>>()?;
+    dumps.sort_unstable();
+    Ok(dumps.last().copied())
 }

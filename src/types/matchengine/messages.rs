@@ -1,4 +1,6 @@
 #![allow(clippy::upper_case_acronyms)]
+use std::ops::{Deref, DerefMut};
+
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_big_array::big_array;
@@ -6,6 +8,11 @@ use serde_big_array::big_array;
 big_array! { BigArray; }
 
 // TODO: reuse related types def in dingir-exchange
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Message<T> {
+    message: T,
+    offset: Option<i64>,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UserMessage {
@@ -141,4 +148,57 @@ pub struct BalanceMessage {
     pub change: Decimal,
     pub balance: Decimal,
     pub detail: String,
+}
+
+pub trait TxMessage {}
+
+impl TxMessage for BalanceMessage {}
+impl TxMessage for TradeMessage {}
+impl TxMessage for OrderMessage {}
+impl TxMessage for UserMessage {}
+
+impl<T: TxMessage> Message<T> {
+    pub fn new(message: T, offset: i64) -> Self {
+        Self {
+            message,
+            offset: Some(offset),
+        }
+    }
+
+    pub fn offset(&self) -> Option<i64> {
+        self.offset
+    }
+
+    pub fn into_parts(self) -> (T, Option<i64>) {
+        (self.message, self.offset)
+    }
+}
+
+impl<T: TxMessage> From<T> for Message<T> {
+    fn from(message: T) -> Self {
+        Self { message, offset: None }
+    }
+}
+
+impl<T: TxMessage> From<(T, i64)> for Message<T> {
+    fn from((message, offset): (T, i64)) -> Self {
+        Self {
+            message,
+            offset: Some(offset),
+        }
+    }
+}
+
+impl<T> Deref for Message<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.message
+    }
+}
+
+impl<T> DerefMut for Message<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.message
+    }
 }

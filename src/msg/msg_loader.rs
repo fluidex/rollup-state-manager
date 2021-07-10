@@ -1,7 +1,9 @@
 use super::msg_consumer::{Simple, SimpleConsumer, SimpleMessageHandler};
 use crate::test_utils::messages::{parse_msg, WrappedMessage};
-use rdkafka::consumer::StreamConsumer;
+use crate::types::matchengine::messages::{BalanceMessage, OrderMessage, TradeMessage, UserMessage};
+use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::message::{BorrowedMessage, Message};
+use rdkafka::{Offset, TopicPartitionList};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
@@ -30,6 +32,7 @@ const MSG_TYPE_TRADES: &str = "trades";
 
 pub fn load_msgs_from_mq(
     brokers: &str,
+    offset: Option<i64>,
     sender: crossbeam_channel::Sender<WrappedMessage>,
 ) -> Option<std::thread::JoinHandle<anyhow::Result<()>>> {
     let brokers = brokers.to_owned();
@@ -38,15 +41,25 @@ pub fn load_msgs_from_mq(
 
         let writer = MessageWriter { sender };
         rt.block_on(async move {
-            let consumer: StreamConsumer = rdkafka::config::ClientConfig::new()
+            let mut config = rdkafka::config::ClientConfig::new();
+            config
                 .set("bootstrap.servers", brokers)
                 .set("group.id", "rollup_msg_consumer")
                 .set("enable.partition.eof", "false")
                 .set("session.timeout.ms", "6000")
-                .set("enable.auto.commit", "false")
-                .set("auto.offset.reset", "earliest")
-                .create()
-                .unwrap();
+                .set("enable.auto.commit", "false");
+            if offset.is_none() {
+                config.set("auto.offset.reset", "earliest");
+            }
+            let consumer: StreamConsumer = config.create().unwrap();
+
+            let mut partitions = TopicPartitionList::new();
+            partitions.add_partition(UNIFY_TOPIC, 0);
+            if let Some(offset) = offset {
+                // FIXME: this might panic if there is no new message, fallback in this scenario
+                partitions.set_partition_offset(UNIFY_TOPIC, 0, Offset::Offset(offset + 1)).unwrap();
+            }
+            consumer.assign(&partitions).unwrap();
 
             let consumer = std::sync::Arc::new(consumer);
             loop {
@@ -60,7 +73,7 @@ pub fn load_msgs_from_mq(
                         break;
                     },
 
-                    err = cr_main.run_stream(|cr|cr.stream()) => {
+                    err = cr_main.run_stream(|cr| cr.stream()) => {
                         log::error!("Kafka consumer error: {}", err);
                     }
                 }
@@ -79,22 +92,24 @@ impl SimpleMessageHandler for &MessageWriter {
     fn on_message(&self, msg: &BorrowedMessage<'_>) {
         let msg_type = std::str::from_utf8(msg.key().unwrap()).unwrap();
         let msg_payload = std::str::from_utf8(msg.payload().unwrap()).unwrap();
+        let offset = msg.offset();
+        log::debug!("got message at offset {}", offset);
         let message = match msg_type {
             MSG_TYPE_BALANCES => {
-                let data = serde_json::from_str(msg_payload).unwrap();
-                WrappedMessage::BALANCE(data)
+                let data: BalanceMessage = serde_json::from_str(msg_payload).unwrap();
+                WrappedMessage::BALANCE((data, offset).into())
             }
             MSG_TYPE_ORDERS => {
-                let data = serde_json::from_str(msg_payload).unwrap();
-                WrappedMessage::ORDER(data)
+                let data: OrderMessage = serde_json::from_str(msg_payload).unwrap();
+                WrappedMessage::ORDER((data, offset).into())
             }
             MSG_TYPE_TRADES => {
-                let data = serde_json::from_str(msg_payload).unwrap();
-                WrappedMessage::TRADE(data)
+                let data: TradeMessage = serde_json::from_str(msg_payload).unwrap();
+                WrappedMessage::TRADE((data, offset).into())
             }
             MSG_TYPE_USERS => {
-                let data = serde_json::from_str(msg_payload).unwrap();
-                WrappedMessage::USER(data)
+                let data: UserMessage = serde_json::from_str(msg_payload).unwrap();
+                WrappedMessage::USER((data, offset).into())
             }
             _ => unreachable!(),
         };
