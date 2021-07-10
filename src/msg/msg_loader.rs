@@ -41,22 +41,23 @@ pub fn load_msgs_from_mq(
 
         let writer = MessageWriter { sender };
         rt.block_on(async move {
-            let consumer: StreamConsumer = rdkafka::config::ClientConfig::new()
+            let mut config = rdkafka::config::ClientConfig::new();
+            config
                 .set("bootstrap.servers", brokers)
                 .set("group.id", "rollup_msg_consumer")
                 .set("enable.partition.eof", "false")
                 .set("session.timeout.ms", "6000")
-                .set("enable.auto.commit", "false")
-                .create()
-                .unwrap();
+                .set("enable.auto.commit", "false");
+            if offset.is_none() {
+                config.set("auto.offset.reset", "earliest");
+            }
+            let consumer: StreamConsumer = config.create().unwrap();
 
             let mut partitions = TopicPartitionList::new();
             partitions.add_partition(UNIFY_TOPIC, 0);
             if let Some(offset) = offset {
                 // FIXME: this might panic if there is no new message, fallback in this scenario
                 partitions.set_partition_offset(UNIFY_TOPIC, 0, Offset::Offset(offset + 1)).unwrap();
-            } else {
-                partitions.set_partition_offset(UNIFY_TOPIC, 0, Offset::Offset(0)).unwrap();
             }
             consumer.assign(&partitions).unwrap();
 
