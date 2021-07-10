@@ -103,7 +103,7 @@ pub fn check_state(witgen: &WitnessGenerator, state: &messages::VerboseTradeStat
         let balance_local = fr_to_decimal(&witgen.get_token_balance(balance_state.user_id, token_id), prec_token_id(token_id));
         assert_eq!(
             balance_remote, balance_local,
-            "{} {} {} {}",
+            "uid {} token {} remote balance {} local balance {}",
             balance_state.user_id, token_id, balance_remote, balance_local
         );
     }
