@@ -76,6 +76,7 @@ fn replay_msgs(
                             processor.handle_balance_msg(&mut witgen, balance);
                         }
                         WrappedMessage::TRADE(trade) => {
+                            log::debug!("gupeng - receive trade");
                             processor.handle_trade_msg(&mut witgen, trade);
                         }
                         WrappedMessage::ORDER(order) => {
@@ -125,7 +126,9 @@ async fn run(offset: Option<i64>, db: Option<sled::Db>) {
     let prover_cluster_db_pool = PgPool::connect(Settings::prover_cluster_db()).await.unwrap();
     let rollup_state_manager_db_pool = PgPool::connect(Settings::rollup_state_manager_db()).await.unwrap();
     let mut check_old_block = true;
+    log::debug!("gupeng - 3");
     for block in blk_receiver.iter() {
+        log::debug!("gupeng - 4");
         if check_old_block {
             let is_present = is_present_block(&rollup_state_manager_db_pool, &block).await.unwrap();
             if is_present {

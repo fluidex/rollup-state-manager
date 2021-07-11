@@ -1,5 +1,5 @@
-brokers: '127.0.0.1:9092'
-prover_cluster_db: postgres://coordinator:coordinator_AA9944@127.0.0.1:5433/prover_cluster
-rollup_state_manager_db: postgres://postgres:postgres_AA9944@127.0.0.1:5434/rollup_state_manager
+brokers: exchange-kafka.dingir-exchange:9092
+prover_cluster_db: postgres://coordinator:coordinator_AA9944@coordinator-pq.prover-cluster/prover_cluster
+rollup_state_manager_db: postgres://postgres:postgres_AA9944@rollup-state-manager-pq/rollup_state_manager
 persist_dir: circuits/testdata/persist
 persist_every_n_block: 10000
