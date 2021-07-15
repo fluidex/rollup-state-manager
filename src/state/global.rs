@@ -6,13 +6,15 @@ use super::AccountState;
 use crate::r#const::sled_db::*;
 use crate::types::l2::Order;
 use crate::types::merkle_tree::{MerkleProof, Tree};
-use crate::types::primitives::Fr;
-#[cfg(feature = "persist_sled")]
-use crate::types::primitives::FrWrapper;
 use anyhow::bail;
-use ff::Field;
-use fnv::FnvHashMap;
+use fluidex_common::ff::Field;
+use fluidex_common::fnv::FnvHashMap;
+#[cfg(feature = "persist_sled")]
+use fluidex_common::serde::FrBytes;
+use fluidex_common::Fr;
 use rayon::prelude::*;
+#[cfg(feature = "persist_sled")]
+use serde::Serialize;
 use sled::transaction::ConflictableTransactionError;
 #[cfg(feature = "persist_sled")]
 use sled::transaction::{TransactionError, Transactional, TransactionalTree};
@@ -544,9 +546,12 @@ impl GlobalState {
 
     #[cfg(feature = "persist_sled")]
     fn load_account_state(account_tree: &Tree, db: &TransactionalTree) -> Result<FnvHashMap<u32, AccountState>, GlobalStateInternalError> {
+        #[derive(Serialize)]
+        struct FrWrapper(#[serde(with = "FrBytes")] Fr);
+
         account_tree
             .iter()
-            .map(|(_id, hash)| match bincode::serialize(&FrWrapper::from(hash)) {
+            .map(|(_id, hash)| match bincode::serialize(&FrWrapper(*hash)) {
                 Ok(key) => db
                     .get(key)
                     .map_err(GlobalStateInternalError::from)
@@ -597,13 +602,13 @@ impl GlobalState {
 
     #[cfg(feature = "persist_sled")]
     fn save_account_state(&self, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
+        #[derive(Serialize)]
+        struct FrWrapper(#[serde(with = "FrBytes")] Fr);
+
         self.account_states.iter().try_for_each(|(id, state)| {
-            db.insert(
-                bincode::serialize(&FrWrapper::from(state.hash()))?,
-                bincode::serialize(&(id, state))?,
-            )
-            .map(|_| ())
-            .map_err(GlobalStateInternalError::from)
+            db.insert(bincode::serialize(&FrWrapper(state.hash()))?, bincode::serialize(&(id, state))?)
+                .map(|_| ())
+                .map_err(GlobalStateInternalError::from)
         })
     }
 

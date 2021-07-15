@@ -9,7 +9,6 @@ use rollup_state_manager::r#const::sled_db::*;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils::messages::WrappedMessage;
 use rollup_state_manager::types::l2::{L2Block, L2BlockSerde};
-use rollup_state_manager::types::primitives::fr_to_string;
 use sqlx::postgres::PgPool;
 use sqlx::Row;
 use std::option::Option::None;
@@ -155,7 +154,7 @@ async fn is_present_block(pool: &PgPool, block: &L2Block) -> anyhow::Result<bool
     {
         Ok(row) => {
             let new_root: String = row.get(0);
-            let old_root: String = fr_to_string(&block.witness.new_root);
+            let old_root: String = block.witness.new_root.to_string();
             if new_root == old_root {
                 log::debug!("skip same l2 block {} {}", block.block_id, new_root);
             } else {
@@ -178,7 +177,7 @@ async fn is_present_block(pool: &PgPool, block: &L2Block) -> anyhow::Result<bool
 }
 
 async fn save_block_to_rollup_state_manager_db(pool: &PgPool, block: &L2Block) -> anyhow::Result<()> {
-    let new_root = fr_to_string(&block.witness.new_root);
+    let new_root = block.witness.new_root.to_string();
     let witness = L2BlockSerde::from(block.witness.clone());
     sqlx::query("insert into l2block (block_id, new_root, witness) values ($1, $2, $3)")
         .bind(block.block_id as u32)

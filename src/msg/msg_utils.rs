@@ -4,10 +4,11 @@ use crate::state::WitnessGenerator;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, OrderSide};
 use crate::types::matchengine::messages;
-use crate::types::primitives::*;
-use crate::types::{self, fixnum, matchengine};
+use crate::types::{fixnum, matchengine};
+use fluidex_common::babyjubjub_rs;
+use fluidex_common::rust_decimal::Decimal;
+use fluidex_common::{types::FrExt, Fr};
 use num::Zero;
-use rust_decimal::Decimal;
 use std::convert::TryInto;
 
 #[derive(Clone, Copy)]
@@ -66,8 +67,8 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
         matchengine::messages::OrderSide::ASK => {
             l2::OrderInput {
                 order_id: origin.id as u32,
-                token_buy: types::primitives::u32_to_fr(quote_token_id),
-                token_sell: types::primitives::u32_to_fr(base_token_id),
+                token_buy: Fr::from_u32(quote_token_id),
+                token_sell: Fr::from_u32(base_token_id),
                 //filled_sell: fixnum::decimal_to_fr(&origin.finished_base, base_token_id),
                 //filled_buy: fixnum::decimal_to_fr(&origin.finished_quote, quote_token_id),
                 total_sell: fixnum::decimal_to_fr(&origin.amount, base_prec),
@@ -80,8 +81,8 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
         matchengine::messages::OrderSide::BID => {
             l2::OrderInput {
                 order_id: origin.id as u32,
-                token_buy: types::primitives::u32_to_fr(base_token_id),
-                token_sell: types::primitives::u32_to_fr(quote_token_id),
+                token_buy: Fr::from_u32(base_token_id),
+                token_sell: Fr::from_u32(quote_token_id),
                 //filled_sell: fixnum::decimal_to_fr(&origin.finished_quote, quote_token_id),
                 //filled_buy: fixnum::decimal_to_fr(&origin.finished_base, base_token_id),
                 total_sell: fixnum::decimal_to_fr(&(origin.amount * origin.price), quote_prec),
@@ -100,7 +101,9 @@ pub fn check_state(witgen: &WitnessGenerator, state: &messages::VerboseTradeStat
         // assert_balance_state(&state.balance, witgen, trade.bid_user_id, trade.ask_user_id, id_pair);
         let balance_remote = balance_state.balance;
         let token_id = get_token_id_by_name(&balance_state.asset);
-        let balance_local = fr_to_decimal(&witgen.get_token_balance(balance_state.user_id, token_id), prec_token_id(token_id));
+        let balance_local = witgen
+            .get_token_balance(balance_state.user_id, token_id)
+            .to_decimal(prec_token_id(token_id));
         assert_eq!(
             balance_remote, balance_local,
             "uid {} token {} remote balance {} local balance {}",
@@ -116,16 +119,16 @@ pub fn check_state(witgen: &WitnessGenerator, state: &messages::VerboseTradeStat
                 messages::OrderSide::BID => {
                     let remote_filled_buy = order_state.finished_base;
                     let remote_filled_sell = order_state.finished_quote;
-                    let local_filled_buy = fr_to_decimal(&order_local.filled_buy, prec_token_id(base_token_id));
-                    let local_filled_sell = fr_to_decimal(&order_local.filled_sell, prec_token_id(quote_token_id));
+                    let local_filled_buy = order_local.filled_buy.to_decimal(prec_token_id(base_token_id));
+                    let local_filled_sell = order_local.filled_sell.to_decimal(prec_token_id(quote_token_id));
                     assert_eq!(remote_filled_buy, local_filled_buy);
                     assert_eq!(remote_filled_sell, local_filled_sell);
                 }
                 messages::OrderSide::ASK => {
                     let remote_filled_buy = order_state.finished_quote;
                     let remote_filled_sell = order_state.finished_base;
-                    let local_filled_buy = fr_to_decimal(&order_local.filled_buy, prec_token_id(quote_token_id));
-                    let local_filled_sell = fr_to_decimal(&order_local.filled_sell, prec_token_id(base_token_id));
+                    let local_filled_buy = order_local.filled_buy.to_decimal(prec_token_id(quote_token_id));
+                    let local_filled_sell = order_local.filled_sell.to_decimal(prec_token_id(base_token_id));
                     assert_eq!(remote_filled_buy, local_filled_buy);
                     assert_eq!(remote_filled_sell, local_filled_sell);
                 }

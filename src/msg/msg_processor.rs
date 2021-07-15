@@ -3,13 +3,13 @@ use crate::state::WitnessGenerator;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::fixnum::Float864;
 use crate::types::l2::{self, OrderInput, OrderSide};
-use crate::types::primitives::{str_to_fr, u32_to_fr, Fr};
 use crate::types::{fixnum, matchengine::messages};
 
-use babyjubjub_rs::Point;
-use ff::Field;
+use fluidex_common::babyjubjub_rs::{self, Point};
+use fluidex_common::ff::Field;
+use fluidex_common::rust_decimal::Decimal;
+use fluidex_common::{types::FrExt, Fr};
 use num::Zero;
-use rust_decimal::Decimal;
 use std::convert::TryInto;
 use std::time::Instant;
 
@@ -44,7 +44,7 @@ impl Processor {
         let l2_pubkey_point: Point = babyjubjub_rs::decompress_point(bjj_compressed).unwrap();
         let fake_token_id = 0;
         let fake_amount = Float864::from_decimal(&Decimal::zero(), prec_token_id(fake_token_id)).unwrap();
-        let eth_addr = str_to_fr(&user_info.l1_address);
+        let eth_addr = Fr::from_str(&user_info.l1_address);
         let sign = if bjj_compressed[31] & 0x80 != 0x00 { Fr::one() } else { Fr::zero() };
         // TODO: remove '0x' from eth addr?
         witgen
@@ -253,8 +253,8 @@ impl Processor {
 
         OrderInput {
             order_id: order.id as u32,
-            token_sell: u32_to_fr(tokensell),
-            token_buy: u32_to_fr(tokenbuy),
+            token_sell: Fr::from_u32(tokensell),
+            token_buy: Fr::from_u32(tokenbuy),
             total_sell: fixnum::decimal_to_fr(&total_sell, prec_token_id(tokensell)),
             total_buy: fixnum::decimal_to_fr(&total_buy, prec_token_id(tokenbuy)),
             sig: Some(bytes_to_sig(order.signature)),

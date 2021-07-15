@@ -1,3 +1,5 @@
+use fluidex_common::rust_decimal::Decimal;
+use fluidex_common::{types::FrExt, Fr};
 use rollup_state_manager::account::Account;
 use rollup_state_manager::state::global::GlobalState;
 use rollup_state_manager::state::witness_generator::WitnessGenerator;
@@ -5,8 +7,6 @@ use rollup_state_manager::test_utils::circuit::{CircuitSource, CircuitTestCase, 
 use rollup_state_manager::test_utils::types::prec_token_id;
 use rollup_state_manager::types::fixnum::{decimal_to_amount, decimal_to_fr};
 use rollup_state_manager::types::l2::{self, DepositTx, L2BlockSerde, L2Key, OrderInput, SpotTradeTx, TransferTx, WithdrawTx};
-use rollup_state_manager::types::primitives::u32_to_fr;
-use rust_decimal::Decimal;
 use serde_json::json;
 
 use rollup_state_manager::params;
@@ -71,9 +71,9 @@ impl Block {
         // mock existing account0 data
         witgen.set_account_l2_addr(account_id0, account0.sign(), account0.ay(), account0.eth_addr());
         for i in 0..2u32.pow(self.balance_levels as u32) {
-            witgen.set_token_balance(account_id0, i, u32_to_fr(20 + i));
+            witgen.set_token_balance(account_id0, i, Fr::from_u32(20 + i));
         }
-        witgen.set_account_nonce(account_id0, u32_to_fr(29));
+        witgen.set_account_nonce(account_id0, Fr::from_u32(29));
 
         // start txs
 
@@ -163,8 +163,8 @@ impl Block {
         let order_id1 = 1;
         let mut order1 = OrderInput {
             order_id: order_id1,
-            token_buy: u32_to_fr(token_id1),
-            token_sell: u32_to_fr(token_id0),
+            token_buy: Fr::from_u32(token_id1),
+            token_sell: Fr::from_u32(token_id0),
             total_buy: decimal_to_fr(&Decimal::new(10000, 0), prec_token_id(token_id1)),
             total_sell: decimal_to_fr(&Decimal::new(1000, 0), prec_token_id(token_id0)),
             sig: Default::default(),
@@ -181,8 +181,8 @@ impl Block {
         let order_id2 = 1;
         let mut order2 = OrderInput {
             order_id: order_id2,
-            token_buy: u32_to_fr(token_id0),
-            token_sell: u32_to_fr(token_id1),
+            token_buy: Fr::from_u32(token_id0),
+            token_sell: Fr::from_u32(token_id1),
             total_buy: decimal_to_fr(&Decimal::new(1000, 0), prec_token_id(token_id0)),
             total_sell: decimal_to_fr(&Decimal::new(10000, 0), prec_token_id(token_id1)),
             sig: Default::default(),

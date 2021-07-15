@@ -10,10 +10,10 @@ use crate::types::l2::{
     tx_detail_idx, DepositTx, FullSpotTradeTx, L2Block, L2BlockWitness, Order, RawTx, TransferTx, TxType, WithdrawTx, TX_LENGTH,
 };
 use crate::types::merkle_tree::Tree;
-use crate::types::primitives::{fr_add, fr_sub, fr_to_bigint, u32_to_fr, Fr};
 use anyhow::{anyhow, bail};
-use babyjubjub_rs::Point;
-use ff::Field;
+use fluidex_common::babyjubjub_rs::{self, Point};
+use fluidex_common::ff::Field;
+use fluidex_common::{types::FrExt, Fr};
 use std::time::Instant;
 
 // TODO: too many unwrap here
@@ -150,17 +150,17 @@ impl WitnessGenerator {
         let mut encoded_tx = [Fr::zero(); TX_LENGTH];
         encoded_tx[tx_detail_idx::AMOUNT] = tx.amount.to_fr();
 
-        encoded_tx[tx_detail_idx::TOKEN_ID1] = u32_to_fr(tx.token_id);
-        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = u32_to_fr(tx.account_id);
+        encoded_tx[tx_detail_idx::TOKEN_ID1] = Fr::from_u32(tx.token_id);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = Fr::from_u32(tx.account_id);
         encoded_tx[tx_detail_idx::BALANCE1] = old_balance;
         encoded_tx[tx_detail_idx::NONCE1] = nonce;
         encoded_tx[tx_detail_idx::ETH_ADDR1] = acc.eth_addr;
         encoded_tx[tx_detail_idx::SIGN1] = acc.sign;
         encoded_tx[tx_detail_idx::AY1] = acc.ay;
 
-        encoded_tx[tx_detail_idx::TOKEN_ID2] = u32_to_fr(tx.token_id);
-        encoded_tx[tx_detail_idx::ACCOUNT_ID2] = u32_to_fr(tx.account_id);
-        encoded_tx[tx_detail_idx::BALANCE2] = fr_add(&old_balance, &tx.amount.to_fr());
+        encoded_tx[tx_detail_idx::TOKEN_ID2] = Fr::from_u32(tx.token_id);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID2] = Fr::from_u32(tx.account_id);
+        encoded_tx[tx_detail_idx::BALANCE2] = old_balance.add(&tx.amount.to_fr());
         encoded_tx[tx_detail_idx::NONCE2] = nonce;
         if deposit_to_new {
             let l2key = tx.l2key.clone().unwrap();
@@ -226,13 +226,13 @@ impl WitnessGenerator {
         let from_old_balance = self.get_token_balance(tx.from, tx.token_id);
         let to_old_balance = self.get_token_balance(tx.to, tx.token_id);
         assert!(from_old_balance > tx.amount.to_fr(), "Transfer balance not enough");
-        let from_new_balance = fr_sub(&from_old_balance, &tx.amount.to_fr());
-        let to_new_balance = fr_add(&to_old_balance, &tx.amount.to_fr());
+        let from_new_balance = from_old_balance.sub(&tx.amount.to_fr());
+        let to_new_balance = to_old_balance.add(&tx.amount.to_fr());
 
         let mut encoded_tx = [Fr::zero(); TX_LENGTH];
-        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = u32_to_fr(tx.from);
-        encoded_tx[tx_detail_idx::ACCOUNT_ID2] = u32_to_fr(tx.to);
-        encoded_tx[tx_detail_idx::TOKEN_ID1] = u32_to_fr(tx.token_id);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = Fr::from_u32(tx.from);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID2] = Fr::from_u32(tx.to);
+        encoded_tx[tx_detail_idx::TOKEN_ID1] = Fr::from_u32(tx.token_id);
         encoded_tx[tx_detail_idx::AMOUNT] = tx.amount.to_fr();
 
         encoded_tx[tx_detail_idx::BALANCE1] = from_old_balance;
@@ -301,7 +301,7 @@ impl WitnessGenerator {
 
         let acc = self.state.get_account(account_id);
         let old_balance = self.get_token_balance(account_id, token_id);
-        let new_balance = fr_sub(&old_balance, &tx.amount.to_fr());
+        let new_balance = old_balance.sub(&tx.amount.to_fr());
         let nonce = acc.nonce;
         // assert(oldBalance > tx.amount, 'Withdraw balance');
 
@@ -310,18 +310,18 @@ impl WitnessGenerator {
 
         encoded_tx[tx_detail_idx::AMOUNT] = tx.amount.to_fr();
 
-        encoded_tx[tx_detail_idx::TOKEN_ID1] = u32_to_fr(token_id);
-        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = u32_to_fr(account_id);
+        encoded_tx[tx_detail_idx::TOKEN_ID1] = Fr::from_u32(token_id);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = Fr::from_u32(account_id);
         encoded_tx[tx_detail_idx::BALANCE1] = old_balance;
         encoded_tx[tx_detail_idx::NONCE1] = nonce;
         encoded_tx[tx_detail_idx::ETH_ADDR1] = acc.eth_addr;
         encoded_tx[tx_detail_idx::SIGN1] = acc.sign;
         encoded_tx[tx_detail_idx::AY1] = acc.ay;
 
-        encoded_tx[tx_detail_idx::TOKEN_ID2] = u32_to_fr(token_id);
-        encoded_tx[tx_detail_idx::ACCOUNT_ID2] = u32_to_fr(account_id);
+        encoded_tx[tx_detail_idx::TOKEN_ID2] = Fr::from_u32(token_id);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID2] = Fr::from_u32(account_id);
         encoded_tx[tx_detail_idx::BALANCE2] = new_balance;
-        encoded_tx[tx_detail_idx::NONCE2] = fr_add(&nonce, &Fr::one());
+        encoded_tx[tx_detail_idx::NONCE2] = nonce.add(&Fr::one());
         encoded_tx[tx_detail_idx::ETH_ADDR2] = acc.eth_addr;
         encoded_tx[tx_detail_idx::SIGN2] = acc.sign;
         encoded_tx[tx_detail_idx::AY2] = acc.ay;
@@ -421,8 +421,8 @@ impl WitnessGenerator {
         // first, generate the tx
 
         let mut encoded_tx = [Fr::zero(); TX_LENGTH];
-        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = u32_to_fr(acc_id1);
-        encoded_tx[tx_detail_idx::ACCOUNT_ID2] = u32_to_fr(acc_id2);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = Fr::from_u32(acc_id1);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID2] = Fr::from_u32(acc_id2);
         encoded_tx[tx_detail_idx::ETH_ADDR1] = account1.eth_addr;
         encoded_tx[tx_detail_idx::ETH_ADDR2] = account2.eth_addr;
         encoded_tx[tx_detail_idx::SIGN1] = account1.sign;
@@ -441,7 +441,7 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::R8Y2] = order2.sig.r8y;
         encoded_tx[tx_detail_idx::SIG_L2_HASH2] = order2.sig.hash;
 
-        encoded_tx[tx_detail_idx::OLD_ORDER1_ID] = u32_to_fr(old_order1_in_tree.order_id);
+        encoded_tx[tx_detail_idx::OLD_ORDER1_ID] = Fr::from_u32(old_order1_in_tree.order_id);
         encoded_tx[tx_detail_idx::OLD_ORDER1_TOKEN_SELL] = old_order1_in_tree.token_sell;
         encoded_tx[tx_detail_idx::OLD_ORDER1_FILLED_SELL] = old_order1_in_tree.filled_sell;
         encoded_tx[tx_detail_idx::OLD_ORDER1_AMOUNT_SELL] = old_order1_in_tree.total_sell;
@@ -449,7 +449,7 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::OLD_ORDER1_FILLED_BUY] = old_order1_in_tree.filled_buy;
         encoded_tx[tx_detail_idx::OLD_ORDER1_AMOUNT_BUY] = old_order1_in_tree.total_buy;
 
-        encoded_tx[tx_detail_idx::OLD_ORDER2_ID] = u32_to_fr(old_order2_in_tree.order_id);
+        encoded_tx[tx_detail_idx::OLD_ORDER2_ID] = Fr::from_u32(old_order2_in_tree.order_id);
         encoded_tx[tx_detail_idx::OLD_ORDER2_TOKEN_SELL] = old_order2_in_tree.token_sell;
         encoded_tx[tx_detail_idx::OLD_ORDER2_FILLED_SELL] = old_order2_in_tree.filled_sell;
         encoded_tx[tx_detail_idx::OLD_ORDER2_AMOUNT_SELL] = old_order2_in_tree.total_sell;
@@ -459,20 +459,20 @@ impl WitnessGenerator {
 
         encoded_tx[tx_detail_idx::AMOUNT] = trade.amount_1to2.to_fr();
         encoded_tx[tx_detail_idx::AMOUNT2] = trade.amount_2to1.to_fr();
-        encoded_tx[tx_detail_idx::ORDER1_POS] = u32_to_fr(order1_pos);
-        encoded_tx[tx_detail_idx::ORDER2_POS] = u32_to_fr(order2_pos);
+        encoded_tx[tx_detail_idx::ORDER1_POS] = Fr::from_u32(order1_pos);
+        encoded_tx[tx_detail_idx::ORDER2_POS] = Fr::from_u32(order2_pos);
 
         let acc1_balance_sell = self.state.get_token_balance(acc_id1, trade.token_id_1to2);
         assert!(acc1_balance_sell > trade.amount_1to2.to_fr(), "balance_1to2");
-        let acc1_balance_sell_new = fr_sub(&acc1_balance_sell, &trade.amount_1to2.to_fr());
+        let acc1_balance_sell_new = acc1_balance_sell.sub(&trade.amount_1to2.to_fr());
         let acc1_balance_buy = self.state.get_token_balance(acc_id1, trade.token_id_2to1);
-        let acc1_balance_buy_new = fr_add(&acc1_balance_buy, &trade.amount_2to1.to_fr());
+        let acc1_balance_buy_new = acc1_balance_buy.add(&trade.amount_2to1.to_fr());
 
         let acc2_balance_sell = self.state.get_token_balance(acc_id2, trade.token_id_2to1);
         assert!(acc2_balance_sell > trade.amount_2to1.to_fr(), "balance_2to1");
-        let acc2_balance_sell_new = fr_sub(&acc2_balance_sell, &trade.amount_2to1.to_fr());
+        let acc2_balance_sell_new = acc2_balance_sell.sub(&trade.amount_2to1.to_fr());
         let acc2_balance_buy = self.state.get_token_balance(acc_id2, trade.token_id_1to2);
-        let acc2_balance_buy_new = fr_add(&acc2_balance_buy, &trade.amount_1to2.to_fr());
+        let acc2_balance_buy_new = acc2_balance_buy.add(&trade.amount_1to2.to_fr());
 
         encoded_tx[tx_detail_idx::BALANCE1] = acc1_balance_sell;
         encoded_tx[tx_detail_idx::BALANCE2] = acc2_balance_buy_new;
@@ -530,7 +530,7 @@ impl WitnessGenerator {
         raw_tx.account_path1 = self.state.account_proof(acc_id2).path_elements;
         raw_tx.order_root1 = self.state.get_account(acc_id2).order_root;
 
-        encoded_tx[tx_detail_idx::NEW_ORDER1_ID] = u32_to_fr(order1.order_id);
+        encoded_tx[tx_detail_idx::NEW_ORDER1_ID] = Fr::from_u32(order1.order_id);
         encoded_tx[tx_detail_idx::NEW_ORDER1_TOKEN_SELL] = order1.token_sell;
         encoded_tx[tx_detail_idx::NEW_ORDER1_FILLED_SELL] = order1.filled_sell;
         encoded_tx[tx_detail_idx::NEW_ORDER1_AMOUNT_SELL] = order1.total_sell;
@@ -538,7 +538,7 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::NEW_ORDER1_FILLED_BUY] = order1.filled_buy;
         encoded_tx[tx_detail_idx::NEW_ORDER1_AMOUNT_BUY] = order1.total_buy;
 
-        encoded_tx[tx_detail_idx::NEW_ORDER2_ID] = u32_to_fr(order2.order_id);
+        encoded_tx[tx_detail_idx::NEW_ORDER2_ID] = Fr::from_u32(order2.order_id);
 
         encoded_tx[tx_detail_idx::NEW_ORDER2_TOKEN_SELL] = order2.token_sell;
         encoded_tx[tx_detail_idx::NEW_ORDER2_FILLED_SELL] = order2.filled_sell;
@@ -594,7 +594,7 @@ impl WitnessGenerator {
         }
         let acc = self.state.get_account(account_id);
         // TODO: it is stupid to recover point every time...
-        let pk = babyjubjub_rs::recover_point(fr_to_bigint(&acc.ay), acc.sign != Fr::zero());
+        let pk = babyjubjub_rs::recover_point(acc.ay.to_bigint(), acc.sign != Fr::zero());
         let pub_key: Point = pk.map_err(|e| anyhow!(e))?;
         if !L2Account::verify_raw_using_pubkey(*msg, sig.clone(), pub_key) {
             bail!("verify sig failed");

@@ -1,26 +1,28 @@
 // from https://github1s.com/Fluidex/circuits/blob/HEAD/test/common.ts
 pub use crate::types::merkle_tree::MerklePath;
+
+use fluidex_common::ff::Field;
 #[cfg(not(feature = "fr_string_repr"))]
-use crate::types::primitives::fr_bytes as fr_serde;
+use fluidex_common::serde::FrBytes as FrSerde;
 #[cfg(feature = "fr_string_repr")]
-use crate::types::primitives::fr_str as fr_serde;
-use crate::types::primitives::{hash, shl, Fr};
-use ff::Field;
+use fluidex_common::serde::FrStr as FrSerde;
+use fluidex_common::types::FrExt;
+use fluidex_common::Fr;
 use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Default, Serialize, Deserialize)]
 pub struct AccountState {
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub nonce: Fr,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub sign: Fr,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub balance_root: Fr,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub ay: Fr,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub eth_addr: Fr,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub order_root: Fr,
 }
 
@@ -52,9 +54,9 @@ impl AccountState {
         let mut data = Fr::zero();
 
         data.add_assign(&self.nonce);
-        data.add_assign(&shl(&self.sign, 40));
+        data.add_assign(&self.sign.shl(40));
         let inputs = &[data, self.balance_root, self.ay, self.eth_addr, self.order_root];
-        hash(inputs)
+        Fr::hash(inputs)
     }
     // TODO: remove eth_addr
     pub fn update_l2_addr(&mut self, sign: Fr, ay: Fr, eth_addr: Fr) {

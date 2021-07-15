@@ -1,11 +1,5 @@
-#[cfg(not(feature = "fr_string_repr"))]
-use crate::types::primitives::fr_bytes as fr_serde;
-#[cfg(feature = "fr_string_repr")]
-use crate::types::primitives::fr_str as fr_serde;
-use crate::types::primitives::{bigint_to_fr, fr_to_bigint, Fr};
 use anyhow::Result;
 use arrayref::array_ref;
-use babyjubjub_rs::{self, decompress_point, Point, PrivateKey};
 use coins_bip32::{path::DerivationPath, prelude::DigestSigner};
 use ethers::{
     core::k256::ecdsa::recoverable::Signature as RecoverableSignature, core::k256::ecdsa::Signature as K256Signature,
@@ -30,10 +24,15 @@ use ethers::{
     signers::to_eip155_v,
     utils::{hash_message, keccak256, secret_key_to_address},
 };
-use ff::from_hex;
-use ff::Field;
+use fluidex_common::babyjubjub_rs::{self, decompress_point, Point, PrivateKey};
+use fluidex_common::ff::{from_hex, Field};
+use fluidex_common::num_bigint::{self, BigInt};
+#[cfg(not(feature = "fr_string_repr"))]
+use fluidex_common::serde::FrBytes as FrSerde;
+#[cfg(feature = "fr_string_repr")]
+use fluidex_common::serde::FrStr as FrSerde;
+use fluidex_common::{types::FrExt, Fr};
 use lazy_static::lazy_static;
-use num_bigint::BigInt;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -44,13 +43,13 @@ const DEFAULT_DERIVATION_PATH_PREFIX: &str = "m/44'/60'/0'/0/";
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Signature {
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub hash: Fr,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub s: Fr,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub r8x: Fr,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub r8y: Fr,
 }
 
@@ -117,9 +116,9 @@ impl L2Account {
 
     // TODO: sign and verify involves a lot of unnecessary computing
     pub fn sign_hash_safe(&self, hash: Fr) -> Result<Signature, String> {
-        let b = self.priv_key.sign(fr_to_bigint(&hash))?.compress();
+        let b = self.priv_key.sign(hash.to_bigint())?.compress();
         let r_b8_bytes: [u8; 32] = *array_ref!(b[..32], 0, 32);
-        let s = bigint_to_fr(BigInt::from_bytes_le(num_bigint::Sign::Plus, &b[32..]));
+        let s = Fr::from_bigint(BigInt::from_bytes_le(num_bigint::Sign::Plus, &b[32..]));
         let r_b8 = decompress_point(r_b8_bytes);
         match r_b8 {
             Result::Err(err) => Err(err),
@@ -128,12 +127,12 @@ impl L2Account {
     }
 
     pub fn verify_safe(&self, sig: Signature) -> bool {
-        let msg = fr_to_bigint(&sig.hash);
+        let msg = sig.hash.to_bigint();
         let r_b8 = Point { x: sig.r8x, y: sig.r8y };
 
         let mut b: Vec<u8> = Vec::new();
         b.append(&mut r_b8.compress().to_vec());
-        let (_, s_bytes) = fr_to_bigint(&sig.s).to_bytes_le();
+        let (_, s_bytes) = sig.s.to_bigint().to_bytes_le();
         let mut s_32bytes: [u8; 32] = [0; 32];
         let len = std::cmp::min(s_bytes.len(), s_32bytes.len());
         s_32bytes[..len].copy_from_slice(&s_bytes[..len]);
@@ -147,11 +146,11 @@ impl L2Account {
         }
     }
     pub fn sign_hash_raw(&self, hash: Fr) -> Result<SignatureBJJ, String> {
-        self.priv_key.sign(fr_to_bigint(&hash))
+        self.priv_key.sign(hash.to_bigint())
     }
     pub fn sign_hash(&self, hash: Fr) -> Result<Signature, String> {
         let sig = self.sign_hash_raw(hash)?;
-        let s = bigint_to_fr(sig.s);
+        let s = Fr::from_bigint(sig.s);
         Ok(Signature {
             hash,
             s,
@@ -160,20 +159,20 @@ impl L2Account {
         })
     }
     pub fn sign_hash_packed(&self, hash: Fr) -> Result<[u8; 64], String> {
-        Ok(self.priv_key.sign(fr_to_bigint(&hash))?.compress())
+        Ok(self.priv_key.sign(hash.to_bigint())?.compress())
     }
     pub fn verify(&self, sig: Signature) -> bool {
         Self::verify_using_pubkey(sig, &self.pub_key)
     }
     pub fn verify_raw_using_pubkey(msg: Fr, sig_bjj: SignatureBJJ, pub_key: Point) -> bool {
-        let msg = fr_to_bigint(&msg);
+        let msg = msg.to_bigint();
         babyjubjub_rs::verify(pub_key, sig_bjj, msg)
     }
     pub fn verify_using_pubkey(sig: Signature, pub_key: &Point) -> bool {
         let r_b8 = Point { x: sig.r8x, y: sig.r8y };
         let sig_bjj = SignatureBJJ {
             r_b8,
-            s: fr_to_bigint(&sig.s),
+            s: sig.s.to_bigint(),
         };
         Self::verify_raw_using_pubkey(sig.hash, sig_bjj, pub_key.clone())
     }
@@ -201,7 +200,7 @@ impl Account {
         Self::from_priv_key(uid, priv_key.as_ref())
     }
     pub fn from_priv_key(uid: u32, priv_key: &SigningKey) -> Result<Self, String> {
-        let public_key = priv_key.verify_key();
+        let public_key = priv_key.verifying_key();
         let eth_addr = secret_key_to_address(priv_key);
 
         let signature = sign_msg_with_signing_key(priv_key, &*CREATE_L2_ACCOUNT_MSG);
@@ -440,7 +439,7 @@ mod tests {
             fr_to_bigint(&acc.ay).to_str_radix(16),
             "20a41ccb24e55dba4fc9ebc17ae9d4c9097d7fe3387d492155568db6be2692a5"
         );
-        assert_eq!(acc.sign, u32_to_fr(1));
+        assert_eq!(acc.sign, Fr::from_u32(1));
 
         // Step2: test l2 sig
         let msg = Fr::from_str("1357924680").unwrap();
@@ -524,10 +523,10 @@ mod tests {
             account_id: 1,
             order_id: 1,
             side: l2::order::OrderSide::Buy,
-            token_buy: u32_to_fr(1),
-            token_sell: u32_to_fr(2),
-            total_buy: u32_to_fr(999),
-            total_sell: u32_to_fr(888),
+            token_buy: Fr::from_u32(1),
+            token_sell: Fr::from_u32(2),
+            total_buy: Fr::from_u32(999),
+            total_sell: Fr::from_u32(888),
             sig: None,
         };
         order.sign_with(&acc).unwrap();

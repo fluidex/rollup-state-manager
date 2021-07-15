@@ -1,6 +1,6 @@
 pub use crate::types::l2;
 pub use crate::types::merkle_tree::MerklePath;
-pub use crate::types::primitives::{fr_to_string, u64_to_fr, Fr};
+use fluidex_common::Fr;
 use serde::ser::SerializeSeq;
 use serde::Serialize;
 use std::convert::TryFrom;
@@ -9,7 +9,7 @@ pub struct FrStr(Fr);
 
 impl Serialize for FrStr {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(fr_to_string(&self.0).as_str())
+        serializer.serialize_str(self.0.to_string().as_str())
     }
 }
 

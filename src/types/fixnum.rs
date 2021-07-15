@@ -1,12 +1,12 @@
-use super::primitives::{bigint_to_fr, u64_to_fr, Fr};
-use num_traits::pow::Pow;
-use rust_decimal::prelude::ToPrimitive;
-use rust_decimal::Decimal;
+use fluidex_common::num_bigint::BigInt;
+use fluidex_common::num_traits::pow::Pow;
+use fluidex_common::rust_decimal::prelude::ToPrimitive;
+use fluidex_common::rust_decimal::Decimal;
+use fluidex_common::{types::FrExt, Fr};
 use std::convert::TryInto;
 
 use anyhow::bail;
 use anyhow::Result;
-use num_bigint::BigInt;
 
 pub fn decimal_to_u64(num: &Decimal, prec: u32) -> u64 {
     let prec_mul = Decimal::new(10, 0).pow(prec as u64);
@@ -16,7 +16,7 @@ pub fn decimal_to_u64(num: &Decimal, prec: u32) -> u64 {
 
 pub fn decimal_to_fr(num: &Decimal, prec: u32) -> Fr {
     // TODO: is u64 enough?
-    u64_to_fr(decimal_to_u64(num, prec))
+    Fr::from_u64(decimal_to_u64(num, prec))
     // Float864::from_decimal(num, prec).unwrap().to_fr()
 }
 
@@ -48,7 +48,7 @@ impl Float864 {
         s * BigInt::from(10).pow(self.exponent)
     }
     pub fn to_fr(&self) -> Fr {
-        bigint_to_fr(self.to_bigint())
+        Fr::from_bigint(self.to_bigint())
     }
     pub fn encode(&self) -> Vec<u8> {
         let mut result = self.exponent.to_be_bytes().to_vec();

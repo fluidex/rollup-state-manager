@@ -1,20 +1,15 @@
 // https://github1s.com/Fluidex/circuits/blob/HEAD/helper.ts/binary_merkle_tree.ts
 use std::iter::Iterator;
 
-use super::primitives::{fr_bytes, hash, Fr};
-#[cfg(feature = "fr_string_repr")]
-use super::primitives::{fr_to_string, str_to_fr};
-
-pub use ff::{Field, PrimeField};
+use fluidex_common::serde::FrBytes;
+use fluidex_common::types::MerkleValueMapType;
+use fluidex_common::{types::FrExt, Fr};
 use rayon::prelude::*;
 use serde::{ser::SerializeStruct, Deserialize, Serialize};
 
 type LeafIndex = u32;
 type NodeIndex = usize;
 type LeafType = Fr;
-// use std::collections::BTreeMap as MerkleValueMapType;
-// use std::collections::HashMap as MerkleValueMapType;
-use fnv::FnvHashMap as MerkleValueMapType;
 
 type ValueMap = MerkleValueMapType<NodeIndex, LeafType>;
 
@@ -63,7 +58,7 @@ impl Tree {
         //self.height = height;
         let mut default_nodes = vec![default_leaf_node_value];
         for i in 0..height {
-            default_nodes.push(hash(&[default_nodes[i], default_nodes[i]]));
+            default_nodes.push(Fr::hash(&[default_nodes[i], default_nodes[i]]));
         }
         let data = ValueMap::default();
         Self {
@@ -153,7 +148,7 @@ impl Tree {
     fn recalculate_parent(&mut self, level: usize, idx: u32) {
         let lhs = self.get_value(level - 1, idx * 2);
         let rhs = self.get_value(level - 1, idx * 2 + 1);
-        let new_hash = hash(&[lhs, rhs]);
+        let new_hash = Fr::hash(&[lhs, rhs]);
         self.data.insert(self.get_flattened_idx(level, idx), new_hash);
     }
 
@@ -211,7 +206,7 @@ impl Tree {
             } else {
                 [self.get_value(i, cur_idx - 1), cur_value]
             };
-            cur_value = hash(&pair);
+            cur_value = Fr::hash(&pair);
             cur_idx = self.parent_idx(cur_idx);
             let cache_item = HashCacheItem {
                 inputs: pair,
@@ -248,7 +243,7 @@ impl Tree {
                 }
             }
             if cache_miss {
-                self.data.insert(self.get_flattened_idx(i + 1, cur_idx), hash(&pair));
+                self.data.insert(self.get_flattened_idx(i + 1, cur_idx), Fr::hash(&pair));
             } else {
                 self.data.insert(self.get_flattened_idx(i + 1, cur_idx), precalculated[i].result);
                 //cache_hit_count += 1;
@@ -304,20 +299,20 @@ impl Serialize for Tree {
         S: serde::Serializer,
     {
         #[derive(Serialize)]
-        struct Wrapper<'a>(#[serde(with = "fr_bytes")] &'a Fr);
+        struct Wrapper(#[serde(with = "FrBytes")] Fr);
 
         let mut tree = serializer.serialize_struct("Tree", 3)?;
         tree.serialize_field("height", &self.height)?;
         #[cfg(not(feature = "fr_string_repr"))]
         {
-            tree.serialize_field("default_leaf_node_value", &Wrapper(&self.default_nodes[0]))?;
-            let map: MerkleValueMapType<NodeIndex, Wrapper> = self.data.iter().map(|(k, v)| (*k, Wrapper(v))).collect();
+            tree.serialize_field("default_leaf_node_value", &Wrapper(self.default_nodes[0]))?;
+            let map: MerkleValueMapType<NodeIndex, Wrapper> = self.data.iter().map(|(k, v)| (*k, Wrapper(*v))).collect();
             tree.serialize_field("data", &map)?;
         }
         #[cfg(feature = "fr_string_repr")]
         {
-            tree.serialize_field("default_leaf_node_value", &fr_to_string(&self.default_nodes[0]))?;
-            let map: MerkleValueMapType<NodeIndex, String> = self.data.iter().map(|(k, v)| (*k, fr_to_string(v))).collect();
+            tree.serialize_field("default_leaf_node_value", &self.default_nodes[0].to_string())?;
+            let map: MerkleValueMapType<NodeIndex, String> = self.data.iter().map(|(k, v)| (*k, v.to_string())).collect();
             tree.serialize_field("data", &map)?;
         }
         tree.end()
@@ -331,12 +326,12 @@ impl<'de> Deserialize<'de> for Tree {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        struct Wrapper(#[serde(with = "fr_bytes")] Fr);
+        struct Wrapper(#[serde(with = "FrBytes")] Fr);
 
         #[derive(Deserialize)]
         struct TreeWrapper {
             height: usize,
-            #[serde(with = "fr_bytes")]
+            #[serde(with = "FrBytes")]
             default_leaf_node_value: Fr,
             data: MerkleValueMapType<NodeIndex, Wrapper>,
         }
@@ -364,8 +359,8 @@ impl<'de> Deserialize<'de> for Tree {
         }
 
         let wrapper = TreeWrapper::deserialize(deserializer)?;
-        let mut tree = Tree::new(wrapper.height, str_to_fr(wrapper.default_leaf_node_value.as_str()));
-        tree.data = wrapper.data.into_iter().map(|(k, v)| (k, str_to_fr(v.as_str()))).collect();
+        let mut tree = Tree::new(wrapper.height, Fr::from_str(wrapper.default_leaf_node_value.as_str()));
+        tree.data = wrapper.data.into_iter().map(|(k, v)| (k, Fr::from_str(v.as_str()))).collect();
 
         Ok(tree)
     }
