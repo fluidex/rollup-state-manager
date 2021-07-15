@@ -18,10 +18,8 @@ env_logger = "0.5"
 ethers = { git = "https://github.com/gakonst/ethers-rs" }
 ff = { git = "https://github.com/Fluidex/ff", package = "ff_ce", features = [ "derive" ] }
 fnv = "1.0.7"
-franklin_crypto = { package = "franklin-crypto", git = "https://github.com/Fluidex/franklin-crypto.git" }
 futures = "0.3.13"
 hex = "0.4.3"
-itertools = "0.10.0"
 lazy_static = "1.4.0"
 log = "0.4"
 num = "0.4.0"
