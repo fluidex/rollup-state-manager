@@ -311,8 +311,8 @@ impl Serialize for Tree {
         }
         #[cfg(feature = "fr_string_repr")]
         {
-            tree.serialize_field("default_leaf_node_value", &self.default_nodes[0].to_string())?;
-            let map: MerkleValueMapType<NodeIndex, String> = self.data.iter().map(|(k, v)| (*k, v.to_string())).collect();
+            tree.serialize_field("default_leaf_node_value", &self.default_nodes[0].to_decimal_string())?;
+            let map: MerkleValueMapType<NodeIndex, String> = self.data.iter().map(|(k, v)| (*k, v.to_decimal_string())).collect();
             tree.serialize_field("data", &map)?;
         }
         tree.end()

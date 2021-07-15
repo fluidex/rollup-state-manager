@@ -31,7 +31,7 @@ fn test_decimal_to_fr() {
     let out = decimal_to_fr(&pi, 3);
     assert_eq!(
         "Fr(0x0000000000000000000000000000000000000000000000000000000000000c45)",
-        out.to_string()
+        out.to_decimal_string()
     );
 }
 

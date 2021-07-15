@@ -13,13 +13,13 @@ pub fn get_merkle_tree_test_case() -> CircuitTestCase {
     let proof2 = tree.get_proof(2);
     // TODO: we need a path index function?
     //
-    let field_slice_to_string = |arr: &[Fr]| arr.iter().map(Fr::to_string).collect::<Vec<String>>();
+    let field_slice_to_string = |arr: &[Fr]| arr.iter().map(Fr::to_decimal_string).collect::<Vec<String>>();
     let input = json!({
         "enabled": 1,
-        "oldLeaf": proof1.leaf.to_string(),
-        "oldRoot": proof1.root.to_string(),
-        "newLeaf": proof2.leaf.to_string(),
-        "newRoot": proof2.root.to_string(),
+        "oldLeaf": proof1.leaf.to_decimal_string(),
+        "oldRoot": proof1.root.to_decimal_string(),
+        "newLeaf": proof2.leaf.to_decimal_string(),
+        "newRoot": proof2.root.to_decimal_string(),
         "pathElements": proof1.path_elements.iter().map(|x| field_slice_to_string(x)).collect::<Vec<_>>(),
         "pathIndex": [0, 1],
     });

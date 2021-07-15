@@ -416,7 +416,8 @@ mod tests {
     use super::*;
     use crate::types::l2::*;
     use crate::types::primitives::*;
-    use ff::PrimeField;
+    use fluidex_common::ff::PrimeField;
+    use fluidex_common::types::FrExt;
 
     #[test]
     fn test_account() {
@@ -446,15 +447,15 @@ mod tests {
         let sig = acc.sign_hash(msg).unwrap();
         let sig_packed_expected = hex::decode("7ddc5c6aadf5e80200bd9f28e9d5bf932cbb7f4224cce0fa11154f4ad24dc5831c295fb522b7b8b4921e271bc6b265f4d7114fbe9516d23e69760065053ca704").unwrap();
         assert_eq!(
-            fr_to_string(&sig.r8x),
+            sig.r8x.to_decimal_string(),
             "15679698175365968671287592821268512384454163537665670071564984871581219397966"
         );
         assert_eq!(
-            fr_to_string(&sig.r8y),
+            sig.r8y.to_decimal_string(),
             "1705544521394286010135369499330220710333064238375605681220284175409544486013"
         );
         assert_eq!(
-            fr_to_bigint(&sig.s).to_string(),
+            &sig.s.to_bigint().to_string(),
             "2104729104368328243963691045555606467740179640947024714099030450797354625308"
         );
         assert_eq!(acc.verify(sig), true);
@@ -532,7 +533,7 @@ mod tests {
         order.sign_with(&acc).unwrap();
 
         assert_eq!(
-            fr_to_string(&order.hash()),
+            order.hash().to_decimal_string(),
             "8056692562185768785417295010793063162660984530596417435073781442183268221458",
             "message (Fr) to sign"
         );
