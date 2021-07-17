@@ -415,8 +415,6 @@ mod tests {
 
     use super::*;
     use crate::types::l2::*;
-    use crate::types::primitives::*;
-    use fluidex_common::ff::PrimeField;
     use fluidex_common::types::FrExt;
 
     #[test]
@@ -433,17 +431,17 @@ mod tests {
         );
         assert_eq!(hex::decode(acc.bjj_pub_key.clone()).unwrap(), pubkey_expected);
         assert_eq!(
-            fr_to_bigint(&acc.ax).to_str_radix(16),
+            acc.ax.to_bigint().to_str_radix(16),
             "1fce25ec2e7eeec94079ec7866a933a8b21f33e0ebd575f3001d62d19251d455"
         );
         assert_eq!(
-            fr_to_bigint(&acc.ay).to_str_radix(16),
+            acc.ay.to_bigint().to_str_radix(16),
             "20a41ccb24e55dba4fc9ebc17ae9d4c9097d7fe3387d492155568db6be2692a5"
         );
         assert_eq!(acc.sign, Fr::from_u32(1));
 
         // Step2: test l2 sig
-        let msg = Fr::from_str("1357924680").unwrap();
+        let msg = FrExt::from_str("1357924680");
         let sig = acc.sign_hash(msg).unwrap();
         let sig_packed_expected = hex::decode("7ddc5c6aadf5e80200bd9f28e9d5bf932cbb7f4224cce0fa11154f4ad24dc5831c295fb522b7b8b4921e271bc6b265f4d7114fbe9516d23e69760065053ca704").unwrap();
         assert_eq!(
@@ -464,7 +462,7 @@ mod tests {
         // test sig verification of packed pubkey and packed sig
         let sig_unpacked = babyjubjub_rs::decompress_signature(&sig_packed_expected.try_into().unwrap()).unwrap();
         let pubkey_unpacked = babyjubjub_rs::decompress_point(pubkey_expected.try_into().unwrap()).unwrap();
-        assert!(babyjubjub_rs::verify(pubkey_unpacked, sig_unpacked, fr_to_bigint(&msg)));
+        assert!(babyjubjub_rs::verify(pubkey_unpacked, sig_unpacked, msg.to_bigint()));
 
         // Step3: l1 sig -> l2 keypair
         // mnemonic => L1 account & eth addr & L2 account
@@ -539,7 +537,7 @@ mod tests {
         );
 
         assert_eq!(
-            hex::encode(fr_to_vec(&order.hash())), // big endian
+            hex::encode(order.hash().to_vec_be()), // big endian
             "11cfed280efe7a90a79f3ff69ad6dafc57bfd03e24f176cd1149068268994212",
             "message (hexdecimal string) to sign"
         );
@@ -564,7 +562,7 @@ mod tests {
 
         let detailed_sig = Signature {
             hash: order.hash(),
-            s: bigint_to_fr(sig.s),
+            s: Fr::from_bigint(sig.s),
             r8x: sig.r_b8.x,
             r8y: sig.r_b8.y,
         };

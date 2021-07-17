@@ -399,6 +399,7 @@ impl<'a> Iterator for TreeLeafIter<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fluidex_common::ff::Field;
     use rand::Rng;
     use std::time::Instant;
     //use test::Bencher;
@@ -414,7 +415,7 @@ mod tests {
                 if j % 100 == 0 {
                     println!("progress {} {}", i, j);
                 }
-                tree.set_value(j, Fr::from_str(&format!("{}", j + i)).unwrap());
+                tree.set_value(j, Fr::from_str(&format!("{}", j + i)));
             }
             // 2021.03.15(Apple M1): typescript: 100 ops takes 4934ms
             // 2021.03.26(Apple M1): rust:       100 ops takes 1160ms
@@ -433,7 +434,7 @@ mod tests {
         let mut updates = Vec::new();
         let rand_elem = || {
             let mut rng = rand::thread_rng();
-            Fr::from_str(&format!("{}", rng.gen_range(0..123456789))).unwrap()
+            Fr::from_str(&format!("{}", rng.gen_range(0..123456789)))
         };
         let rand_idx = || {
             let mut rng = rand::thread_rng();
@@ -463,7 +464,7 @@ mod tests {
             let mut same_updates = Vec::new();
             let rand_elem = || {
                 let mut rng = rand::thread_rng();
-                Fr::from_str(&format!("{}", rng.gen_range(0..123456789))).unwrap()
+                Fr::from_str(&format!("{}", rng.gen_range(0..123456789)))
             };
             let rand_idx = || {
                 let mut rng = rand::thread_rng();

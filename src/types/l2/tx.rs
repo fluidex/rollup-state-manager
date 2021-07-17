@@ -296,9 +296,9 @@ fn test_deposit_to_new_pubdata() {
             exponent: 11,
         },
         l2key: Some(L2Key {
-            eth_addr: primitives::u64_to_fr(1223232332323233),
-            sign: primitives::u64_to_fr(1),
-            ay: primitives::u64_to_fr(987657654765),
+            eth_addr: Fr::from_u64(1223232332323233),
+            sign: Fr::from_u64(1),
+            ay: Fr::from_u64(987657654765),
         }),
     };
     let pubdata1 = tx.to_pubdata();
