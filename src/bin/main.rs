@@ -58,7 +58,7 @@ fn replay_msgs(
         };
         let mut witgen = WitnessGenerator::new(state, *params::NTXS, block_offset, *params::VERBOSE);
 
-        println!("genesis root {}", fr_to_string(&witgen.root()));
+        println!("genesis root {}", witgen.root().to_string());
 
         let mut processor = msg_processor::Processor::default();
 
