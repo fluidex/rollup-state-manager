@@ -1,11 +1,11 @@
 use super::order;
 use crate::account::Signature;
-use crate::types::fixnum::Float864;
 use crate::types::merkle_tree::MerklePath;
-use crate::types::primitives::{self, fr_to_vec, hash, u32_to_fr, Fr};
 use anyhow::bail;
 use anyhow::Result;
-use ff::Field;
+use fluidex_common::ff::Field;
+use fluidex_common::types::{Float864, FrExt};
+use fluidex_common::Fr;
 use std::convert::TryInto;
 
 #[derive(Copy, Clone)]
@@ -109,11 +109,15 @@ impl TransferTx {
     }
 
     pub fn hash(&self) -> Fr {
-        let data = hash(&[u32_to_fr(TxType::Transfer as u32), u32_to_fr(self.token_id), self.amount.to_fr()]);
+        let data = Fr::hash(&[
+            Fr::from_u32(TxType::Transfer as u32),
+            Fr::from_u32(self.token_id),
+            self.amount.to_fr(),
+        ]);
         // do we really need to sign oldBalance?
         // i think we don't need to sign old_balance_from/to_nonce/old_balance_to?
-        let data = hash(&[data, u32_to_fr(self.from), self.from_nonce]);
-        hash(&[data, u32_to_fr(self.to)])
+        let data = Fr::hash(&[data, Fr::from_u32(self.from), self.from_nonce]);
+        Fr::hash(&[data, Fr::from_u32(self.to)])
     }
 }
 
@@ -141,9 +145,13 @@ impl WithdrawTx {
     }
 
     pub fn hash(&self) -> Fr {
-        let data = hash(&[u32_to_fr(TxType::Withdraw as u32), u32_to_fr(self.token_id), self.amount.to_fr()]);
+        let data = Fr::hash(&[
+            Fr::from_u32(TxType::Withdraw as u32),
+            Fr::from_u32(self.token_id),
+            self.amount.to_fr(),
+        ]);
         // do we really need to sign oldBalance?
-        hash(&[data, u32_to_fr(self.account_id), self.nonce, self.old_balance])
+        Fr::hash(&[data, Fr::from_u32(self.account_id), self.nonce, self.old_balance])
     }
 }
 
@@ -163,9 +171,9 @@ impl DepositTx {
         result.append(&mut (self.token_id as u16).to_be_bytes().to_vec());
         result.append(&mut self.amount.encode());
         let l2key = self.l2key.clone().unwrap_or_default();
-        result.append(&mut (fr_to_vec(&l2key.ay)));
-        result.append(&mut [primitives::fr_to_bool(&l2key.sign).unwrap() as u8].to_vec());
-        result.append(&mut (fr_to_vec(&l2key.eth_addr)));
+        result.append(&mut (l2key.ay.to_vec_be()));
+        result.append(&mut [l2key.sign.to_bool().unwrap() as u8].to_vec());
+        result.append(&mut (l2key.eth_addr.to_vec_be()));
         //println!("{}, {}", result.len(), PUBDATA_LEN);
         assert!(result.len() <= PUBDATA_LEN);
         result.append(&mut vec![0; PUBDATA_LEN - result.len()]);
@@ -191,7 +199,7 @@ impl DepositTx {
         let amount = AmountType::decode(&data[idx..(idx + AMOUNT_LEN)])?;
         idx += AMOUNT_LEN;
 
-        let ay = primitives::vec_to_fr(&data[idx..(idx + FR_LEN)])?;
+        let ay = Fr::from_slice(&data[idx..(idx + FR_LEN)])?;
         idx += FR_LEN;
         if ay.is_zero() {
             return Ok(Self {
@@ -202,13 +210,13 @@ impl DepositTx {
             });
         }
 
-        let sign = primitives::vec_to_fr(&data[idx..(idx + 1)])?;
+        let sign = Fr::from_slice(&data[idx..(idx + 1)])?;
         idx += 1;
         if sign != Fr::one() && sign != Fr::zero() {
             bail!("invalid l2 account sign");
         }
 
-        let eth_addr = primitives::vec_to_fr(&data[idx..(idx + FR_LEN)])?;
+        let eth_addr = Fr::from_slice(&data[idx..(idx + FR_LEN)])?;
         //idx += FR_LEN;
 
         Ok(Self {
@@ -288,9 +296,9 @@ fn test_deposit_to_new_pubdata() {
             exponent: 11,
         },
         l2key: Some(L2Key {
-            eth_addr: primitives::u64_to_fr(1223232332323233),
-            sign: primitives::u64_to_fr(1),
-            ay: primitives::u64_to_fr(987657654765),
+            eth_addr: Fr::from_u64(1223232332323233),
+            sign: Fr::from_u64(1),
+            ay: Fr::from_u64(987657654765),
         }),
     };
     let pubdata1 = tx.to_pubdata();

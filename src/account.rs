@@ -1,11 +1,5 @@
-#[cfg(not(feature = "fr_string_repr"))]
-use crate::types::primitives::fr_bytes as fr_serde;
-#[cfg(feature = "fr_string_repr")]
-use crate::types::primitives::fr_str as fr_serde;
-use crate::types::primitives::{bigint_to_fr, fr_to_bigint, Fr};
 use anyhow::Result;
 use arrayref::array_ref;
-use babyjubjub_rs::{self, decompress_point, Point, PrivateKey};
 use coins_bip32::{path::DerivationPath, prelude::DigestSigner};
 use ethers::{
     core::k256::ecdsa::recoverable::Signature as RecoverableSignature, core::k256::ecdsa::Signature as K256Signature,
@@ -30,10 +24,15 @@ use ethers::{
     signers::to_eip155_v,
     utils::{hash_message, keccak256, secret_key_to_address},
 };
-use ff::from_hex;
-use ff::Field;
+use fluidex_common::babyjubjub_rs::{self, decompress_point, Point, PrivateKey};
+use fluidex_common::ff::{from_hex, Field};
+use fluidex_common::num_bigint::{self, BigInt};
+#[cfg(not(feature = "fr_string_repr"))]
+use fluidex_common::serde::FrBytes as FrSerde;
+#[cfg(feature = "fr_string_repr")]
+use fluidex_common::serde::FrStr as FrSerde;
+use fluidex_common::{types::FrExt, Fr};
 use lazy_static::lazy_static;
-use num_bigint::BigInt;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -44,13 +43,13 @@ const DEFAULT_DERIVATION_PATH_PREFIX: &str = "m/44'/60'/0'/0/";
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Signature {
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub hash: Fr,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub s: Fr,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub r8x: Fr,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub r8y: Fr,
 }
 
@@ -117,9 +116,9 @@ impl L2Account {
 
     // TODO: sign and verify involves a lot of unnecessary computing
     pub fn sign_hash_safe(&self, hash: Fr) -> Result<Signature, String> {
-        let b = self.priv_key.sign(fr_to_bigint(&hash))?.compress();
+        let b = self.priv_key.sign(hash.to_bigint())?.compress();
         let r_b8_bytes: [u8; 32] = *array_ref!(b[..32], 0, 32);
-        let s = bigint_to_fr(BigInt::from_bytes_le(num_bigint::Sign::Plus, &b[32..]));
+        let s = Fr::from_bigint(BigInt::from_bytes_le(num_bigint::Sign::Plus, &b[32..]));
         let r_b8 = decompress_point(r_b8_bytes);
         match r_b8 {
             Result::Err(err) => Err(err),
@@ -128,12 +127,12 @@ impl L2Account {
     }
 
     pub fn verify_safe(&self, sig: Signature) -> bool {
-        let msg = fr_to_bigint(&sig.hash);
+        let msg = sig.hash.to_bigint();
         let r_b8 = Point { x: sig.r8x, y: sig.r8y };
 
         let mut b: Vec<u8> = Vec::new();
         b.append(&mut r_b8.compress().to_vec());
-        let (_, s_bytes) = fr_to_bigint(&sig.s).to_bytes_le();
+        let (_, s_bytes) = sig.s.to_bigint().to_bytes_le();
         let mut s_32bytes: [u8; 32] = [0; 32];
         let len = std::cmp::min(s_bytes.len(), s_32bytes.len());
         s_32bytes[..len].copy_from_slice(&s_bytes[..len]);
@@ -147,11 +146,11 @@ impl L2Account {
         }
     }
     pub fn sign_hash_raw(&self, hash: Fr) -> Result<SignatureBJJ, String> {
-        self.priv_key.sign(fr_to_bigint(&hash))
+        self.priv_key.sign(hash.to_bigint())
     }
     pub fn sign_hash(&self, hash: Fr) -> Result<Signature, String> {
         let sig = self.sign_hash_raw(hash)?;
-        let s = bigint_to_fr(sig.s);
+        let s = Fr::from_bigint(sig.s);
         Ok(Signature {
             hash,
             s,
@@ -160,20 +159,20 @@ impl L2Account {
         })
     }
     pub fn sign_hash_packed(&self, hash: Fr) -> Result<[u8; 64], String> {
-        Ok(self.priv_key.sign(fr_to_bigint(&hash))?.compress())
+        Ok(self.priv_key.sign(hash.to_bigint())?.compress())
     }
     pub fn verify(&self, sig: Signature) -> bool {
         Self::verify_using_pubkey(sig, &self.pub_key)
     }
     pub fn verify_raw_using_pubkey(msg: Fr, sig_bjj: SignatureBJJ, pub_key: Point) -> bool {
-        let msg = fr_to_bigint(&msg);
+        let msg = msg.to_bigint();
         babyjubjub_rs::verify(pub_key, sig_bjj, msg)
     }
     pub fn verify_using_pubkey(sig: Signature, pub_key: &Point) -> bool {
         let r_b8 = Point { x: sig.r8x, y: sig.r8y };
         let sig_bjj = SignatureBJJ {
             r_b8,
-            s: fr_to_bigint(&sig.s),
+            s: sig.s.to_bigint(),
         };
         Self::verify_raw_using_pubkey(sig.hash, sig_bjj, pub_key.clone())
     }
@@ -201,7 +200,7 @@ impl Account {
         Self::from_priv_key(uid, priv_key.as_ref())
     }
     pub fn from_priv_key(uid: u32, priv_key: &SigningKey) -> Result<Self, String> {
-        let public_key = priv_key.verify_key();
+        let public_key = priv_key.verifying_key();
         let eth_addr = secret_key_to_address(priv_key);
 
         let signature = sign_msg_with_signing_key(priv_key, &*CREATE_L2_ACCOUNT_MSG);
@@ -416,8 +415,7 @@ mod tests {
 
     use super::*;
     use crate::types::l2::*;
-    use crate::types::primitives::*;
-    use ff::PrimeField;
+    use fluidex_common::types::FrExt;
 
     #[test]
     fn test_account() {
@@ -433,29 +431,29 @@ mod tests {
         );
         assert_eq!(hex::decode(acc.bjj_pub_key.clone()).unwrap(), pubkey_expected);
         assert_eq!(
-            fr_to_bigint(&acc.ax).to_str_radix(16),
+            acc.ax.to_bigint().to_str_radix(16),
             "1fce25ec2e7eeec94079ec7866a933a8b21f33e0ebd575f3001d62d19251d455"
         );
         assert_eq!(
-            fr_to_bigint(&acc.ay).to_str_radix(16),
+            acc.ay.to_bigint().to_str_radix(16),
             "20a41ccb24e55dba4fc9ebc17ae9d4c9097d7fe3387d492155568db6be2692a5"
         );
-        assert_eq!(acc.sign, u32_to_fr(1));
+        assert_eq!(acc.sign, Fr::from_u32(1));
 
         // Step2: test l2 sig
-        let msg = Fr::from_str("1357924680").unwrap();
+        let msg = FrExt::from_str("1357924680");
         let sig = acc.sign_hash(msg).unwrap();
         let sig_packed_expected = hex::decode("7ddc5c6aadf5e80200bd9f28e9d5bf932cbb7f4224cce0fa11154f4ad24dc5831c295fb522b7b8b4921e271bc6b265f4d7114fbe9516d23e69760065053ca704").unwrap();
         assert_eq!(
-            fr_to_string(&sig.r8x),
+            sig.r8x.to_decimal_string(),
             "15679698175365968671287592821268512384454163537665670071564984871581219397966"
         );
         assert_eq!(
-            fr_to_string(&sig.r8y),
+            sig.r8y.to_decimal_string(),
             "1705544521394286010135369499330220710333064238375605681220284175409544486013"
         );
         assert_eq!(
-            fr_to_bigint(&sig.s).to_string(),
+            &sig.s.to_bigint().to_string(),
             "2104729104368328243963691045555606467740179640947024714099030450797354625308"
         );
         assert_eq!(acc.verify(sig), true);
@@ -464,7 +462,7 @@ mod tests {
         // test sig verification of packed pubkey and packed sig
         let sig_unpacked = babyjubjub_rs::decompress_signature(&sig_packed_expected.try_into().unwrap()).unwrap();
         let pubkey_unpacked = babyjubjub_rs::decompress_point(pubkey_expected.try_into().unwrap()).unwrap();
-        assert!(babyjubjub_rs::verify(pubkey_unpacked, sig_unpacked, fr_to_bigint(&msg)));
+        assert!(babyjubjub_rs::verify(pubkey_unpacked, sig_unpacked, msg.to_bigint()));
 
         // Step3: l1 sig -> l2 keypair
         // mnemonic => L1 account & eth addr & L2 account
@@ -524,22 +522,22 @@ mod tests {
             account_id: 1,
             order_id: 1,
             side: l2::order::OrderSide::Buy,
-            token_buy: u32_to_fr(1),
-            token_sell: u32_to_fr(2),
-            total_buy: u32_to_fr(999),
-            total_sell: u32_to_fr(888),
+            token_buy: Fr::from_u32(1),
+            token_sell: Fr::from_u32(2),
+            total_buy: Fr::from_u32(999),
+            total_sell: Fr::from_u32(888),
             sig: None,
         };
         order.sign_with(&acc).unwrap();
 
         assert_eq!(
-            fr_to_string(&order.hash()),
+            order.hash().to_decimal_string(),
             "8056692562185768785417295010793063162660984530596417435073781442183268221458",
             "message (Fr) to sign"
         );
 
         assert_eq!(
-            hex::encode(fr_to_vec(&order.hash())), // big endian
+            hex::encode(order.hash().to_vec_be()), // big endian
             "11cfed280efe7a90a79f3ff69ad6dafc57bfd03e24f176cd1149068268994212",
             "message (hexdecimal string) to sign"
         );
@@ -564,7 +562,7 @@ mod tests {
 
         let detailed_sig = Signature {
             hash: order.hash(),
-            s: bigint_to_fr(sig.s),
+            s: Fr::from_bigint(sig.s),
             r8x: sig.r_b8.x,
             r8y: sig.r_b8.y,
         };

@@ -1,9 +1,10 @@
-use super::msg_consumer::{Simple, SimpleConsumer, SimpleMessageHandler};
 use crate::test_utils::messages::{parse_msg, WrappedMessage};
 use crate::types::matchengine::messages::{BalanceMessage, OrderMessage, TradeMessage, UserMessage};
-use rdkafka::consumer::{Consumer, StreamConsumer};
-use rdkafka::message::{BorrowedMessage, Message};
-use rdkafka::{Offset, TopicPartitionList};
+use fluidex_common::message::consumer::{Simple, SimpleConsumer, SimpleMessageHandler};
+use fluidex_common::rdkafka;
+use fluidex_common::rdkafka::consumer::{Consumer, StreamConsumer};
+use fluidex_common::rdkafka::message::{BorrowedMessage, Message};
+use fluidex_common::rdkafka::{Offset, TopicPartitionList};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::{Arc, Mutex};

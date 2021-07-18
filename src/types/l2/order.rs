@@ -1,11 +1,11 @@
 #![allow(clippy::let_and_return)]
 use crate::account::{Account, Signature, SignatureBJJ};
+use fluidex_common::ff::Field;
 #[cfg(not(feature = "fr_string_repr"))]
-use crate::types::primitives::fr_bytes as fr_serde;
+use fluidex_common::serde::FrBytes as FrSerde;
 #[cfg(feature = "fr_string_repr")]
-use crate::types::primitives::fr_str as fr_serde;
-use crate::types::primitives::*;
-use ff::Field;
+use fluidex_common::serde::FrStr as FrSerde;
+use fluidex_common::{types::FrExt, Fr};
 use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -30,11 +30,11 @@ impl OrderInput {
     pub fn hash(&self) -> Fr {
         // copy from https://github.com/Fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/state-utils.ts#L38
         // TxType::PlaceOrder
-        let magic_head = u32_to_fr(4);
-        let data = hash(&[
+        let magic_head = Fr::from_u32(4);
+        let data = Fr::hash(&[
             magic_head,
             // TODO: sign nonce or order_id
-            //u32_to_fr(self.order_id),
+            //Fr::from_u32(self.order_id),
             self.token_sell,
             self.token_buy,
             self.total_sell,
@@ -44,7 +44,7 @@ impl OrderInput {
         // nonce and orderID seems redundant?
 
         // account_id is not needed if the hash is signed later?
-        //data = hash(&[data, u32_to_fr(self.account_id)]);
+        //data = hash(&[data, Fr::from_u32(self.account_id)]);
         data
     }
     pub fn sign_with(&mut self, account: &Account) -> Result<(), String> {
@@ -59,18 +59,18 @@ pub struct Order {
     pub account_id: u32,
     pub order_id: u32,
     pub side: OrderSide,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub token_buy: Fr,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub token_sell: Fr,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub total_sell: Fr,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub total_buy: Fr,
     pub sig: Signature,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub filled_sell: Fr,
-    #[serde(with = "fr_serde")]
+    #[serde(with = "FrSerde")]
     pub filled_buy: Fr,
     pub is_active: bool,
 }
@@ -103,7 +103,7 @@ impl From<OrderInput> for Order {
             total_buy: order_input.total_buy,
             sig: Signature {
                 hash: order_input.hash(),
-                s: bigint_to_fr(order_input.sig.clone().unwrap().s),
+                s: Fr::from_bigint(order_input.sig.clone().unwrap().s),
                 r8x: order_input.sig.clone().unwrap().r_b8.x,
                 r8y: order_input.sig.clone().unwrap().r_b8.y,
             },
@@ -119,10 +119,10 @@ impl From<OrderInput> for Order {
 impl Order {
     pub fn hash(&self) -> Fr {
         let mut data = Fr::zero();
-        data.add_assign(&u32_to_fr(self.order_id));
-        data.add_assign(&shl(&self.token_buy, 32));
-        data.add_assign(&shl(&self.token_sell, 64));
-        hash(&[data, self.filled_sell, self.filled_buy, self.total_sell, self.total_buy])
+        data.add_assign(&Fr::from_u32(self.order_id));
+        data.add_assign(&self.token_buy.shl(32));
+        data.add_assign(&self.token_sell.shl(64));
+        Fr::hash(&[data, self.filled_sell, self.filled_buy, self.total_sell, self.total_buy])
     }
     pub fn is_filled(&self) -> bool {
         //debug_assert!(self.filled_buy <= self.total_buy, "too much filled buy");

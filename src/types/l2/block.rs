@@ -1,6 +1,7 @@
 use super::tx::TxType;
 use crate::types::merkle_tree::MerklePath;
-use crate::types::primitives::Fr;
+
+use fluidex_common::Fr;
 
 #[derive(Clone)]
 pub struct L2BlockWitness {

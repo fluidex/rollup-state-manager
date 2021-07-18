@@ -3,6 +3,7 @@
 #![allow(clippy::large_enum_variant)]
 #![allow(clippy::wrong_self_convention)]
 #![allow(clippy::needless_return)]
+#![allow(clippy::branches_sharing_code)]
 #![allow(dead_code)]
 pub mod account;
 pub mod config;

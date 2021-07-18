@@ -1,11 +1,9 @@
 #![allow(clippy::upper_case_acronyms)]
 use std::ops::{Deref, DerefMut};
 
-use rust_decimal::Decimal;
+use fluidex_common::rust_decimal::Decimal;
+use fluidex_common::serde::HexArray;
 use serde::{Deserialize, Serialize};
-use serde_big_array::big_array;
-
-big_array! { BigArray; }
 
 // TODO: reuse related types def in dingir-exchange
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -68,7 +66,7 @@ pub struct Order {
     pub finished_fee: Decimal,
     pub post_only: bool,
 
-    #[serde(with = "BigArray")]
+    #[serde(with = "HexArray")]
     pub signature: [u8; 64],
     // TODO: remove Option once migration is done
     //pub signature: Option<String>,

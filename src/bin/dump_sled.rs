@@ -4,11 +4,13 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use fnv::FnvHashMap;
+use fluidex_common::fnv::FnvHashMap;
+use fluidex_common::serde::FrBytes;
+use fluidex_common::Fr;
 use rollup_state_manager::r#const::sled_db::{ACCOUNTSTATES_KEY, ACCOUNTTREE_KEY, BALANCETREES_KEY, ORDERTREES_KEY};
 use rollup_state_manager::state::AccountState;
 use rollup_state_manager::types::merkle_tree::Tree;
-use rollup_state_manager::types::primitives::{fr_to_string, FrWrapper};
+use serde::Serialize;
 
 fn main() -> Result<()> {
     let sled_path: PathBuf = env::var("SLED_DB_PATH")
@@ -31,9 +33,12 @@ fn main() -> Result<()> {
     let loaded_account_states: FnvHashMap<u32, AccountState> = account_tree
         .iter()
         .map(|(id, hash)| {
-            println!("{} {}", id, fr_to_string(hash));
+            #[derive(Serialize)]
+            struct Wrapper(#[serde(with = "FrBytes")] Fr);
+
+            println!("{} {}", id, hash.to_string());
             let v = account_states
-                .get(bincode::serialize(&FrWrapper::from(hash)).unwrap())
+                .get(bincode::serialize(&Wrapper(*hash)).unwrap())
                 .ok()
                 .flatten()
                 .unwrap();
