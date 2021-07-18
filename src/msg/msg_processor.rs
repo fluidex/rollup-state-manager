@@ -1,14 +1,14 @@
 use crate::msg::msg_utils::bytes_to_sig;
 use crate::state::WitnessGenerator;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
-use crate::types::fixnum::Float864;
 use crate::types::l2::{self, OrderInput, OrderSide};
-use crate::types::{fixnum, matchengine::messages};
+use crate::types::matchengine::messages;
 
 use fluidex_common::babyjubjub_rs::{self, Point};
 use fluidex_common::ff::Field;
 use fluidex_common::rust_decimal::Decimal;
-use fluidex_common::{types::FrExt, Fr};
+use fluidex_common::types::{DecimalExt, Float864, FrExt};
+use fluidex_common::Fr;
 use num::Zero;
 use std::convert::TryInto;
 use std::time::Instant;
@@ -78,13 +78,10 @@ impl Processor {
         assert!(!balance_before.is_sign_negative(), "invalid balance {:?}", deposit);
 
         let expected_balance_before = witgen.get_token_balance(deposit.user_id, token_id);
-        assert_eq!(
-            expected_balance_before,
-            fixnum::decimal_to_fr(&balance_before, prec_token_id(token_id))
-        );
+        assert_eq!(expected_balance_before, balance_before.to_fr(prec_token_id(token_id)));
 
         let timing = Instant::now();
-        let amount = fixnum::decimal_to_amount(&deposit.change, prec_token_id(token_id));
+        let amount = deposit.change.to_amount(prec_token_id(token_id));
 
         if is_old {
             witgen
@@ -135,14 +132,12 @@ impl Processor {
                         !witgen.has_order(order.order.user, order.order.id as u32),
                         "witgen should not have empty order"
                     );
-                    return;
                 } else {
                     debug_assert!(
                         witgen.has_order(order.order.user, order.order.id as u32),
                         "witgen should have traded order"
                     );
                     witgen.cancel_order(order.order.user, order.order.id as u32);
-                    return;
                 }
             }
             messages::OrderEventType::PUT => {}
@@ -215,8 +210,8 @@ impl Processor {
                 order2_account_id: trade.bid_user_id,
                 token_id_1to2: id_pair.0,
                 token_id_2to1: id_pair.1,
-                amount_1to2: fixnum::decimal_to_amount(&trade.amount, prec_token_id(id_pair.0)),
-                amount_2to1: fixnum::decimal_to_amount(&trade.quote_amount, prec_token_id(id_pair.1)),
+                amount_1to2: trade.amount.to_amount(prec_token_id(id_pair.0)),
+                amount_2to1: trade.quote_amount.to_amount(prec_token_id(id_pair.1)),
                 order1_id: trade.ask_order_id as u32,
                 order2_id: trade.bid_order_id as u32,
             },
@@ -225,8 +220,8 @@ impl Processor {
                 order2_account_id: trade.ask_user_id,
                 token_id_1to2: id_pair.1,
                 token_id_2to1: id_pair.0,
-                amount_1to2: fixnum::decimal_to_amount(&trade.quote_amount, prec_token_id(id_pair.1)),
-                amount_2to1: fixnum::decimal_to_amount(&trade.amount, prec_token_id(id_pair.0)),
+                amount_1to2: trade.quote_amount.to_amount(prec_token_id(id_pair.1)),
+                amount_2to1: trade.amount.to_amount(prec_token_id(id_pair.0)),
                 order1_id: trade.bid_order_id as u32,
                 order2_id: trade.ask_order_id as u32,
             },
@@ -255,8 +250,8 @@ impl Processor {
             order_id: order.id as u32,
             token_sell: Fr::from_u32(tokensell),
             token_buy: Fr::from_u32(tokenbuy),
-            total_sell: fixnum::decimal_to_fr(&total_sell, prec_token_id(tokensell)),
-            total_buy: fixnum::decimal_to_fr(&total_buy, prec_token_id(tokenbuy)),
+            total_sell: total_sell.to_fr(prec_token_id(tokensell)),
+            total_buy: total_buy.to_fr(prec_token_id(tokenbuy)),
             sig: Some(bytes_to_sig(order.signature)),
             account_id: order.user,
             side: if is_ask { OrderSide::Sell } else { OrderSide::Buy },

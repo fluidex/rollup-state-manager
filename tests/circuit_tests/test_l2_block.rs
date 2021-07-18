@@ -1,11 +1,11 @@
 use fluidex_common::rust_decimal::Decimal;
-use fluidex_common::{types::FrExt, Fr};
+use fluidex_common::types::{DecimalExt, FrExt};
+use fluidex_common::Fr;
 use rollup_state_manager::account::Account;
 use rollup_state_manager::state::global::GlobalState;
 use rollup_state_manager::state::witness_generator::WitnessGenerator;
 use rollup_state_manager::test_utils::circuit::{CircuitSource, CircuitTestCase, CircuitTestData};
 use rollup_state_manager::test_utils::types::prec_token_id;
-use rollup_state_manager::types::fixnum::{decimal_to_amount, decimal_to_fr};
 use rollup_state_manager::types::l2::{self, DepositTx, L2BlockSerde, L2Key, OrderInput, SpotTradeTx, TransferTx, WithdrawTx};
 use serde_json::json;
 
@@ -83,7 +83,7 @@ impl Block {
                 DepositTx {
                     token_id: token_id0,
                     account_id: account_id0,
-                    amount: decimal_to_amount(&Decimal::new(300, 0), prec_token_id(token_id0)),
+                    amount: Decimal::new(300, 0).to_amount(prec_token_id(token_id0)),
                     l2key: None,
                 },
                 None,
@@ -94,7 +94,7 @@ impl Block {
             account_id0,
             account_id1,
             token_id0,
-            decimal_to_amount(&Decimal::new(100, 0), prec_token_id(token_id0)),
+            Decimal::new(100, 0).to_amount(prec_token_id(token_id0)),
         );
         transfer_tx0.l2key = Some(L2Key {
             eth_addr: account1.eth_addr(),
@@ -110,18 +110,14 @@ impl Block {
             account_id1,
             account_id0,
             token_id0,
-            decimal_to_amount(&Decimal::new(50, 0), prec_token_id(token_id0)),
+            Decimal::new(50, 0).to_amount(prec_token_id(token_id0)),
         );
         transfer_tx1.from_nonce = witgen.get_account_nonce(account_id1);
         let hash = transfer_tx1.hash();
         transfer_tx1.sig = account1.sign_hash(hash).unwrap();
         witgen.transfer(transfer_tx1, None);
 
-        let mut withdraw_tx = WithdrawTx::new(
-            account_id0,
-            token_id0,
-            decimal_to_amount(&Decimal::new(150, 0), prec_token_id(token_id0)),
-        );
+        let mut withdraw_tx = WithdrawTx::new(account_id0, token_id0, Decimal::new(150, 0).to_amount(prec_token_id(token_id0)));
         witgen.fill_withdraw_tx(&mut withdraw_tx);
         let hash = withdraw_tx.hash();
         // hash = common.hashWithdraw(fullWithdrawTx);
@@ -137,7 +133,7 @@ impl Block {
                 DepositTx {
                     account_id: account_id1,
                     token_id: token_id0,
-                    amount: decimal_to_amount(&Decimal::new(199, 0), prec_token_id(token_id0)),
+                    amount: Decimal::new(199, 0).to_amount(prec_token_id(token_id0)),
                     l2key: None,
                 },
                 None,
@@ -148,7 +144,7 @@ impl Block {
                 DepositTx {
                     account_id: account_id2,
                     token_id: token_id1,
-                    amount: decimal_to_amount(&Decimal::new(1990, 0), prec_token_id(token_id1)),
+                    amount: Decimal::new(1990, 0).to_amount(prec_token_id(token_id1)),
                     l2key: Some(L2Key {
                         eth_addr: account2.eth_addr(),
                         sign: account2.sign(),
@@ -165,8 +161,8 @@ impl Block {
             order_id: order_id1,
             token_buy: Fr::from_u32(token_id1),
             token_sell: Fr::from_u32(token_id0),
-            total_buy: decimal_to_fr(&Decimal::new(10000, 0), prec_token_id(token_id1)),
-            total_sell: decimal_to_fr(&Decimal::new(1000, 0), prec_token_id(token_id0)),
+            total_buy: Decimal::new(10000, 0).to_fr(prec_token_id(token_id1)),
+            total_sell: Decimal::new(1000, 0).to_fr(prec_token_id(token_id0)),
             sig: Default::default(),
             account_id: 1,
             side: l2::order::OrderSide::Buy,
@@ -183,8 +179,8 @@ impl Block {
             order_id: order_id2,
             token_buy: Fr::from_u32(token_id0),
             token_sell: Fr::from_u32(token_id1),
-            total_buy: decimal_to_fr(&Decimal::new(1000, 0), prec_token_id(token_id0)),
-            total_sell: decimal_to_fr(&Decimal::new(10000, 0), prec_token_id(token_id1)),
+            total_buy: Decimal::new(1000, 0).to_fr(prec_token_id(token_id0)),
+            total_sell: Decimal::new(10000, 0).to_fr(prec_token_id(token_id1)),
             sig: Default::default(),
             account_id: 2,
             side: l2::order::OrderSide::Buy,
@@ -196,8 +192,8 @@ impl Block {
             order2_account_id: account_id2,
             token_id_1to2: token_id0,
             token_id_2to1: token_id1,
-            amount_1to2: decimal_to_amount(&Decimal::new(amount_1to2, 0), prec_token_id(token_id0)),
-            amount_2to1: decimal_to_amount(&Decimal::new(amount_2to1, 0), prec_token_id(token_id1)),
+            amount_1to2: Decimal::new(amount_1to2, 0).to_amount(prec_token_id(token_id0)),
+            amount_2to1: Decimal::new(amount_2to1, 0).to_amount(prec_token_id(token_id1)),
             order1_id: order_id1,
             order2_id: order_id2,
         };

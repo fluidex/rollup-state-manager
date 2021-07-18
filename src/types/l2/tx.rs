@@ -1,11 +1,11 @@
 use super::order;
 use crate::account::Signature;
-use crate::types::fixnum::Float864;
 use crate::types::merkle_tree::MerklePath;
 use anyhow::bail;
 use anyhow::Result;
 use fluidex_common::ff::Field;
-use fluidex_common::{types::FrExt, Fr};
+use fluidex_common::types::{Float864, FrExt};
+use fluidex_common::Fr;
 use std::convert::TryInto;
 
 #[derive(Copy, Clone)]

@@ -3,11 +3,11 @@ use crate::account::SignatureBJJ;
 use crate::state::WitnessGenerator;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, OrderSide};
-use crate::types::matchengine::messages;
-use crate::types::{fixnum, matchengine};
+use crate::types::matchengine::{self, messages};
 use fluidex_common::babyjubjub_rs;
 use fluidex_common::rust_decimal::Decimal;
-use fluidex_common::{types::FrExt, Fr};
+use fluidex_common::types::{DecimalExt, FrExt};
+use fluidex_common::Fr;
 use num::Zero;
 use std::convert::TryInto;
 
@@ -71,8 +71,8 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
                 token_sell: Fr::from_u32(base_token_id),
                 //filled_sell: fixnum::decimal_to_fr(&origin.finished_base, base_token_id),
                 //filled_buy: fixnum::decimal_to_fr(&origin.finished_quote, quote_token_id),
-                total_sell: fixnum::decimal_to_fr(&origin.amount, base_prec),
-                total_buy: fixnum::decimal_to_fr(&(origin.amount * origin.price), quote_prec),
+                total_sell: origin.amount.to_fr(base_prec),
+                total_buy: (origin.amount * origin.price).to_fr(quote_prec),
                 sig: Some(bytes_to_sig(origin.signature)),
                 account_id: origin.user,
                 side: OrderSide::Sell,
@@ -85,8 +85,8 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
                 token_sell: Fr::from_u32(quote_token_id),
                 //filled_sell: fixnum::decimal_to_fr(&origin.finished_quote, quote_token_id),
                 //filled_buy: fixnum::decimal_to_fr(&origin.finished_base, base_token_id),
-                total_sell: fixnum::decimal_to_fr(&(origin.amount * origin.price), quote_prec),
-                total_buy: fixnum::decimal_to_fr(&origin.amount, base_prec),
+                total_sell: (origin.amount * origin.price).to_fr(quote_prec),
+                total_buy: origin.amount.to_fr(base_prec),
                 sig: Some(bytes_to_sig(origin.signature)),
                 account_id: origin.user,
                 side: OrderSide::Buy,

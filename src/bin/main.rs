@@ -172,7 +172,7 @@ async fn is_present_block(pool: &PgPool, block: &L2Block) -> anyhow::Result<bool
             Ok(true)
         }
         Err(sqlx::Error::RowNotFound) => Ok(false),
-        Err(error) => return Err(error.into()),
+        Err(error) => Err(error.into()),
     }
 }
 
