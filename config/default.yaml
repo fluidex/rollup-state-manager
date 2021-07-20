@@ -1,0 +1,2 @@
+persist_dir: circuits/testdata/persist
+persist_every_n_block: 10000

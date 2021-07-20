@@ -22,9 +22,15 @@ impl Settings {
     /// # panics
     /// if the `CONFIG` env var not exist or the file is corrupt, it panics.
     pub fn init_default() {
-        let mut conf = config_rs::Config::new();
-        let config_file = env::var("CONFIG").unwrap();
-        conf.merge(config_rs::File::with_name(&config_file)).unwrap();
+        // Initializes with `config/default.yaml`.
+        let mut conf = config_rs::Config::default();
+        conf.merge(config_rs::File::with_name("config/default")).unwrap();
+
+        // Merges with `config/RUN_MODE.yaml` (development as default).
+        let run_mode = env::var("RUN_MODE").unwrap_or_else(|_| "development".into());
+        conf.merge(config_rs::File::with_name(&format!("config/{}", run_mode)).required(false))
+            .unwrap();
+
         Self::set(conf.try_into().unwrap());
     }
 
