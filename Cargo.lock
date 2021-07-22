@@ -1076,7 +1076,7 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 [[package]]
 name = "fluidex-common"
 version = "0.1.0"
-source = "git+https://github.com/Fluidex/common-rs?branch=dev#edfdfbf0d252cb9e07d7c83691415dd6de47a64a"
+source = "git+https://github.com/Fluidex/common-rs?branch=master#f653d4ad11a9e35c6a6abce6915e9fe655e6485b"
 dependencies = [
  "babyjubjub-rs",
  "ff_ce",
@@ -1090,6 +1090,7 @@ dependencies = [
  "poseidon-rs",
  "rdkafka",
  "rust_decimal",
+ "rust_decimal_macros",
  "serde 1.0.126",
  "serde_json",
  "thiserror",
@@ -2674,6 +2675,16 @@ dependencies = [
  "num-traits 0.2.14",
  "serde 1.0.126",
  "serde_json",
+]
+
+[[package]]
+name = "rust_decimal_macros"
+version = "1.14.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a776fe1e773e2e599d7813414ca7dd1f78b7e0fa699ecbefbfd24b5584df6819"
+dependencies = [
+ "quote",
+ "rust_decimal",
 ]
 
 [[package]]
