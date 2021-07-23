@@ -624,6 +624,7 @@ impl WitnessGenerator {
         blocks
     }
 
+    #[cfg(feature = "persist_sled")]
     fn persist(&mut self, i: usize) {
         log::info!("start to dump #{}", self.block_generate_num);
         let start = Instant::now();
