@@ -16,10 +16,9 @@ use std::time::Instant;
 use super::msg_utils::{check_state, exchange_order_to_rollup_order, TokenIdPair, TokenPair};
 
 pub struct Processor {
-    trade_tx_total_time: f32,
-    balance_tx_total_time: f32,
-    enable_check_order_sig: bool,
-    enable_handle_order: bool,
+    pub trade_tx_total_time: f32,
+    pub balance_tx_total_time: f32,
+    pub enable_check_order_sig: bool,
 }
 
 impl Default for Processor {
@@ -28,7 +27,6 @@ impl Default for Processor {
             trade_tx_total_time: 0.0,
             balance_tx_total_time: 0.0,
             enable_check_order_sig: true,
-            enable_handle_order: false,
         }
     }
 }
@@ -36,6 +34,7 @@ impl Default for Processor {
 impl Processor {
     pub fn handle_user_msg(&mut self, witgen: &mut WitnessGenerator, message: messages::Message<messages::UserMessage>) {
         let (user_info, offset) = message.into_parts();
+        //println!("handle_user_msg {:#?}", user_info);
         let account_id = user_info.user_id;
         assert!(!witgen.has_account(account_id));
         let l2_pubkey: String = user_info.l2_pubkey;
@@ -64,8 +63,8 @@ impl Processor {
             .unwrap();
     }
     pub fn handle_balance_msg(&mut self, witgen: &mut WitnessGenerator, message: messages::Message<messages::BalanceMessage>) {
-        //log::debug!("handle_balance_msg {:#?}", deposit);
         let (deposit, offset) = message.into_parts();
+        //println!("handle_balance_msg {:#?}", deposit);
         assert!(!deposit.change.is_sign_negative(), "only support deposit now");
         let token_id = get_token_id_by_name(&deposit.asset);
         let account_id = deposit.user_id;

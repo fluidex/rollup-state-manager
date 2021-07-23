@@ -15,6 +15,7 @@ use fluidex_common::Fr;
 use rayon::prelude::*;
 #[cfg(feature = "persist_sled")]
 use serde::Serialize;
+#[cfg(feature = "persist_sled")]
 use sled::transaction::ConflictableTransactionError;
 #[cfg(feature = "persist_sled")]
 use sled::transaction::{TransactionError, Transactional, TransactionalTree};
@@ -68,6 +69,7 @@ enum GlobalStateInternalError {
     NotFound,
 }
 
+#[cfg(feature = "persist_sled")]
 impl From<GlobalStateInternalError> for ConflictableTransactionError<GlobalStateError> {
     fn from(e: GlobalStateInternalError) -> Self {
         use GlobalStateInternalError::*;
@@ -79,6 +81,7 @@ impl From<GlobalStateInternalError> for ConflictableTransactionError<GlobalState
     }
 }
 
+#[cfg(feature = "persist_sled")]
 impl From<TransactionError<GlobalStateError>> for GlobalStateError {
     fn from(e: TransactionError<GlobalStateError>) -> Self {
         use TransactionError::*;
