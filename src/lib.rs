@@ -9,6 +9,7 @@ pub mod account;
 pub mod config;
 pub mod r#const;
 pub mod db;
+pub mod grpc;
 pub mod msg;
 pub mod params;
 pub mod state;

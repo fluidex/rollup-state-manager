@@ -14,11 +14,12 @@ use anyhow::{anyhow, bail};
 use fluidex_common::babyjubjub_rs::{self, Point};
 use fluidex_common::ff::Field;
 use fluidex_common::{types::FrExt, Fr};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Instant;
 
 // TODO: too many unwrap here
 pub struct WitnessGenerator {
-    state: GlobalState,
+    state: Arc<RwLock<GlobalState>>,
     n_tx: usize,
     // 0 <= len(buffered_txs) < n_tx
     buffered_txs: Vec<RawTx>,
@@ -32,7 +33,7 @@ impl WitnessGenerator {
     pub fn print_config() {
         Tree::print_config();
     }
-    pub fn new(state: GlobalState, n_tx: usize, block_offset: Option<usize>, verbose: bool) -> Self {
+    pub fn new(state: Arc<RwLock<GlobalState>>, n_tx: usize, block_offset: Option<usize>, verbose: bool) -> Self {
         Self {
             state,
             n_tx,
@@ -46,43 +47,43 @@ impl WitnessGenerator {
 
     /////////////////// forward method call to self.state //////////////////////////////////
     pub fn root(&self) -> Fr {
-        self.state.root()
+        self.state().root()
     }
     pub fn has_order(&self, account_id: u32, order_id: u32) -> bool {
-        self.state.has_order(account_id, order_id)
+        self.state().has_order(account_id, order_id)
     }
     pub fn has_account(&self, account_id: u32) -> bool {
-        self.state.has_account(account_id)
+        self.state().has_account(account_id)
     }
     pub fn cancel_order(&mut self, account_id: u32, order_id: u32) {
-        self.state.cancel_order(account_id, order_id)
+        self.mut_state().cancel_order(account_id, order_id)
     }
     pub fn get_token_balance(&self, account_id: u32, token_id: u32) -> Fr {
-        self.state.get_token_balance(account_id, token_id)
+        self.state().get_token_balance(account_id, token_id)
     }
     //pub fn update_order_state(&mut self, account_id: u32, order: Order) {
     //    self.state.update_order_state(account_id, order)
     //}
     pub fn create_new_account(&mut self, next_order_id: u32) -> anyhow::Result<u32> {
-        self.state.create_new_account(next_order_id)
+        self.mut_state().create_new_account(next_order_id)
     }
     pub fn get_account_order_by_id(&self, account_id: u32, order_id: u32) -> Order {
-        self.state.get_account_order_by_id(account_id, order_id)
+        self.state().get_account_order_by_id(account_id, order_id)
     }
     pub fn set_account_l2_addr(&mut self, account_id: u32, sign: Fr, ay: Fr, eth_addr: Fr) {
-        self.state.set_account_l2_addr(account_id, sign, ay, eth_addr);
+        self.mut_state().set_account_l2_addr(account_id, sign, ay, eth_addr);
     }
     pub fn set_account_nonce(&mut self, account_id: u32, nonce: Fr) {
-        self.state.set_account_nonce(account_id, nonce);
+        self.mut_state().set_account_nonce(account_id, nonce);
     }
     pub fn get_account_nonce(&self, account_id: u32) -> Fr {
-        self.state.get_account_nonce(account_id)
+        self.state().get_account_nonce(account_id)
     }
     pub fn set_account_order(&mut self, account_id: u32, order_pos: u32, order: Order) {
-        self.state.set_account_order(account_id, order_pos, order);
+        self.mut_state().set_account_order(account_id, order_pos, order);
     }
     pub fn set_token_balance(&mut self, account_id: u32, token_id: u32, balance: Fr) {
-        self.state.set_token_balance(account_id, token_id, balance);
+        self.mut_state().set_token_balance(account_id, token_id, balance);
     }
 
     pub fn forge_with_txs(block_id: usize, buffered_txs: &[RawTx]) -> L2Block {
@@ -134,17 +135,18 @@ impl WitnessGenerator {
         self.block_generate_num
     }
     pub fn deposit(&mut self, tx: DepositTx, offset: Option<i64>) -> anyhow::Result<()> {
+        let mut state = self.mut_state();
         let deposit_to_new = tx.l2key.is_some();
-        if deposit_to_new && self.has_account(tx.account_id) {
+        if deposit_to_new && state.has_account(tx.account_id) {
             bail!("deposit to new, but account already existed");
         }
-        if !deposit_to_new && !self.has_account(tx.account_id) {
+        if !deposit_to_new && !state.has_account(tx.account_id) {
             bail!("deposit to old, but account not existed");
         }
-        //assert!(self.accounts.get(tx.account_id).eth_addr != 0n, "deposit_to_old");
-        let proof = self.state.balance_full_proof(tx.account_id, tx.token_id);
-        let acc = self.state.get_account(tx.account_id);
-        let old_balance = self.state.get_token_balance(tx.account_id, tx.token_id);
+        // assert!(state.accounts.get(tx.account_id).eth_addr != 0n, "deposit_to_old");
+        let proof = state.balance_full_proof(tx.account_id, tx.token_id);
+        let acc = state.get_account(tx.account_id);
+        let old_balance = state.get_token_balance(tx.account_id, tx.token_id);
         let nonce = acc.nonce;
 
         let mut encoded_tx = [Fr::zero(); TX_LENGTH];
@@ -184,8 +186,8 @@ impl WitnessGenerator {
             balance_path1: proof.balance_path.clone(),
             balance_path2: proof.balance_path.clone(),
             balance_path3: proof.balance_path,
-            order_path0: self.state.trivial_order_path_elements(),
-            order_path1: self.state.trivial_order_path_elements(),
+            order_path0: state.trivial_order_path_elements(),
+            order_path1: state.trivial_order_path_elements(),
             order_root0: acc.order_root,
             order_root1: acc.order_root,
             account_path0: proof.account_path.clone(),
@@ -197,34 +199,39 @@ impl WitnessGenerator {
 
         let mut balance = old_balance;
         balance.add_assign(&tx.amount.to_fr());
-        self.state.set_token_balance(tx.account_id, tx.token_id, balance);
+        state.set_token_balance(tx.account_id, tx.token_id, balance);
         if deposit_to_new {
             let l2key = tx.l2key.clone().unwrap();
-            self.state.set_account_l2_addr(tx.account_id, l2key.sign, l2key.ay, l2key.eth_addr);
+            state.set_account_l2_addr(tx.account_id, l2key.sign, l2key.ay, l2key.eth_addr);
         }
 
-        raw_tx.root_after = self.state.root();
+        let new_root = state.root();
+        drop(state);
+        log::debug!("finish deposit tx {:?} new root {}", tx, new_root);
+        raw_tx.root_after = new_root;
+
         self.add_raw_tx(raw_tx);
-        log::debug!("finish deposit tx {:?} new root {}", tx, self.state.root());
         Ok(())
     }
     pub fn fill_withdraw_tx(&self, tx: &mut WithdrawTx) {
-        tx.nonce = self.state.get_account(tx.account_id).nonce;
-        tx.old_balance = self.get_token_balance(tx.account_id, tx.token_id);
+        let state = self.state();
+        tx.nonce = state.get_account(tx.account_id).nonce;
+        tx.old_balance = state.get_token_balance(tx.account_id, tx.token_id);
     }
     pub fn transfer(&mut self, tx: TransferTx, offset: Option<i64>) {
-        if !self.state.has_account(tx.from) {
+        let mut state = self.mut_state();
+        if !state.has_account(tx.from) {
             panic!("invalid account {:?}", tx);
         }
 
         let transfer_to_new = tx.l2key.is_some();
-        let proof_from = self.state.balance_full_proof(tx.from, tx.token_id);
-        let from_account = self.state.get_account(tx.from);
+        let proof_from = state.balance_full_proof(tx.from, tx.token_id);
+        let from_account = state.get_account(tx.from);
         // when transfer_to_new, `to_account` will be an empty account
-        let to_account = self.state.get_account(tx.to);
+        let to_account = state.get_account(tx.to);
 
-        let from_old_balance = self.get_token_balance(tx.from, tx.token_id);
-        let to_old_balance = self.get_token_balance(tx.to, tx.token_id);
+        let from_old_balance = state.get_token_balance(tx.from, tx.token_id);
+        let to_old_balance = state.get_token_balance(tx.to, tx.token_id);
         assert!(from_old_balance > tx.amount.to_fr(), "Transfer balance not enough");
         let from_new_balance = from_old_balance.sub(&tx.amount.to_fr());
         let to_new_balance = to_old_balance.add(&tx.amount.to_fr());
@@ -263,14 +270,14 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::ENABLE_SIG_CHECK1] = Fr::one();
         encoded_tx[tx_detail_idx::DST_IS_NEW] = if transfer_to_new { Fr::one() } else { Fr::zero() };
 
-        self.set_token_balance(tx.from, tx.token_id, from_new_balance);
-        self.state.increase_nonce(tx.from);
+        state.set_token_balance(tx.from, tx.token_id, from_new_balance);
+        state.increase_nonce(tx.from);
 
-        let proof_to = self.state.balance_full_proof(tx.to, tx.token_id);
-        self.set_token_balance(tx.to, tx.token_id, to_new_balance);
+        let proof_to = state.balance_full_proof(tx.to, tx.token_id);
+        state.set_token_balance(tx.to, tx.token_id, to_new_balance);
         if transfer_to_new {
             let l2key = tx.l2key.unwrap();
-            self.state.set_account_l2_addr(tx.to, l2key.sign, l2key.ay, l2key.eth_addr);
+            state.set_account_l2_addr(tx.to, l2key.sign, l2key.ay, l2key.eth_addr);
         }
 
         let raw_tx = RawTx {
@@ -280,27 +287,29 @@ impl WitnessGenerator {
             balance_path1: proof_to.balance_path.clone(),
             balance_path2: proof_from.balance_path,
             balance_path3: proof_to.balance_path,
-            order_path0: self.state.trivial_order_path_elements(),
-            order_path1: self.state.trivial_order_path_elements(),
+            order_path0: state.trivial_order_path_elements(),
+            order_path1: state.trivial_order_path_elements(),
             order_root0: from_account.order_root,
             order_root1: to_account.order_root,
             account_path0: proof_from.account_path,
             account_path1: proof_to.account_path,
             root_before: proof_from.root,
-            root_after: self.root(),
+            root_after: state.root(),
             offset,
         };
 
+        drop(state);
         self.add_raw_tx(raw_tx);
     }
     pub fn withdraw(&mut self, tx: WithdrawTx, offset: Option<i64>) {
         // assert(this.accounts.get(tx.accountID).ethAddr != 0n, 'Withdraw');
         let account_id = tx.account_id;
         let token_id = tx.token_id;
-        let proof = self.state.balance_full_proof(account_id, token_id);
+        let mut state = self.mut_state();
+        let proof = state.balance_full_proof(account_id, token_id);
 
-        let acc = self.state.get_account(account_id);
-        let old_balance = self.get_token_balance(account_id, token_id);
+        let acc = state.get_account(account_id);
+        let old_balance = state.get_token_balance(account_id, token_id);
         let new_balance = old_balance.sub(&tx.amount.to_fr());
         let nonce = acc.nonce;
         // assert(oldBalance > tx.amount, 'Withdraw balance');
@@ -342,8 +351,8 @@ impl WitnessGenerator {
             balance_path1: proof.balance_path.clone(),
             balance_path2: proof.balance_path.clone(),
             balance_path3: proof.balance_path,
-            order_path0: self.state.trivial_order_path_elements(),
-            order_path1: self.state.trivial_order_path_elements(),
+            order_path0: state.trivial_order_path_elements(),
+            order_path1: state.trivial_order_path_elements(),
             order_root0: acc.order_root,
             order_root1: acc.order_root,
             account_path0: proof.account_path.clone(),
@@ -353,10 +362,11 @@ impl WitnessGenerator {
             offset,
         };
 
-        self.state.set_token_balance(account_id, token_id, new_balance);
-        self.state.increase_nonce(account_id);
+        state.set_token_balance(account_id, token_id, new_balance);
+        state.increase_nonce(account_id);
+        raw_tx.root_after = state.root();
+        drop(state);
 
-        raw_tx.root_after = self.state.root();
         self.add_raw_tx(raw_tx);
     }
 
@@ -374,49 +384,50 @@ impl WitnessGenerator {
         if acc_id1 == acc_id2 {
             panic!("self trade no allowed");
         }
-        assert!(self.state.has_account(acc_id1));
-        assert!(self.state.has_account(acc_id2));
+        let mut state = self.mut_state();
+        assert!(state.has_account(acc_id1));
+        assert!(state.has_account(acc_id2));
 
         // Step2: retrive old state first for later use
 
-        let old_root = self.state.root();
-        let proof_order1_seller = self.state.balance_full_proof(acc_id1, trade.token_id_1to2);
-        let proof_order2_seller = self.state.balance_full_proof(acc_id2, trade.token_id_2to1);
+        let old_root = state.root();
+        let proof_order1_seller = state.balance_full_proof(acc_id1, trade.token_id_1to2);
+        let proof_order2_seller = state.balance_full_proof(acc_id2, trade.token_id_2to1);
 
-        let account1 = self.state.get_account(acc_id1);
+        let account1 = state.get_account(acc_id1);
         let order_root0 = account1.order_root;
-        let account2 = self.state.get_account(acc_id2);
+        let account2 = state.get_account(acc_id2);
 
         // Step3: handle new order
         let mut order1 = if let Some(maker_order) = full_tx.maker_order {
             // new order
-            assert!(!self.has_order(maker_order.account_id, maker_order.order_id));
+            assert!(!state.has_order(maker_order.account_id, maker_order.order_id));
             assert_eq!(maker_order.filled_buy, Fr::zero());
             assert_eq!(maker_order.filled_sell, Fr::zero());
-            //self.state.update_order_state(maker_order.account_id, maker_order);
+            // state.update_order_state(maker_order.account_id, maker_order);
             maker_order
         } else {
             // order1 means maker, order2 means taker
-            assert!(self.state.has_order(acc_id1, trade.order1_id), "unknown order1 {}", trade.order1_id);
-            self.state.get_account_order_by_id(acc_id1, trade.order1_id)
+            assert!(state.has_order(acc_id1, trade.order1_id), "unknown order1 {}", trade.order1_id);
+            state.get_account_order_by_id(acc_id1, trade.order1_id)
         };
 
         let mut order2 = if let Some(taker_order) = full_tx.taker_order {
             // new order
-            assert!(!self.has_order(taker_order.account_id, taker_order.order_id));
+            assert!(!state.has_order(taker_order.account_id, taker_order.order_id));
             assert_eq!(taker_order.filled_buy, Fr::zero());
             assert_eq!(taker_order.filled_sell, Fr::zero());
-            //self.state.update_order_state(taker_order.account_id, taker_order);
+            // state.update_order_state(taker_order.account_id, taker_order);
             taker_order
         } else {
-            assert!(self.state.has_order(acc_id2, trade.order2_id), "unknown order2 {}", trade.order2_id);
-            self.state.get_account_order_by_id(acc_id2, trade.order2_id)
+            assert!(state.has_order(acc_id2, trade.order2_id), "unknown order2 {}", trade.order2_id);
+            state.get_account_order_by_id(acc_id2, trade.order2_id)
         };
 
         // old_order1 is same as old_order1_in_tree when case3
         // not same when case1 and case2
-        let (order1_pos, old_order1_in_tree) = self.state.find_or_insert_order(acc_id1, &order1);
-        let (order2_pos, old_order2_in_tree) = self.state.find_or_insert_order(acc_id2, &order2);
+        let (order1_pos, old_order1_in_tree) = state.find_or_insert_order(acc_id1, &order1);
+        let (order2_pos, old_order2_in_tree) = state.find_or_insert_order(acc_id2, &order2);
 
         // first, generate the tx
 
@@ -462,16 +473,16 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::ORDER1_POS] = Fr::from_u32(order1_pos);
         encoded_tx[tx_detail_idx::ORDER2_POS] = Fr::from_u32(order2_pos);
 
-        let acc1_balance_sell = self.state.get_token_balance(acc_id1, trade.token_id_1to2);
+        let acc1_balance_sell = state.get_token_balance(acc_id1, trade.token_id_1to2);
         assert!(acc1_balance_sell > trade.amount_1to2.to_fr(), "balance_1to2");
         let acc1_balance_sell_new = acc1_balance_sell.sub(&trade.amount_1to2.to_fr());
-        let acc1_balance_buy = self.state.get_token_balance(acc_id1, trade.token_id_2to1);
+        let acc1_balance_buy = state.get_token_balance(acc_id1, trade.token_id_2to1);
         let acc1_balance_buy_new = acc1_balance_buy.add(&trade.amount_2to1.to_fr());
 
-        let acc2_balance_sell = self.state.get_token_balance(acc_id2, trade.token_id_2to1);
+        let acc2_balance_sell = state.get_token_balance(acc_id2, trade.token_id_2to1);
         assert!(acc2_balance_sell > trade.amount_2to1.to_fr(), "balance_2to1");
         let acc2_balance_sell_new = acc2_balance_sell.sub(&trade.amount_2to1.to_fr());
-        let acc2_balance_buy = self.state.get_token_balance(acc_id2, trade.token_id_1to2);
+        let acc2_balance_buy = state.get_token_balance(acc_id2, trade.token_id_1to2);
         let acc2_balance_buy_new = acc2_balance_buy.add(&trade.amount_1to2.to_fr());
 
         encoded_tx[tx_detail_idx::BALANCE1] = acc1_balance_sell;
@@ -491,8 +502,8 @@ impl WitnessGenerator {
             balance_path1: Default::default(),
             balance_path2: proof_order2_seller.balance_path,
             balance_path3: Default::default(),
-            order_path0: self.state.order_proof(acc_id1, order1_pos).path_elements,
-            order_path1: self.state.order_proof(acc_id2, order2_pos).path_elements,
+            order_path0: state.order_proof(acc_id1, order1_pos).path_elements,
+            order_path1: state.order_proof(acc_id2, order2_pos).path_elements,
             order_root0,
             order_root1: Default::default(),
             account_path0: proof_order1_seller.account_path,
@@ -503,9 +514,9 @@ impl WitnessGenerator {
         };
 
         order1.trade_with(&trade.amount_1to2.to_fr(), &trade.amount_2to1.to_fr());
-        self.state.update_order_state(acc_id1, order1_pos, order1);
+        state.update_order_state(acc_id1, order1_pos, order1);
         order2.trade_with(&trade.amount_2to1.to_fr(), &trade.amount_1to2.to_fr());
-        self.state.update_order_state(acc_id2, order2_pos, order2);
+        state.update_order_state(acc_id2, order2_pos, order2);
 
         let acc1_updates = AccountUpdates {
             account_id: acc_id1,
@@ -523,12 +534,12 @@ impl WitnessGenerator {
             ],
             order_updates: vec![(order2_pos, order2.hash())],
         };
-        self.state.batch_update(vec![acc1_updates, acc2_updates], true);
+        state.batch_update(vec![acc1_updates, acc2_updates], true);
 
-        raw_tx.balance_path3 = self.state.balance_proof(acc_id1, trade.token_id_2to1).path_elements;
-        raw_tx.balance_path1 = self.state.balance_proof(acc_id2, trade.token_id_1to2).path_elements;
-        raw_tx.account_path1 = self.state.account_proof(acc_id2).path_elements;
-        raw_tx.order_root1 = self.state.get_account(acc_id2).order_root;
+        raw_tx.balance_path3 = state.balance_proof(acc_id1, trade.token_id_2to1).path_elements;
+        raw_tx.balance_path1 = state.balance_proof(acc_id2, trade.token_id_1to2).path_elements;
+        raw_tx.account_path1 = state.account_proof(acc_id2).path_elements;
+        raw_tx.order_root1 = state.get_account(acc_id2).order_root;
 
         encoded_tx[tx_detail_idx::NEW_ORDER1_ID] = Fr::from_u32(order1.order_id);
         encoded_tx[tx_detail_idx::NEW_ORDER1_TOKEN_SELL] = order1.token_sell;
@@ -551,13 +562,15 @@ impl WitnessGenerator {
         encoded_tx[tx_detail_idx::TOKEN_ID2] = order2.token_buy;
 
         raw_tx.payload = encoded_tx.to_vec();
-        raw_tx.root_after = self.state.root();
+        raw_tx.root_after = state.root();
+        drop(state);
         self.add_raw_tx(raw_tx);
     }
 
     pub fn nop(&mut self) {
         // assume we already have initialized the account tree and the balance tree
-        let trivial_proof = self.state.trivial_state_proof();
+        let state = self.state();
+        let trivial_proof = state.trivial_state_proof();
         let encoded_tx = [Fr::zero(); TX_LENGTH];
         let raw_tx = RawTx {
             tx_type: TxType::Nop,
@@ -566,16 +579,17 @@ impl WitnessGenerator {
             balance_path1: trivial_proof.balance_path.clone(),
             balance_path2: trivial_proof.balance_path.clone(),
             balance_path3: trivial_proof.balance_path,
-            order_path0: self.state.trivial_order_path_elements(),
-            order_path1: self.state.trivial_order_path_elements(),
+            order_path0: state.trivial_order_path_elements(),
+            order_path1: state.trivial_order_path_elements(),
             order_root0: Fr::zero(),
             order_root1: Fr::zero(),
             account_path0: trivial_proof.account_path.clone(),
             account_path1: trivial_proof.account_path,
-            root_before: self.state.root(),
-            root_after: self.state.root(),
+            root_before: state.root(),
+            root_after: state.root(),
             offset: None,
         };
+        drop(state);
         self.add_raw_tx(raw_tx);
     }
 
@@ -589,10 +603,11 @@ impl WitnessGenerator {
     }
 
     pub fn check_sig(&self, account_id: u32, msg: &Fr, sig: &SignatureBJJ) -> anyhow::Result<()> {
-        if !self.state.has_account(account_id) {
+        let state = self.state();
+        if !state.has_account(account_id) {
             bail!("account not found");
         }
-        let acc = self.state.get_account(account_id);
+        let acc = state.get_account(account_id);
         // TODO: it is stupid to recover point every time...
         let pk = babyjubjub_rs::recover_point(acc.ay.to_bigint(), acc.sign != Fr::zero());
         let pub_key: Point = pk.map_err(|e| anyhow!(e))?;
@@ -653,7 +668,15 @@ impl WitnessGenerator {
 
     #[cfg(feature = "persist_sled")]
     pub fn dump_to_sled(&self, db: &sled::Db) -> Result<(), super::global::GlobalStateError> {
-        self.state.persist(db)?;
+        self.state().persist(db)?;
         Ok(())
+    }
+
+    fn state(&self) -> RwLockReadGuard<'_, GlobalState> {
+        self.state.read().unwrap()
+    }
+
+    fn mut_state(&self) -> RwLockWriteGuard<'_, GlobalState> {
+        self.state.write().unwrap()
     }
 }

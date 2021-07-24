@@ -3,6 +3,7 @@
 
 use crossbeam_channel::RecvTimeoutError;
 use rollup_state_manager::config::Settings;
+use rollup_state_manager::grpc::run_grpc_server;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
 use rollup_state_manager::params;
 use rollup_state_manager::r#const::sled_db::*;
@@ -12,6 +13,7 @@ use rollup_state_manager::types::l2::{L2Block, L2BlockSerde};
 use sqlx::postgres::PgPool;
 use sqlx::Row;
 use std::option::Option::None;
+use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::{fs, io};
 
@@ -38,20 +40,22 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+fn grpc_run(state: Arc<RwLock<GlobalState>>) -> Option<std::thread::JoinHandle<anyhow::Result<()>>> {
+    Some(std::thread::spawn(move || {
+        let addr = Settings::grpc_addr().parse()?;
+        run_grpc_server(addr, state)
+    }))
+}
+
 fn replay_msgs(
     msg_receiver: crossbeam_channel::Receiver<WrappedMessage>,
     block_sender: crossbeam_channel::Sender<L2Block>,
+    state: Arc<RwLock<GlobalState>>,
     db: Option<sled::Db>,
 ) -> Option<std::thread::JoinHandle<anyhow::Result<()>>> {
     Some(std::thread::spawn(move || {
-        let mut state = GlobalState::new(
-            *params::BALANCELEVELS,
-            *params::ORDERLEVELS,
-            *params::ACCOUNTLEVELS,
-            *params::VERBOSE,
-        );
         let block_offset: Option<usize> = if let Some(db) = db {
-            state.load_persist(&db).unwrap();
+            state.write().unwrap().load_persist(&db).unwrap();
             db.get(BLOCK_OFFSET_KEY).ok().flatten().and_then(|v| bincode::deserialize(&v).ok())
         } else {
             None
@@ -115,11 +119,19 @@ fn replay_msgs(
 }
 
 async fn run(offset: Option<i64>, db: Option<sled::Db>) {
+    let state = Arc::new(RwLock::new(GlobalState::new(
+        *params::BALANCELEVELS,
+        *params::ORDERLEVELS,
+        *params::ACCOUNTLEVELS,
+        *params::VERBOSE,
+    )));
+
     let (msg_sender, msg_receiver) = crossbeam_channel::unbounded();
     let (blk_sender, blk_receiver) = crossbeam_channel::unbounded();
 
     let loader_thread = msg_loader::load_msgs_from_mq(Settings::brokers(), offset, msg_sender);
-    let replay_thread = replay_msgs(msg_receiver, blk_sender, db);
+    let replay_thread = replay_msgs(msg_receiver, blk_sender, Arc::clone(&state), db);
+    let server_thread = grpc_run(state);
 
     let prover_cluster_db_pool = PgPool::connect(Settings::prover_cluster_db()).await.unwrap();
     let rollup_state_manager_db_pool = PgPool::connect(Settings::rollup_state_manager_db()).await.unwrap();
@@ -143,6 +155,7 @@ async fn run(offset: Option<i64>, db: Option<sled::Db>) {
 
     loader_thread.map(|h| h.join().expect("loader thread failed"));
     replay_thread.map(|h| h.join().expect("loader thread failed"));
+    server_thread.map(|h| h.join().expect("loader thread failed"));
 }
 
 // Returns true if already present in DB, otherwise false.
