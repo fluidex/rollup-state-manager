@@ -28,7 +28,7 @@ impl Controller {
 
         Ok(TokenBalanceQueryResponse {
             balance: balance.to_decimal(precision).to_string(),
-            balance_raw: balance.to_string(),
+            balance_raw: balance.to_decimal_string(),
             precision,
         })
     }
