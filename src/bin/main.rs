@@ -3,6 +3,7 @@
 
 use crossbeam_channel::RecvTimeoutError;
 use rollup_state_manager::config::Settings;
+use rollup_state_manager::db::MIGRATOR;
 use rollup_state_manager::grpc::run_grpc_server;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
 use rollup_state_manager::params;
@@ -133,8 +134,16 @@ async fn run(offset: Option<i64>, db: Option<sled::Db>) {
     let replay_thread = replay_msgs(msg_receiver, blk_sender, Arc::clone(&state), db);
     let server_thread = grpc_run(state);
 
-    let prover_cluster_db_pool = PgPool::connect(Settings::prover_cluster_db()).await.unwrap();
+    // TODO: It should be better to integrate prover-cluster DB migrations with CI.
+    let prover_cluster_db_pool = if dotenv::var("CI").map_or_else(|_| false, |v| v.parse().unwrap()) {
+        None
+    } else {
+        Some(PgPool::connect(Settings::prover_cluster_db()).await.unwrap())
+    };
+
     let rollup_state_manager_db_pool = PgPool::connect(Settings::rollup_state_manager_db()).await.unwrap();
+    MIGRATOR.run(&rollup_state_manager_db_pool).await.ok();
+
     let mut check_old_block = true;
     for block in blk_receiver.iter() {
         if check_old_block {
@@ -150,7 +159,9 @@ async fn run(offset: Option<i64>, db: Option<sled::Db>) {
         save_block_to_rollup_state_manager_db(&rollup_state_manager_db_pool, &block)
             .await
             .unwrap();
-        save_task_to_prover_cluster_db(&prover_cluster_db_pool, block).await.unwrap();
+        if let Some(db_pool) = &prover_cluster_db_pool {
+            save_task_to_prover_cluster_db(db_pool, block).await.unwrap();
+        }
     }
 
     loader_thread.map(|h| h.join().expect("loader thread failed"));

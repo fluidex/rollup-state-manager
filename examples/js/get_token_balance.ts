@@ -1,4 +1,4 @@
-import { grpcClient } from "./client";
+import { grpcClient } from "./grpc_client";
 import { kafkaProducer } from "./kafka_producer";
 import { sleep } from "./util";
 import { strict as assert } from "assert";
