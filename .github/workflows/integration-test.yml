@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - prod
+      - release/*
+  pull_request:
+    branches:
+      - master
+      - prod
+      - release/*
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        rust:
+          - 1.53.0
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Cache cargo registry
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo target
+        uses: actions/cache@v2
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install libpq
+        run: sudo apt-get install libpq-dev
+
+      - name: Install rust 1.53.0 toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: 1.53.0
+          override: true
+          components: rustfmt, clippy
+
+      - name: Install Node.js 14
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: NPM install
+        run: |
+          cd ./examples/js/
+          npm install
+
+      - name: Up docker-compose
+        run: docker-compose --file "./docker/docker-compose-ci.yaml" up --detach # db zookeeper kafka
+
+      # 1. we build the binary after starting docker-compose, to ensure time for running services in docker-compose
+      # 2. we avoid nohup cargo run directly, to make sure server is running before starting tests
+      - name: Run "cargo build"
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --
+
+      - name: Start server daemon
+        run: make startall
+
+      - name: Check services status
+        run: |
+          sleep 5
+          make taillogs
+          docker-compose --file "./docker/docker-compose-ci.yaml" logs --tail=20
+
+      - name: Run tests
+        run: |
+          cd ./examples/js/
+          npx ts-node get_token_balance.ts

@@ -11,6 +11,7 @@ use serde_json::json;
 
 use rollup_state_manager::params;
 use std::option::Option::None;
+use std::sync::{Arc, RwLock};
 
 pub struct Block {
     n_txs: usize,
@@ -53,7 +54,12 @@ impl Block {
         keypair of account1 is created by transfer_to_new
         keypair of account2 is created by deposit_to_new
         */
-        let state = GlobalState::new(self.balance_levels, self.order_levels, self.account_levels, self.verbose);
+        let state = Arc::new(RwLock::new(GlobalState::new(
+            self.balance_levels,
+            self.order_levels,
+            self.account_levels,
+            self.verbose,
+        )));
         let (sender, receiver) = crossbeam_channel::bounded(100);
         let mut witgen = WitnessGenerator::new(state, self.n_txs, None, self.verbose);
 
@@ -224,7 +230,12 @@ impl Block {
     }
 
     fn empty_block_case(&self) -> CircuitTestData {
-        let state = GlobalState::new(self.balance_levels, self.order_levels, self.account_levels, self.verbose);
+        let state = Arc::new(RwLock::new(GlobalState::new(
+            self.balance_levels,
+            self.order_levels,
+            self.account_levels,
+            self.verbose,
+        )));
         let (sender, receiver) = crossbeam_channel::bounded(100);
         let mut witgen = WitnessGenerator::new(state, self.n_txs, None, self.verbose);
         // we need to have at least 1 account

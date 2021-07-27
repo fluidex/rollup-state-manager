@@ -10,6 +10,7 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 use rollup_state_manager::msg::msg_processor;
@@ -30,12 +31,12 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     println!("prepare bench: {} records", messages.len());
 
     GlobalState::print_config();
-    let state = GlobalState::new(
+    let state = Arc::new(RwLock::new(GlobalState::new(
         *params::BALANCELEVELS,
         *params::ORDERLEVELS,
         *params::ACCOUNTLEVELS,
         *params::VERBOSE,
-    );
+    )));
 
     //amplify the records: in each iter we run records on a group of new accounts
     let mut processor = msg_processor::Processor {

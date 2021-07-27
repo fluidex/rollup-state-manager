@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package rollup_state;
+
+import "google/api/annotations.proto";
+
+service RollupState {
+  rpc TokenBalanceQuery(TokenBalanceQueryRequest) returns (TokenBalanceQueryResponse) {
+    option (google.api.http) = {
+      post : "/api/token_balance/{account_id}/{token_id}"
+      body : "*"
+    };
+  }
+}
+
+message TokenBalanceQueryRequest {
+  uint32 account_id = 1;
+  uint32 token_id = 2;
+  string token_address = 3;
+  string token_name = 4;
+}
+
+message TokenBalanceQueryResponse {
+    string balance = 1;
+    string balance_raw = 2;
+    uint32 precision = 3;
+}
