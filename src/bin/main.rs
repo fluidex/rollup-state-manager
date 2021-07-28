@@ -2,8 +2,8 @@
 #![allow(dead_code)]
 
 use crossbeam_channel::RecvTimeoutError;
+use fluidex_common::db::MIGRATOR;
 use rollup_state_manager::config::Settings;
-use rollup_state_manager::db::MIGRATOR;
 use rollup_state_manager::grpc::run_grpc_server;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
 use rollup_state_manager::params;
