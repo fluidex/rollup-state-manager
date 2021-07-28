@@ -1,4 +1,4 @@
-use rollup_state_manager::db::{ConnectionType, MIGRATOR};
+use fluidex_common::db::{ConnectionType, MIGRATOR};
 use sqlx::Connection;
 
 #[tokio::main]

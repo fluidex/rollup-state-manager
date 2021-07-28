@@ -1097,9 +1097,10 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 [[package]]
 name = "fluidex-common"
 version = "0.1.0"
-source = "git+https://github.com/Fluidex/common-rs?branch=master#f653d4ad11a9e35c6a6abce6915e9fe655e6485b"
+source = "git+https://github.com/Fluidex/common-rs?branch=master#d4c62b24eef75ae4e107ecd7575339883765fddc"
 dependencies = [
  "babyjubjub-rs",
+ "cfg-if",
  "ff_ce",
  "fnv",
  "futures",
@@ -1114,6 +1115,7 @@ dependencies = [
  "rust_decimal_macros",
  "serde 1.0.126",
  "serde_json",
+ "sqlx",
  "thiserror",
 ]
 
