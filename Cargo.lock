@@ -426,6 +426,8 @@ dependencies = [
  "libc",
  "num-integer",
  "num-traits 0.2.14",
+ "serde 1.0.126",
+ "time",
  "winapi",
 ]
 
@@ -1097,10 +1099,11 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 [[package]]
 name = "fluidex-common"
 version = "0.1.0"
-source = "git+https://github.com/Fluidex/common-rs?branch=master#d4c62b24eef75ae4e107ecd7575339883765fddc"
+source = "git+https://github.com/Fluidex/common-rs?branch=master#59a607606a18a84cd2219afe26d342465a96730a"
 dependencies = [
  "babyjubjub-rs",
  "cfg-if",
+ "chrono",
  "ff_ce",
  "fnv",
  "futures",
@@ -3247,6 +3250,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "time"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca8a50ef2360fbd1eeb0ecd46795a87a19024eb4b53c5dc916ca1fd95fe62438"
+dependencies = [
+ "libc",
+ "winapi",
 ]
 
 [[package]]

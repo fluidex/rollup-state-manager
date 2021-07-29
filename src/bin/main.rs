@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 use crossbeam_channel::RecvTimeoutError;
+use fluidex_common::db::models::tablenames;
 use fluidex_common::db::MIGRATOR;
 use rollup_state_manager::config::Settings;
 use rollup_state_manager::grpc::run_grpc_server;
@@ -171,7 +172,7 @@ async fn run(offset: Option<i64>, db: Option<sled::Db>) {
 
 // Returns true if already present in DB, otherwise false.
 async fn is_present_block(pool: &PgPool, block: &L2Block) -> anyhow::Result<bool> {
-    match sqlx::query("select new_root from l2block where block_id = $1")
+    match sqlx::query(&format!("select new_root from {} where block_id = $1", tablenames::L2_BLOCK))
         .bind(block.block_id as u32)
         .fetch_one(pool)
         .await
@@ -203,12 +204,15 @@ async fn is_present_block(pool: &PgPool, block: &L2Block) -> anyhow::Result<bool
 async fn save_block_to_rollup_state_manager_db(pool: &PgPool, block: &L2Block) -> anyhow::Result<()> {
     let new_root = block.witness.new_root.to_string();
     let witness = L2BlockSerde::from(block.witness.clone());
-    sqlx::query("insert into l2block (block_id, new_root, witness) values ($1, $2, $3)")
-        .bind(block.block_id as u32)
-        .bind(new_root)
-        .bind(sqlx::types::Json(witness))
-        .execute(pool)
-        .await?;
+    sqlx::query(&format!(
+        "insert into {} (block_id, new_root, witness) values ($1, $2, $3)",
+        tablenames::L2_BLOCK
+    ))
+    .bind(block.block_id as u32)
+    .bind(new_root)
+    .bind(sqlx::types::Json(witness))
+    .execute(pool)
+    .await?;
 
     Ok(())
 }
