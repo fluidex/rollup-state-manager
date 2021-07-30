@@ -105,7 +105,7 @@ impl MessageWriter {
         self.offset
     }
 
-    async fn handle_stream<'c, C, R>(&mut self, mut strm: MessageStream<'c, C, R>) -> KafkaError
+    async fn handle_stream<C, R>(&mut self, mut strm: MessageStream<'_, C, R>) -> KafkaError
     where
         C: ConsumerContext + 'static,
     {
