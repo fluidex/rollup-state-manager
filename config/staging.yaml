@@ -1,4 +1,3 @@
 brokers: 'exchange-kafka.dingir-exchange:9092'
 grpc_addr: '127.0.0.1:50061' # TODO: Update for staging
-prover_cluster_db: postgres://coordinator:coordinator_AA9944@prover-cluster-pq.prover-cluster/prover_cluster
-rollup_state_manager_db: postgres://postgres:postgres_AA9944@rollup-state-manager-pq.rollup-state-manager/rollup_state_manager
+db: postgres://postgres:postgres_AA9944@rollup-state-manager-pq.rollup-state-manager/rollup_state_manager
