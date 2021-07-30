@@ -11,7 +11,7 @@ static SETTINGS: OnceCell<Settings> = OnceCell::new();
 pub struct Settings {
     brokers: String,
     grpc_addr: String,
-    rollup_state_manager_db: String,
+    db: String,
     persist_dir: Box<Path>,
     persist_every_n_block: usize,
 }
@@ -66,8 +66,8 @@ impl Settings {
 
     /// Shortcut of `Self::get().rollup_state_manager_db.as_str()`
     #[inline(always)]
-    pub fn rollup_state_manager_db() -> &'static str {
-        Self::get().rollup_state_manager_db.as_str()
+    pub fn db() -> &'static str {
+        Self::get().db.as_str()
     }
 
     pub fn persist_dir() -> &'static Path {

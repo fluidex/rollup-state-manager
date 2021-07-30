@@ -135,7 +135,7 @@ async fn run(offset: Option<i64>, db: Option<sled::Db>) {
     let replay_thread = replay_msgs(msg_receiver, blk_sender, Arc::clone(&state), db);
     let server_thread = grpc_run(state);
 
-    let db_pool = PgPool::connect(Settings::rollup_state_manager_db()).await.unwrap();
+    let db_pool = PgPool::connect(Settings::db()).await.unwrap();
     MIGRATOR.run(&db_pool).await.ok();
 
     let mut check_old_block = true;
