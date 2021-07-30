@@ -10,6 +10,7 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 use rollup_state_manager::msg::msg_processor;
@@ -17,31 +18,31 @@ use std::option::Option::None;
 
 //if we use nightly build, we are able to use bench test ...
 fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
-    //let test_dir = circuit_repo.join("test").join("testdata");
-    //let file = File::open(test_dir.join("msgs_float.jsonl"))?;
-    //let filepath = "circuits/test/testdata/msgs_float.jsonl";
-    let filepath = "tests/global_state/testdata/data003.txt";
+    let filepath = "tests/global_state/testdata/data.txt";
     let file = File::open(filepath)?;
     let messages: Vec<WrappedMessage> = BufReader::new(file)
         .lines()
         .map(Result::unwrap)
         .map(parse_msg)
         .map(Result::unwrap)
-        .filter(|msg| matches!(msg, WrappedMessage::BALANCE(_) | WrappedMessage::ORDER(_)))
+        //.filter(|msg| matches!(msg, WrappedMessage::BALANCE(_) | WrappedMessage::ORDER(_)))
         .collect();
 
     println!("prepare bench: {} records", messages.len());
 
     GlobalState::print_config();
-    let state = GlobalState::new(
+    let state = Arc::new(RwLock::new(GlobalState::new(
         *params::BALANCELEVELS,
         *params::ORDERLEVELS,
         *params::ACCOUNTLEVELS,
         *params::VERBOSE,
-    );
+    )));
 
     //amplify the records: in each iter we run records on a group of new accounts
-    let mut processor = msg_processor::Processor::default();
+    let mut processor = msg_processor::Processor {
+        enable_check_order_sig: false,
+        ..Default::default()
+    };
 
     // TODO: max(user id)
     let account_num = 10;
@@ -49,10 +50,7 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     // by clone accounts with same trades
     let loop_num = 50;
 
-    let (sender, receiver) = crossbeam_channel::unbounded();
-
     let mut witgen = WitnessGenerator::new(state, *params::NTXS, None, *params::VERBOSE);
-
     let timing = Instant::now();
     let mut inner_timing = Instant::now();
 
@@ -74,6 +72,16 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
                     let mut trade = trade.clone();
                     trade.ask_user_id += account_offset;
                     trade.bid_user_id += account_offset;
+                    trade.state_after = None;
+                    trade.state_before = None;
+                    trade.ask_order.as_mut().map(|mut o| {
+                        o.user += account_offset;
+                        o
+                    });
+                    trade.bid_order.as_mut().map(|mut o| {
+                        o.user += account_offset;
+                        o
+                    });
                     processor.handle_trade_msg(&mut witgen, trade);
                 }
                 WrappedMessage::ORDER(order) => {
@@ -97,14 +105,10 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
             );
             inner_timing = Instant::now();
         }
+        //println!("\nepoch {} done", i);
     }
 
-    for block in witgen.pop_all_blocks() {
-        sender.try_send(block).unwrap();
-    }
-
-    drop(witgen); // to close sender
-    let blocks: Vec<_> = receiver.iter().collect();
+    let blocks: Vec<_> = witgen.pop_all_blocks();
     println!(
         "bench for {} blocks (TPS: {})",
         blocks.len(),

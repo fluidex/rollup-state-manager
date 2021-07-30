@@ -10,8 +10,8 @@ static SETTINGS: OnceCell<Settings> = OnceCell::new();
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Settings {
     brokers: String,
-    prover_cluster_db: String,
-    rollup_state_manager_db: String,
+    grpc_addr: String,
+    db: String,
     persist_dir: Box<Path>,
     persist_every_n_block: usize,
 }
@@ -58,16 +58,16 @@ impl Settings {
         Self::get().brokers.as_str()
     }
 
-    /// Shortcut of `Self::get().prover_cluster_db.as_str()`
+    /// Shortcut of `Self::get().grpc_addr.as_str()`
     #[inline(always)]
-    pub fn prover_cluster_db() -> &'static str {
-        Self::get().prover_cluster_db.as_str()
+    pub fn grpc_addr() -> &'static str {
+        Self::get().grpc_addr.as_str()
     }
 
     /// Shortcut of `Self::get().rollup_state_manager_db.as_str()`
     #[inline(always)]
-    pub fn rollup_state_manager_db() -> &'static str {
-        Self::get().rollup_state_manager_db.as_str()
+    pub fn db() -> &'static str {
+        Self::get().db.as_str()
     }
 
     pub fn persist_dir() -> &'static Path {

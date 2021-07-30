@@ -15,4 +15,4 @@ cd $REPO_DIR
 git submodule update --init --recursive
 if [ -z ${CI+x} ]; then git pull --recurse-submodules; fi
 
-cargo run --release --bin bench_global_state
+cargo run --no-default-features --release --bin bench_global_state

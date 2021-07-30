@@ -13,6 +13,7 @@ use rollup_state_manager::test_utils::messages::WrappedMessage;
 use rollup_state_manager::types::l2::{L2Block, L2BlockSerde};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 use rollup_state_manager::config::Settings;
@@ -24,12 +25,12 @@ fn replay_msgs(
     block_sender: crossbeam_channel::Sender<L2Block>,
 ) -> Option<std::thread::JoinHandle<anyhow::Result<()>>> {
     Some(std::thread::spawn(move || {
-        let state = GlobalState::new(
+        let state = Arc::new(RwLock::new(GlobalState::new(
             *params::BALANCELEVELS,
             *params::ORDERLEVELS,
             *params::ACCOUNTLEVELS,
             *params::VERBOSE,
-        );
+        )));
         let mut witgen = WitnessGenerator::new(state, *params::NTXS, None, *params::VERBOSE);
 
         println!("genesis root {}", witgen.root());

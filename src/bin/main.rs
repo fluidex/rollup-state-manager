@@ -2,7 +2,15 @@
 #![allow(dead_code)]
 
 use crossbeam_channel::RecvTimeoutError;
+use fluidex_common::db::{
+    models::{
+        tablenames,
+        task::{CircuitType, TaskStatus},
+    },
+    MIGRATOR,
+};
 use rollup_state_manager::config::Settings;
+use rollup_state_manager::grpc::run_grpc_server;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
 use rollup_state_manager::params;
 use rollup_state_manager::r#const::sled_db::*;
@@ -12,6 +20,7 @@ use rollup_state_manager::types::l2::{L2Block, L2BlockSerde};
 use sqlx::postgres::PgPool;
 use sqlx::Row;
 use std::option::Option::None;
+use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::{fs, io};
 
@@ -38,20 +47,22 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+fn grpc_run(state: Arc<RwLock<GlobalState>>) -> Option<std::thread::JoinHandle<anyhow::Result<()>>> {
+    Some(std::thread::spawn(move || {
+        let addr = Settings::grpc_addr().parse()?;
+        run_grpc_server(addr, state)
+    }))
+}
+
 fn replay_msgs(
     msg_receiver: crossbeam_channel::Receiver<WrappedMessage>,
     block_sender: crossbeam_channel::Sender<L2Block>,
+    state: Arc<RwLock<GlobalState>>,
     db: Option<sled::Db>,
 ) -> Option<std::thread::JoinHandle<anyhow::Result<()>>> {
     Some(std::thread::spawn(move || {
-        let mut state = GlobalState::new(
-            *params::BALANCELEVELS,
-            *params::ORDERLEVELS,
-            *params::ACCOUNTLEVELS,
-            *params::VERBOSE,
-        );
         let block_offset: Option<usize> = if let Some(db) = db {
-            state.load_persist(&db).unwrap();
+            state.write().unwrap().load_persist(&db).unwrap();
             db.get(BLOCK_OFFSET_KEY).ok().flatten().and_then(|v| bincode::deserialize(&v).ok())
         } else {
             None
@@ -115,18 +126,27 @@ fn replay_msgs(
 }
 
 async fn run(offset: Option<i64>, db: Option<sled::Db>) {
+    let state = Arc::new(RwLock::new(GlobalState::new(
+        *params::BALANCELEVELS,
+        *params::ORDERLEVELS,
+        *params::ACCOUNTLEVELS,
+        *params::VERBOSE,
+    )));
+
     let (msg_sender, msg_receiver) = crossbeam_channel::unbounded();
     let (blk_sender, blk_receiver) = crossbeam_channel::unbounded();
 
     let loader_thread = msg_loader::load_msgs_from_mq(Settings::brokers(), offset, msg_sender);
-    let replay_thread = replay_msgs(msg_receiver, blk_sender, db);
+    let replay_thread = replay_msgs(msg_receiver, blk_sender, Arc::clone(&state), db);
+    let server_thread = grpc_run(state);
 
-    let prover_cluster_db_pool = PgPool::connect(Settings::prover_cluster_db()).await.unwrap();
-    let rollup_state_manager_db_pool = PgPool::connect(Settings::rollup_state_manager_db()).await.unwrap();
+    let db_pool = PgPool::connect(Settings::db()).await.unwrap();
+    MIGRATOR.run(&db_pool).await.ok();
+
     let mut check_old_block = true;
     for block in blk_receiver.iter() {
         if check_old_block {
-            let is_present = is_present_block(&rollup_state_manager_db_pool, &block).await.unwrap();
+            let is_present = is_present_block(&db_pool, &block).await.unwrap();
             if is_present {
                 // skip saving to db
                 continue;
@@ -135,19 +155,18 @@ async fn run(offset: Option<i64>, db: Option<sled::Db>) {
                 check_old_block = false;
             }
         }
-        save_block_to_rollup_state_manager_db(&rollup_state_manager_db_pool, &block)
-            .await
-            .unwrap();
-        save_task_to_prover_cluster_db(&prover_cluster_db_pool, block).await.unwrap();
+        save_block_to_db(&db_pool, &block).await.unwrap();
+        save_task_to_db(&db_pool, block).await.unwrap();
     }
 
     loader_thread.map(|h| h.join().expect("loader thread failed"));
     replay_thread.map(|h| h.join().expect("loader thread failed"));
+    server_thread.map(|h| h.join().expect("loader thread failed"));
 }
 
 // Returns true if already present in DB, otherwise false.
 async fn is_present_block(pool: &PgPool, block: &L2Block) -> anyhow::Result<bool> {
-    match sqlx::query("select new_root from l2block where block_id = $1")
+    match sqlx::query(&format!("select new_root from {} where block_id = $1", tablenames::L2_BLOCK))
         .bind(block.block_id as u32)
         .fetch_one(pool)
         .await
@@ -176,42 +195,29 @@ async fn is_present_block(pool: &PgPool, block: &L2Block) -> anyhow::Result<bool
     }
 }
 
-async fn save_block_to_rollup_state_manager_db(pool: &PgPool, block: &L2Block) -> anyhow::Result<()> {
+async fn save_block_to_db(pool: &PgPool, block: &L2Block) -> anyhow::Result<()> {
     let new_root = block.witness.new_root.to_string();
     let witness = L2BlockSerde::from(block.witness.clone());
-    sqlx::query("insert into l2block (block_id, new_root, witness) values ($1, $2, $3)")
-        .bind(block.block_id as u32)
-        .bind(new_root)
-        .bind(sqlx::types::Json(witness))
-        .execute(pool)
-        .await?;
+    sqlx::query(&format!(
+        "insert into {} (block_id, new_root, witness) values ($1, $2, $3)",
+        tablenames::L2_BLOCK
+    ))
+    .bind(block.block_id as u32)
+    .bind(new_root)
+    .bind(sqlx::types::Json(witness))
+    .execute(pool)
+    .await?;
 
     Ok(())
 }
 
-#[derive(sqlx::Type)]
-#[sqlx(type_name = "varchar", rename_all = "lowercase")]
-pub enum CircuitType {
-    Block,
-}
-
-#[derive(sqlx::Type)]
-#[sqlx(type_name = "task_status", rename_all = "snake_case")]
-enum TaskStatus {
-    Inited,
-    Witgening,
-    Ready,
-    Assigned,
-    Proved,
-}
-
-async fn save_task_to_prover_cluster_db(pool: &PgPool, block: L2Block) -> anyhow::Result<()> {
+async fn save_task_to_db(pool: &PgPool, block: L2Block) -> anyhow::Result<()> {
     let input = L2BlockSerde::from(block.witness);
     let task_id = unique_task_id();
 
     sqlx::query("insert into task (task_id, circuit, block_id, input, status) values ($1, $2, $3, $4, $5)")
         .bind(task_id)
-        .bind(CircuitType::Block)
+        .bind(CircuitType::BLOCK)
         .bind(block.block_id as i64) // TODO: will it overflow?
         .bind(sqlx::types::Json(input))
         .bind(TaskStatus::Inited)
