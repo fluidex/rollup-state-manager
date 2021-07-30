@@ -2,8 +2,13 @@
 #![allow(dead_code)]
 
 use crossbeam_channel::RecvTimeoutError;
-use fluidex_common::db::models::tablenames;
-use fluidex_common::db::MIGRATOR;
+use fluidex_common::db::{
+    models::{
+        tablenames,
+        task::{CircuitType, TaskStatus},
+    },
+    MIGRATOR,
+};
 use rollup_state_manager::config::Settings;
 use rollup_state_manager::grpc::run_grpc_server;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
@@ -206,29 +211,13 @@ async fn save_block_to_db(pool: &PgPool, block: &L2Block) -> anyhow::Result<()> 
     Ok(())
 }
 
-#[derive(sqlx::Type)]
-#[sqlx(type_name = "varchar", rename_all = "lowercase")]
-pub enum CircuitType {
-    Block,
-}
-
-#[derive(sqlx::Type)]
-#[sqlx(type_name = "task_status", rename_all = "snake_case")]
-enum TaskStatus {
-    Inited,
-    Witgening,
-    Ready,
-    Assigned,
-    Proved,
-}
-
 async fn save_task_to_db(pool: &PgPool, block: L2Block) -> anyhow::Result<()> {
     let input = L2BlockSerde::from(block.witness);
     let task_id = unique_task_id();
 
     sqlx::query("insert into task (task_id, circuit, block_id, input, status) values ($1, $2, $3, $4, $5)")
         .bind(task_id)
-        .bind(CircuitType::Block)
+        .bind(CircuitType::BLOCK)
         .bind(block.block_id as i64) // TODO: will it overflow?
         .bind(sqlx::types::Json(input))
         .bind(TaskStatus::Inited)
