@@ -137,8 +137,6 @@ impl MessageWriter {
         }
         self.offset = offset;
 
-        log::debug!("got message type {}", msg_type);
-
         let message = match msg_type {
             MSG_TYPE_BALANCES => {
                 let data: BalanceMessage = serde_json::from_str(msg_payload).unwrap();
@@ -160,7 +158,5 @@ impl MessageWriter {
         };
 
         self.sender.try_send(message).unwrap();
-
-        log::debug!("send message {} {} ", msg_type, offset);
     }
 }
