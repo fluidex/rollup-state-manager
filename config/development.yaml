@@ -1,4 +1,3 @@
 brokers: '127.0.0.1:9092'
 grpc_addr: '127.0.0.1:50061'
-prover_cluster_db: postgres://coordinator:coordinator_AA9944@127.0.0.1:5433/prover_cluster
 rollup_state_manager_db: postgres://postgres:postgres_AA9944@127.0.0.1:5434/rollup_state_manager

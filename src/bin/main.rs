@@ -135,20 +135,13 @@ async fn run(offset: Option<i64>, db: Option<sled::Db>) {
     let replay_thread = replay_msgs(msg_receiver, blk_sender, Arc::clone(&state), db);
     let server_thread = grpc_run(state);
 
-    // TODO: It should be better to integrate prover-cluster DB migrations with CI.
-    let prover_cluster_db_pool = if dotenv::var("CI").map_or_else(|_| false, |v| v.parse().unwrap()) {
-        None
-    } else {
-        Some(PgPool::connect(Settings::prover_cluster_db()).await.unwrap())
-    };
-
-    let rollup_state_manager_db_pool = PgPool::connect(Settings::rollup_state_manager_db()).await.unwrap();
-    MIGRATOR.run(&rollup_state_manager_db_pool).await.ok();
+    let db_pool = PgPool::connect(Settings::rollup_state_manager_db()).await.unwrap();
+    MIGRATOR.run(&db_pool).await.ok();
 
     let mut check_old_block = true;
     for block in blk_receiver.iter() {
         if check_old_block {
-            let is_present = is_present_block(&rollup_state_manager_db_pool, &block).await.unwrap();
+            let is_present = is_present_block(&db_pool, &block).await.unwrap();
             if is_present {
                 // skip saving to db
                 continue;
@@ -157,12 +150,8 @@ async fn run(offset: Option<i64>, db: Option<sled::Db>) {
                 check_old_block = false;
             }
         }
-        save_block_to_rollup_state_manager_db(&rollup_state_manager_db_pool, &block)
-            .await
-            .unwrap();
-        if let Some(db_pool) = &prover_cluster_db_pool {
-            save_task_to_prover_cluster_db(db_pool, block).await.unwrap();
-        }
+        save_block_to_db(&db_pool, &block).await.unwrap();
+        save_task_to_db(&db_pool, block).await.unwrap();
     }
 
     loader_thread.map(|h| h.join().expect("loader thread failed"));
@@ -201,7 +190,7 @@ async fn is_present_block(pool: &PgPool, block: &L2Block) -> anyhow::Result<bool
     }
 }
 
-async fn save_block_to_rollup_state_manager_db(pool: &PgPool, block: &L2Block) -> anyhow::Result<()> {
+async fn save_block_to_db(pool: &PgPool, block: &L2Block) -> anyhow::Result<()> {
     let new_root = block.witness.new_root.to_string();
     let witness = L2BlockSerde::from(block.witness.clone());
     sqlx::query(&format!(
@@ -233,7 +222,7 @@ enum TaskStatus {
     Proved,
 }
 
-async fn save_task_to_prover_cluster_db(pool: &PgPool, block: L2Block) -> anyhow::Result<()> {
+async fn save_task_to_db(pool: &PgPool, block: L2Block) -> anyhow::Result<()> {
     let input = L2BlockSerde::from(block.witness);
     let task_id = unique_task_id();
 
