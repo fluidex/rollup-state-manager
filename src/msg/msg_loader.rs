@@ -65,12 +65,12 @@ pub fn load_msgs_from_mq(
                 let assign_offset = writer.last_offset();
                 let join_handle = handle.spawn_blocking(move || {
                     let mut partitions = TopicPartitionList::new();
-                    log::debug!("assign offset {} to consumer", assign_offset);
-                    let offset = if assign_offset == 0 {
+                    let offset = if assign_offset < 0 {
                         Offset::Beginning
                     } else {
                         Offset::Offset(assign_offset)
                     };
+                    log::debug!("assign offset {:?} to consumer", offset);
                     partitions.add_partition_offset(UNIFY_TOPIC, 0, offset).unwrap();
                     consumer.assign(&partitions).unwrap();
                     return consumer;
