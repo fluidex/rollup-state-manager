@@ -1,17 +1,17 @@
 #![allow(dead_code)]
 #![allow(unreachable_patterns)]
 use anyhow::Result;
-use pprof::protos::Message;
 use rollup_state_manager::params;
 use rollup_state_manager::state::{GlobalState, WitnessGenerator};
 use rollup_state_manager::test_utils::messages::{parse_msg, WrappedMessage};
 use rollup_state_manager::types::l2;
 use std::fs::{self, File};
-use std::io::Write;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
+#[cfg(test)]
+use {pprof::protos::Message, std::io::Write};
 
 use rollup_state_manager::msg::msg_processor;
 use std::option::Option::None;
@@ -123,6 +123,7 @@ fn run_bench() -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 fn profile_bench() {
     let guard = pprof::ProfilerGuard::new(100).unwrap();
 
