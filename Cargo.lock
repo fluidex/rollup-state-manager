@@ -999,6 +999,7 @@ source = "git+https://github.com/gakonst/ethers-rs#d31d19c3b79aa7dac356ac158db51
 dependencies = [
  "async-trait",
  "auto_impl",
+ "bytes",
  "ethers-core",
  "futures-channel",
  "futures-core",
@@ -1012,6 +1013,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-tungstenite",
+ "tokio-util",
  "tracing",
  "tracing-futures",
  "url",
@@ -3365,8 +3367,12 @@ dependencies = [
  "futures-util",
  "log",
  "pin-project",
+ "rustls",
  "tokio",
+ "tokio-rustls",
  "tungstenite",
+ "webpki",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -3528,10 +3534,13 @@ dependencies = [
  "input_buffer",
  "log",
  "rand",
+ "rustls",
  "sha-1",
  "thiserror",
  "url",
  "utf-8",
+ "webpki",
+ "webpki-roots",
 ]
 
 [[package]]
