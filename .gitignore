@@ -1,3 +1,5 @@
+.vscode
+.cargo
 /target
 *orig
 *.bak

@@ -1,13 +1,15 @@
 use crate::test_utils::messages::{parse_msg, WrappedMessage};
 use crate::types::matchengine::messages::{BalanceMessage, OrderMessage, TradeMessage, UserMessage};
-use fluidex_common::message::consumer::{Simple, SimpleConsumer, SimpleMessageHandler};
+//use fluidex_common::message::consumer::{Simple, SimpleConsumer, SimpleMessageHandler};
 use fluidex_common::rdkafka;
-use fluidex_common::rdkafka::consumer::{Consumer, StreamConsumer};
-use fluidex_common::rdkafka::message::{BorrowedMessage, Message};
-use fluidex_common::rdkafka::{Offset, TopicPartitionList};
+use rdkafka::consumer::{Consumer, ConsumerContext, MessageStream, StreamConsumer};
+use rdkafka::error::KafkaError;
+use rdkafka::message::{BorrowedMessage, Message};
+use rdkafka::{Offset, TopicPartitionList};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::sync::{Arc, Mutex};
+//use std::sync::{Mutex};
+use futures::StreamExt;
 
 pub fn load_msgs_from_file(
     filepath: &str,
@@ -41,9 +43,9 @@ pub fn load_msgs_from_mq(
     Some(std::thread::spawn(move || {
         let rt: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap();
 
-        let writer = MessageWriter {
+        let mut writer = MessageWriter {
             sender,
-            offset: Arc::new(Mutex::new(0)),
+            offset: offset.unwrap_or(-1),
         };
         rt.block_on(async move {
             let mut config = rdkafka::config::ClientConfig::new();
@@ -56,29 +58,33 @@ pub fn load_msgs_from_mq(
             if offset.is_none() {
                 config.set("auto.offset.reset", "earliest");
             }
-            let consumer: StreamConsumer = config.create().unwrap();
-
-            let mut partitions = TopicPartitionList::new();
-            partitions.add_partition(UNIFY_TOPIC, 0);
-            if let Some(offset) = offset {
-                // FIXME: this might panic if there is no new message, fallback in this scenario
-                partitions.set_partition_offset(UNIFY_TOPIC, 0, Offset::Offset(offset + 1)).unwrap();
-            }
-            consumer.assign(&partitions).unwrap();
-
-            let consumer = std::sync::Arc::new(consumer);
+            let mut consumer: StreamConsumer = config.create().unwrap();
             loop {
-                let cr_main = SimpleConsumer::new(consumer.as_ref())
-                    .add_topic(UNIFY_TOPIC, Simple::from(&writer))
-                    .unwrap();
+                //alway reset to last offset
+                let handle = tokio::runtime::Handle::current();
+                let assign_offset = writer.last_offset();
+                let join_handle = handle.spawn_blocking(move || {
+                    let mut partitions = TopicPartitionList::new();
+                    let offset = if assign_offset < 0 {
+                        Offset::Beginning
+                    } else {
+                        Offset::Offset(assign_offset)
+                    };
+                    log::debug!("assign offset {:?} to consumer", offset);
+                    partitions.add_partition_offset(UNIFY_TOPIC, 0, offset).unwrap();
+                    consumer.assign(&partitions).unwrap();
+                    return consumer;
+                });
+
+                consumer = join_handle.await.unwrap();
 
                 tokio::select! {
                     _ = tokio::signal::ctrl_c() => {
                         log::info!("Ctrl-c received, shutting down");
-                        break;
+                        return;
                     },
 
-                    err = cr_main.run_stream(|cr| cr.stream()) => {
+                    err = writer.handle_stream(consumer.stream()) => {
                         log::error!("Kafka consumer error: {}", err);
                     }
                 }
@@ -91,22 +97,46 @@ pub fn load_msgs_from_mq(
 
 struct MessageWriter {
     sender: crossbeam_channel::Sender<WrappedMessage>,
-    offset: Arc<Mutex<i64>>,
+    offset: i64,
 }
 
-impl SimpleMessageHandler for &MessageWriter {
-    fn on_message(&self, msg: &BorrowedMessage<'_>) {
+impl MessageWriter {
+    fn last_offset(&self) -> i64 {
+        self.offset
+    }
+
+    async fn handle_stream<C, R>(&mut self, mut strm: MessageStream<'_, C, R>) -> KafkaError
+    where
+        C: ConsumerContext + 'static,
+    {
+        loop {
+            match strm.next().await.expect("Kafka's stream has no EOF") {
+                Err(KafkaError::NoMessageReceived) => {} //nothing to do yet
+                Err(KafkaError::PartitionEOF(_)) => {}   //simply omit this type of error
+                Err(e) => {
+                    return e;
+                }
+                Ok(m) => self.on_message(&m),
+            }
+        }
+    }
+
+    fn on_message(&mut self, msg: &BorrowedMessage<'_>) {
         let msg_type = std::str::from_utf8(msg.key().unwrap()).unwrap();
         let msg_payload = std::str::from_utf8(msg.payload().unwrap()).unwrap();
         let offset: i64 = msg.offset();
+        log::debug!("got message at offset {}", offset);
 
-        let last_offset: i64 = *self.offset.try_lock().unwrap();
+        let last_offset: i64 = self.offset;
+        //tolerance re-winded msg
+        if offset <= last_offset {
+            return;
+        }
         if last_offset != 0 && offset != last_offset + 1 {
             panic!("offset not continuous {} {}", last_offset, offset);
         }
-        *self.offset.try_lock().unwrap() = offset;
+        self.offset = offset;
 
-        log::debug!("got message at offset {}", offset);
         let message = match msg_type {
             MSG_TYPE_BALANCES => {
                 let data: BalanceMessage = serde_json::from_str(msg_payload).unwrap();
