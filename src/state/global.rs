@@ -510,15 +510,31 @@ impl GlobalState {
         let balance_trees = db.open_tree(BALANCETREES_KEY)?;
         let order_trees = db.open_tree(ORDERTREES_KEY)?;
         let order_states = db.open_tree(ORDERSTATES_KEY)?;
-        let (account_tree, account_states, balance_trees, order_trees, order_states) =
-            (&**db, &account_states, &balance_trees, &order_trees, &order_states).transaction(
-                |(db, account_states, balance_trees, order_trees, order_states)| {
+        let next_order_positions = db.open_tree(NEXT_ORDER_POSITIONS_KEY)?;
+        let (account_tree, account_states, balance_trees, order_trees, order_states, next_order_positions) = (
+            &**db,
+            &account_states,
+            &balance_trees,
+            &order_trees,
+            &order_states,
+            &next_order_positions,
+        )
+            .transaction(
+                |(db, account_states, balance_trees, order_trees, order_states, next_order_positions)| {
                     let account_tree = Self::load_account_tree(db)?;
                     let account_states = Self::load_account_state(&account_tree, account_states)?;
                     let balance_trees = Self::load_trees::<Arc<Mutex<Tree>>>(&account_states, balance_trees)?;
                     let order_trees = Self::load_trees::<Arc<Mutex<Tree>>>(&account_states, order_trees)?;
                     let order_states = Self::load_trees::<BTreeMap<u32, Order>>(&account_states, order_states)?;
-                    Ok((account_tree, account_states, balance_trees, order_trees, order_states))
+                    let next_order_positions = Self::load_trees::<u32>(&account_states, next_order_positions)?;
+                    Ok((
+                        account_tree,
+                        account_states,
+                        balance_trees,
+                        order_trees,
+                        order_states,
+                        next_order_positions,
+                    ))
                 },
             )?;
         self.account_tree = Arc::new(Mutex::new(account_tree));
@@ -537,6 +553,7 @@ impl GlobalState {
             })
             .flatten()
             .collect();
+        self.next_order_positions = next_order_positions;
         Ok(())
     }
 
@@ -590,16 +607,26 @@ impl GlobalState {
         let balance_trees = db.open_tree(BALANCETREES_KEY)?;
         let order_trees = db.open_tree(ORDERTREES_KEY)?;
         let order_states = db.open_tree(ORDERSTATES_KEY)?;
-        (&**db, &account_states, &balance_trees, &order_trees, &order_states).transaction(
-            |(db, account_states, balance_trees, order_trees, order_states)| {
-                self.save_account_tree(db)?;
-                self.save_account_state(account_states)?;
-                self.save_balance_trees(balance_trees)?;
-                self.save_order_trees(order_trees)?;
-                self.save_order_states(order_states)?;
-                Ok(())
-            },
-        )?;
+        let next_order_positions = db.open_tree(NEXT_ORDER_POSITIONS_KEY)?;
+        (
+            &**db,
+            &account_states,
+            &balance_trees,
+            &order_trees,
+            &order_states,
+            &next_order_positions,
+        )
+            .transaction(
+                |(db, account_states, balance_trees, order_trees, order_states, next_order_positions)| {
+                    self.save_account_tree(db)?;
+                    self.save_account_state(account_states)?;
+                    self.save_balance_trees(balance_trees)?;
+                    self.save_order_trees(order_trees)?;
+                    self.save_order_states(order_states)?;
+                    self.save_next_order_positions(next_order_positions)?;
+                    Ok(())
+                },
+            )?;
         Ok(())
     }
 
@@ -616,9 +643,13 @@ impl GlobalState {
     }
 
     #[cfg(feature = "persist_sled")]
-    fn save_trees(trees: &FnvHashMap<u32, Arc<Mutex<Tree>>>, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
-        trees.iter().try_for_each(|(id, tree)| {
-            db.insert(bincode::serialize(id)?, bincode::serialize(&*tree.clone())?)
+    fn save_serializable_map<K, V>(db: &TransactionalTree, map: &FnvHashMap<K, V>) -> Result<(), GlobalStateInternalError>
+    where
+        K: Serialize,
+        V: Serialize + Clone,
+    {
+        map.iter().try_for_each(|(id, value)| {
+            db.insert(bincode::serialize(id)?, bincode::serialize(&value.clone())?)
                 .map(|_| ())
                 .map_err(GlobalStateInternalError::from)
         })
@@ -626,21 +657,17 @@ impl GlobalState {
 
     #[cfg(feature = "persist_sled")]
     fn save_order_states(&self, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
-        self.order_states.iter().try_for_each(|(id, order)| {
-            db.insert(bincode::serialize(id)?, bincode::serialize(order)?)
-                .map(|_| ())
-                .map_err(GlobalStateInternalError::from)
-        })
+        Self::save_serializable_map(db, &self.order_states)
     }
 
     #[cfg(feature = "persist_sled")]
     fn save_order_trees(&self, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
-        Self::save_trees(&self.order_trees, db)
+        Self::save_serializable_map(db, &self.order_trees)
     }
 
     #[cfg(feature = "persist_sled")]
     fn save_balance_trees(&self, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
-        Self::save_trees(&self.balance_trees, db)
+        Self::save_serializable_map(db, &self.balance_trees)
     }
 
     #[cfg(feature = "persist_sled")]
@@ -648,5 +675,10 @@ impl GlobalState {
         db.insert(ACCOUNTTREE_KEY, bincode::serialize(&*self.account_tree.clone())?)
             .map(|_| ())?;
         Ok(())
+    }
+
+    #[cfg(feature = "persist_sled")]
+    fn save_next_order_positions(&self, db: &TransactionalTree) -> Result<(), GlobalStateInternalError> {
+        Self::save_serializable_map(db, &self.next_order_positions)
     }
 }
