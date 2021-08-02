@@ -13,7 +13,6 @@ coins-bip32 = "0.3"
 config_rs = { package = "config", version = "0.10.1" }
 crossbeam-channel = "0.5.1"
 dotenv = "0.15.0"
-env_logger = "0.5"
 ethers = { git = "https://github.com/gakonst/ethers-rs" }
 fluidex-common = { git = "https://github.com/Fluidex/common-rs", branch = "master", features = [ "kafka", "non-blocking-tracing", "rollup-state-db" ] }
 futures = "0.3.13"
