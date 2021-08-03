@@ -9,6 +9,7 @@ use fluidex_common::db::{
     },
     MIGRATOR,
 };
+use fluidex_common::non_blocking_tracing;
 use rollup_state_manager::config::Settings;
 use rollup_state_manager::grpc::run_grpc_server;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
@@ -27,7 +28,7 @@ use std::{fs, io};
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
-    env_logger::init();
+    let _guard = non_blocking_tracing::setup();
     log::info!("state_keeper started");
 
     Settings::init_default();

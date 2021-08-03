@@ -1,3 +1,4 @@
+use fluidex_common::non_blocking_tracing;
 use rollup_state_manager::test_utils::circuit;
 use std::fs;
 use std::path::PathBuf;
@@ -19,7 +20,7 @@ fn run() -> anyhow::Result<()> {
 
 fn main() {
     dotenv::dotenv().ok();
-    env_logger::init();
+    let _guard = non_blocking_tracing::setup();
     Settings::init_default();
     log::debug!("{:?}", Settings::get());
     match run() {
