@@ -1,16 +1,50 @@
 pub use crate::types::l2;
 pub use crate::types::merkle_tree::MerklePath;
+use fluidex_common::num_bigint::BigInt;
 use fluidex_common::types::FrExt;
 use fluidex_common::Fr;
 use serde::ser::SerializeSeq;
-use serde::Serialize;
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryFrom;
+use std::str::FromStr;
 
-pub struct FrStr(Fr);
+pub struct FrStr(pub Fr);
+
+// TODO: May use or integrate serializers and deserializers with `https://github.com/Fluidex/common-rs/blob/master/src/serde.rs`.
 
 impl Serialize for FrStr {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.0.to_decimal_string().as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for FrStr {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct FrStrVisitor;
+
+        impl<'de> de::Visitor<'de> for FrStrVisitor {
+            type Value = Fr;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a Fr in decimal str repr")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                if let Ok(fr) = BigInt::from_str(v) {
+                    Ok(Fr::from_bigint(fr))
+                } else {
+                    Err(de::Error::invalid_type(de::Unexpected::Str(v), &self))
+                }
+            }
+        }
+
+        Ok(Self(deserializer.deserialize_str(FrStrVisitor)?))
     }
 }
 
@@ -27,6 +61,33 @@ impl Serialize for MerkleLeafStr {
         let mut seq = serializer.serialize_seq(Some(1))?;
         seq.serialize_element(&self.0)?;
         seq.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for MerkleLeafStr {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct MerkleLeafStrVisitor;
+
+        impl<'de> de::Visitor<'de> for MerkleLeafStrVisitor {
+            type Value = MerkleLeafStr;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a Merkle Leaf str repr")
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<Self::Value, V::Error>
+            where
+                V: de::SeqAccess<'de>,
+            {
+                let fr_str = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                Ok(MerkleLeafStr(fr_str))
+            }
+        }
+
+        deserializer.deserialize_seq(MerkleLeafStrVisitor)
     }
 }
 
@@ -50,32 +111,67 @@ impl Serialize for l2::TxType {
     }
 }
 
+impl<'de> Deserialize<'de> for l2::TxType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct L2TxTypeVisitor;
+
+        impl<'de> de::Visitor<'de> for L2TxTypeVisitor {
+            type Value = l2::TxType;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a L2 TX type repr")
+            }
+
+            fn visit_i32<E>(self, v: i32) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let tx_type = match v {
+                    0 => l2::TxType::Nop,
+                    1 => l2::TxType::Deposit,
+                    2 => l2::TxType::Transfer,
+                    3 => l2::TxType::Withdraw,
+                    4 => l2::TxType::PlaceOrder,
+                    5 => l2::TxType::SpotTrade,
+                    _ => return Err(de::Error::invalid_type(de::Unexpected::Signed(v as i64), &self)),
+                };
+                Ok(tx_type)
+            }
+        }
+
+        deserializer.deserialize_i32(L2TxTypeVisitor)
+    }
+}
+
 type MerklePathStr = Vec<MerkleLeafStr>;
 
 //use derive could save many efforts for impling Serialize
 //TODO: carmel style except for three "elements" field
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct L2BlockSerde {
     #[serde(rename(serialize = "oldRoot"))]
-    old_root: FrStr,
+    pub old_root: FrStr,
     #[serde(rename(serialize = "newRoot"))]
-    new_root: FrStr,
+    pub new_root: FrStr,
     #[serde(rename(serialize = "txsType"))]
-    txs_type: Vec<l2::TxType>,
+    pub txs_type: Vec<l2::TxType>,
     #[serde(rename(serialize = "encodedTxs"))]
-    encoded_txs: Vec<Vec<FrStr>>,
+    pub encoded_txs: Vec<Vec<FrStr>>,
     #[serde(rename(serialize = "balancePathElements"))]
-    balance_path_elements: Vec<[MerklePathStr; 4]>,
+    pub balance_path_elements: Vec<[MerklePathStr; 4]>,
     #[serde(rename(serialize = "orderPathElements"))]
-    order_path_elements: Vec<[MerklePathStr; 2]>,
+    pub order_path_elements: Vec<[MerklePathStr; 2]>,
     #[serde(rename(serialize = "accountPathElements"))]
-    account_path_elements: Vec<[MerklePathStr; 2]>,
+    pub account_path_elements: Vec<[MerklePathStr; 2]>,
     #[serde(rename(serialize = "orderRoots"))]
-    order_roots: Vec<[FrStr; 2]>,
+    pub order_roots: Vec<[FrStr; 2]>,
     #[serde(rename(serialize = "oldAccountRoots"))]
-    old_account_roots: Vec<FrStr>,
+    pub old_account_roots: Vec<FrStr>,
     #[serde(rename(serialize = "newAccountRoots"))]
-    new_account_roots: Vec<FrStr>,
+    pub new_account_roots: Vec<FrStr>,
 }
 
 //array::map is not stable
