@@ -3,8 +3,8 @@ import { kafkaProducer } from "./kafka_producer";
 import { sleep } from "./util";
 import { strict as assert } from "assert";
 
-const tokenId = 0;
-const userId = 1;
+const blockId = 0;
+const userId = 0;
 
 const kafkaUserValue = {
   user_id: userId,
@@ -42,7 +42,7 @@ async function mainTest() {
   await sleep(1000);
   await kafkaProducer.Stop();
 
-  await getTokenBalanceTest();
+  await getL2BlockByIdTest();
 }
 
 async function registerUser() {
@@ -63,13 +63,19 @@ async function depositBalance() {
   ]);
 }
 
-async function getTokenBalanceTest() {
-  const res = await grpcClient.tokenBalanceQuery(userId, tokenId, "", "");
-  assert.equal(res["balance"], "3.0000");
-  assert.equal(res["balance_raw"], "30000");
-  assert.equal(res["precision"], 4);
+async function getL2BlockByIdTest() {
+  const res = await grpcClient.l2BlockQuery(blockId);
+  assert.equal(res["created_time"], 1628077128);
+  assert.equal(res["tx_num"], "2");
+  assert.equal(res["real_tx_num"], "2");
+  assert.equal(res["status"], "INITED");
+  assert(res["txs"]);
+  assert.equal(
+    res["new_root"],
+    "Fr(0x1cd19866300cc822c6ead46a420ecf2b4dacd26b49d3a5cbf737761f3fa2dd01)"
+  );
 
-  console.log("getTokenBalanceTest passed");
+  console.log("getL2BlockByIdTest passed");
 }
 
 main();

@@ -125,7 +125,28 @@ impl<'de> Deserialize<'de> for l2::TxType {
                 formatter.write_str("a L2 TX type repr")
             }
 
+            fn visit_i8<E>(self, v: i8) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                self.visit_i64(i64::from(v))
+            }
+
+            fn visit_i16<E>(self, v: i16) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                self.visit_i64(i64::from(v))
+            }
+
             fn visit_i32<E>(self, v: i32) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                self.visit_i64(i64::from(v))
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
@@ -136,7 +157,44 @@ impl<'de> Deserialize<'de> for l2::TxType {
                     3 => l2::TxType::Withdraw,
                     4 => l2::TxType::PlaceOrder,
                     5 => l2::TxType::SpotTrade,
-                    _ => return Err(de::Error::invalid_type(de::Unexpected::Signed(v as i64), &self)),
+                    _ => return Err(de::Error::invalid_type(de::Unexpected::Signed(v), &self)),
+                };
+                Ok(tx_type)
+            }
+
+            fn visit_u8<E>(self, v: u8) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                self.visit_i64(i64::from(v))
+            }
+
+            fn visit_u16<E>(self, v: u16) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                self.visit_i64(i64::from(v))
+            }
+
+            fn visit_u32<E>(self, v: u32) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                self.visit_i64(i64::from(v))
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let tx_type = match v {
+                    0 => l2::TxType::Nop,
+                    1 => l2::TxType::Deposit,
+                    2 => l2::TxType::Transfer,
+                    3 => l2::TxType::Withdraw,
+                    4 => l2::TxType::PlaceOrder,
+                    5 => l2::TxType::SpotTrade,
+                    _ => return Err(de::Error::invalid_type(de::Unexpected::Unsigned(v), &self)),
                 };
                 Ok(tx_type)
             }
@@ -148,29 +206,27 @@ impl<'de> Deserialize<'de> for l2::TxType {
 
 type MerklePathStr = Vec<MerkleLeafStr>;
 
-//use derive could save many efforts for impling Serialize
-//TODO: carmel style except for three "elements" field
 #[derive(Serialize, Deserialize)]
 pub struct L2BlockSerde {
-    #[serde(rename(serialize = "oldRoot"))]
+    #[serde(rename = "oldRoot")]
     pub old_root: FrStr,
-    #[serde(rename(serialize = "newRoot"))]
+    #[serde(rename = "newRoot")]
     pub new_root: FrStr,
-    #[serde(rename(serialize = "txsType"))]
+    #[serde(rename = "txsType")]
     pub txs_type: Vec<l2::TxType>,
-    #[serde(rename(serialize = "encodedTxs"))]
+    #[serde(rename = "encodedTxs")]
     pub encoded_txs: Vec<Vec<FrStr>>,
-    #[serde(rename(serialize = "balancePathElements"))]
+    #[serde(rename = "balancePathElements")]
     pub balance_path_elements: Vec<[MerklePathStr; 4]>,
-    #[serde(rename(serialize = "orderPathElements"))]
+    #[serde(rename = "orderPathElements")]
     pub order_path_elements: Vec<[MerklePathStr; 2]>,
-    #[serde(rename(serialize = "accountPathElements"))]
+    #[serde(rename = "accountPathElements")]
     pub account_path_elements: Vec<[MerklePathStr; 2]>,
-    #[serde(rename(serialize = "orderRoots"))]
+    #[serde(rename = "orderRoots")]
     pub order_roots: Vec<[FrStr; 2]>,
-    #[serde(rename(serialize = "oldAccountRoots"))]
+    #[serde(rename = "oldAccountRoots")]
     pub old_account_roots: Vec<FrStr>,
-    #[serde(rename(serialize = "newAccountRoots"))]
+    #[serde(rename = "newAccountRoots")]
     pub new_account_roots: Vec<FrStr>,
 }
 
