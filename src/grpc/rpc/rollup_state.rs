@@ -1,4 +1,34 @@
 #[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, ::prost::Message)]
+pub struct L2BlockQueryRequest {
+    #[prost(int64, tag = "1")]
+    pub block_id: i64,
+}
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, ::prost::Message)]
+pub struct L2BlockQueryResponse {
+    #[prost(string, tag = "1")]
+    pub new_root: ::prost::alloc::string::String,
+    #[prost(double, tag = "2")]
+    pub created_time: f64,
+    #[prost(uint64, tag = "3")]
+    pub tx_num: u64,
+    #[prost(uint64, tag = "4")]
+    pub real_tx_num: u64,
+    #[prost(enumeration = "TaskStatus", tag = "5")]
+    pub status: i32,
+    #[prost(message, repeated, tag = "6")]
+    pub txs: ::prost::alloc::vec::Vec<l2_block_query_response::Tx>,
+}
+/// Nested message and enum types in `L2BlockQueryResponse`.
+pub mod l2_block_query_response {
+    /// TODO: Adds `l1_tx_hash: string`.
+    #[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, ::prost::Message)]
+    pub struct Tx {
+        /// TODO: Fixes to decoding TX in issue #132.
+        #[prost(string, repeated, tag = "1")]
+        pub detail: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    }
+}
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, ::prost::Message)]
 pub struct TokenBalanceQueryRequest {
     #[prost(uint32, tag = "1")]
     pub account_id: u32,
@@ -17,6 +47,15 @@ pub struct TokenBalanceQueryResponse {
     pub balance_raw: ::prost::alloc::string::String,
     #[prost(uint32, tag = "3")]
     pub precision: u32,
+}
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum TaskStatus {
+    Inited = 0,
+    Witgening = 1,
+    Ready = 2,
+    Assigned = 3,
+    Proved = 4,
 }
 #[doc = r" Generated client implementations."]
 pub mod rollup_state_client {
@@ -51,6 +90,18 @@ pub mod rollup_state_client {
             let inner = tonic::client::Grpc::with_interceptor(inner, interceptor);
             Self { inner }
         }
+        pub async fn l2_block_query(
+            &mut self,
+            request: impl tonic::IntoRequest<super::L2BlockQueryRequest>,
+        ) -> Result<tonic::Response<super::L2BlockQueryResponse>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| tonic::Status::new(tonic::Code::Unknown, format!("Service was not ready: {}", e.into())))?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/rollup_state.RollupState/L2BlockQuery");
+            self.inner.unary(request.into_request(), path, codec).await
+        }
         pub async fn token_balance_query(
             &mut self,
             request: impl tonic::IntoRequest<super::TokenBalanceQueryRequest>,
@@ -82,6 +133,10 @@ pub mod rollup_state_server {
     #[doc = "Generated trait containing gRPC methods that should be implemented for use with RollupStateServer."]
     #[async_trait]
     pub trait RollupState: Send + Sync + 'static {
+        async fn l2_block_query(
+            &self,
+            request: tonic::Request<super::L2BlockQueryRequest>,
+        ) -> Result<tonic::Response<super::L2BlockQueryResponse>, tonic::Status>;
         async fn token_balance_query(
             &self,
             request: tonic::Request<super::TokenBalanceQueryRequest>,
@@ -119,6 +174,34 @@ pub mod rollup_state_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
+                "/rollup_state.RollupState/L2BlockQuery" => {
+                    #[allow(non_camel_case_types)]
+                    struct L2BlockQuerySvc<T: RollupState>(pub Arc<T>);
+                    impl<T: RollupState> tonic::server::UnaryService<super::L2BlockQueryRequest> for L2BlockQuerySvc<T> {
+                        type Response = super::L2BlockQueryResponse;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(&mut self, request: tonic::Request<super::L2BlockQueryRequest>) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).l2_block_query(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let interceptor = inner.1.clone();
+                        let inner = inner.0;
+                        let method = L2BlockQuerySvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = if let Some(interceptor) = interceptor {
+                            tonic::server::Grpc::with_interceptor(codec, interceptor)
+                        } else {
+                            tonic::server::Grpc::new(codec)
+                        };
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
                 "/rollup_state.RollupState/TokenBalanceQuery" => {
                     #[allow(non_camel_case_types)]
                     struct TokenBalanceQuerySvc<T: RollupState>(pub Arc<T>);
