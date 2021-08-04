@@ -65,11 +65,11 @@ async function depositBalance() {
 
 async function getL2BlockByIdTest() {
   const res = await grpcClient.l2BlockQuery(blockId);
-  assert.equal(res["created_time"], 1628077128);
+  assert(res["created_time"]);
+  assert.equal(res["txs"].length, 2);
   assert.equal(res["tx_num"], "2");
   assert.equal(res["real_tx_num"], "2");
   assert.equal(res["status"], "INITED");
-  assert(res["txs"]);
   assert.equal(
     res["new_root"],
     "Fr(0x1cd19866300cc822c6ead46a420ecf2b4dacd26b49d3a5cbf737761f3fa2dd01)"
