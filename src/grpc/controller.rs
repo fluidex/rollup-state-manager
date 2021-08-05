@@ -89,7 +89,7 @@ async fn get_l2_block_by_id(db_pool: &sqlx::Pool<DbType>, block_id: i64) -> Resu
         Ok(l2_block) => Ok(l2_block),
         Err(sqlx::Error::RowNotFound) => Err(Status::new(Code::NotFound, "db l2_block record not found")),
         Err(err) => {
-            println!("{:?}", err);
+            log::error!("{:?}", err);
             Err(Status::new(Code::Internal, "db table l2_block fetch error"))
         }
     }
