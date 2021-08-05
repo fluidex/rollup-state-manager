@@ -55,7 +55,7 @@ fn grpc_run(state: Arc<RwLock<GlobalState>>) -> Option<std::thread::JoinHandle<a
     }))
 }
 
-fn replay_msgs(
+fn process_msgs(
     msg_receiver: crossbeam_channel::Receiver<WrappedMessage>,
     block_sender: crossbeam_channel::Sender<L2Block>,
     state: Arc<RwLock<GlobalState>>,
@@ -68,13 +68,59 @@ fn replay_msgs(
         } else {
             None
         };
-        let mut witgen = WitnessGenerator::new(state, *params::NTXS, block_offset, *params::VERBOSE);
 
-        println!("genesis root {}", witgen.root().to_string());
+        let witgen = WitnessGenerator::new(state, *params::NTXS, block_offset, *params::VERBOSE);
+        log::info!("genesis root {}", witgen.root().to_string());
 
+        run_msg_processor(msg_receiver, block_sender, witgen)
+    }))
+}
+
+async fn run(offset: Option<i64>, db: Option<sled::Db>) {
+    let state = Arc::new(RwLock::new(GlobalState::new(
+        *params::BALANCELEVELS,
+        *params::ORDERLEVELS,
+        *params::ACCOUNTLEVELS,
+        *params::VERBOSE,
+    )));
+
+    let (msg_sender, msg_receiver) = crossbeam_channel::unbounded();
+    let (blk_sender, blk_receiver) = crossbeam_channel::unbounded();
+
+    let loader_thread = msg_loader::load_msgs_from_mq(Settings::brokers(), offset, msg_sender);
+    let replay_thread = process_msgs(msg_receiver, blk_sender, Arc::clone(&state), db);
+    let server_thread = grpc_run(state);
+
+    let db_pool = PgPool::connect(Settings::db()).await.unwrap();
+    MIGRATOR.run(&db_pool).await.ok();
+
+    for block in blk_receiver.iter() {
+        save_block_to_db(&db_pool, &block).await.unwrap();
+        save_task_to_db(&db_pool, block).await.unwrap();
+    }
+
+    loader_thread.map(|h| h.join().expect("loader thread failed"));
+    replay_thread.map(|h| h.join().expect("loader thread failed"));
+    server_thread.map(|h| h.join().expect("loader thread failed"));
+}
+
+fn run_msg_processor(
+    msg_receiver: crossbeam_channel::Receiver<WrappedMessage>,
+    block_sender: crossbeam_channel::Sender<L2Block>,
+    mut witgen: WitnessGenerator,
+) -> anyhow::Result<()> {
+    let rt: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("Build runtime");
+
+    rt.block_on(async {
         let mut processor = msg_processor::Processor::default();
 
         let timing = Instant::now();
+        let db_pool = PgPool::connect(Settings::db()).await.unwrap();
+        let mut old_block_check = true;
+        let mut old_block_num = 0;
         loop {
             // In the worst case we wait for about 119 seconds timeout until we try to
             // generate a block, if there's any tx.
@@ -108,12 +154,21 @@ fn replay_msgs(
             };
 
             for block in witgen.pop_all_blocks() {
+                if old_block_check && is_present_block(&db_pool, &block).await.unwrap() {
+                    // Skips this old block.
+                    old_block_num += 1;
+                    continue;
+                }
+
+                // Once the block is a new one, no need to check if old.
+                old_block_check = false;
+
                 block_sender.try_send(block).unwrap();
             }
 
-            let block_num = witgen.get_block_generate_num();
+            let block_num = witgen.get_block_generate_num() - old_block_num;
             let secs = timing.elapsed().as_secs_f32();
-            println!(
+            log::info!(
                 "generate {} blocks with block_size {} in {}s: average TPS: {}",
                 block_num,
                 *params::NTXS,
@@ -123,46 +178,7 @@ fn replay_msgs(
         }
 
         Ok(())
-    }))
-}
-
-async fn run(offset: Option<i64>, db: Option<sled::Db>) {
-    let state = Arc::new(RwLock::new(GlobalState::new(
-        *params::BALANCELEVELS,
-        *params::ORDERLEVELS,
-        *params::ACCOUNTLEVELS,
-        *params::VERBOSE,
-    )));
-
-    let (msg_sender, msg_receiver) = crossbeam_channel::unbounded();
-    let (blk_sender, blk_receiver) = crossbeam_channel::unbounded();
-
-    let loader_thread = msg_loader::load_msgs_from_mq(Settings::brokers(), offset, msg_sender);
-    let replay_thread = replay_msgs(msg_receiver, blk_sender, Arc::clone(&state), db);
-    let server_thread = grpc_run(state);
-
-    let db_pool = PgPool::connect(Settings::db()).await.unwrap();
-    MIGRATOR.run(&db_pool).await.ok();
-
-    let mut check_old_block = true;
-    for block in blk_receiver.iter() {
-        if check_old_block {
-            let is_present = is_present_block(&db_pool, &block).await.unwrap();
-            if is_present {
-                // skip saving to db
-                continue;
-            } else {
-                // once the old block is not in db, we don't need checking any longer
-                check_old_block = false;
-            }
-        }
-        save_block_to_db(&db_pool, &block).await.unwrap();
-        save_task_to_db(&db_pool, block).await.unwrap();
-    }
-
-    loader_thread.map(|h| h.join().expect("loader thread failed"));
-    replay_thread.map(|h| h.join().expect("loader thread failed"));
-    server_thread.map(|h| h.join().expect("loader thread failed"));
+    })
 }
 
 // Returns true if already present in DB, otherwise false.
