@@ -22,9 +22,6 @@ impl Controller {
         Self { db_pool, state }
     }
 
-    // TODO: offset can be optional?
-    // default 0? what about genesis block?
-    // default -1?
     pub async fn l2_blocks_query(&self, request: L2BlocksQueryRequest) -> Result<L2BlocksQueryResponse, Status> {
         let (total, blocks) = self.l2_blocks_db_query(request).await.map_err(|e| {
             log::error!("{:?}", e);
