@@ -31,7 +31,7 @@ impl Controller {
         })?;
 
         Ok(L2BlocksQueryResponse {
-            total: total.into(),
+            total,
             blocks: blocks
                 .iter()
                 .map(|b| l2_blocks_query_response::BlockSummary {
