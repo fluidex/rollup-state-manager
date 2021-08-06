@@ -1,6 +1,6 @@
 #![allow(clippy::let_and_return)]
 use crate::account::SignatureBJJ;
-use manager::state::ManagerWrapper;
+use crate::state::ManagerWrapper;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, OrderSide};
 use crate::types::matchengine::{self, messages};
