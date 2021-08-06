@@ -5,6 +5,13 @@ package rollup_state;
 import "google/api/annotations.proto";
 
 service RollupState {
+  rpc L2BlocksQuery(L2BlocksQueryRequest) returns (L2BlocksQueryResponse) {
+    option (google.api.http) = {
+      post : "/api/l2_blocks"
+      body : "*"
+    };
+  }
+
   rpc L2BlockQuery(L2BlockQueryRequest) returns (L2BlockQueryResponse) {
     option (google.api.http) = {
       post : "/api/l2_block/{block_id}"
@@ -18,6 +25,21 @@ service RollupState {
       body : "*"
     };
   }
+}
+
+message L2BlocksQueryRequest {
+  int64 offset = 1;
+  int64 limit = 2;
+}
+
+message L2BlocksQueryResponse {
+  int64 total = 1;
+  repeated BlockSummary blocks = 2;
+  message BlockSummary {
+      int64 block_height = 1;
+      string merkle_root = 2;
+      double block_time = 3;
+  }  
 }
 
 message L2BlockQueryRequest {
