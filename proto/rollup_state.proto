@@ -14,8 +14,7 @@ service RollupState {
 
   rpc L2BlockQuery(L2BlockQueryRequest) returns (L2BlockQueryResponse) {
     option (google.api.http) = {
-      post : "/api/l2_block/{block_id}"
-      body : "*"
+      get : "/api/l2_block/{block_id}"
     };
   }
 
