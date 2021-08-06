@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use rollup_state_manager::params;
-use rollup_state_manager::state::{GlobalState, WitnessGenerator};
+use rollup_state_manager::state::{GlobalState, ManagerWrapper};
 use rollup_state_manager::test_utils;
 use rollup_state_manager::test_utils::circuit::{write_test_case, CircuitTestCase, CircuitTestData};
 use rollup_state_manager::test_utils::messages::WrappedMessage;
@@ -31,9 +31,9 @@ fn replay_msgs(
             *params::ACCOUNTLEVELS,
             *params::VERBOSE,
         )));
-        let mut witgen = WitnessGenerator::new(state, *params::NTXS, None, *params::VERBOSE);
+        let mut manager = ManagerWrapper::new(state, *params::NTXS, None, *params::VERBOSE);
 
-        println!("genesis root {}", witgen.root());
+        println!("genesis root {}", manager.root());
 
         let mut processor = msg_processor::Processor::default();
 
@@ -41,36 +41,36 @@ fn replay_msgs(
         for msg in msg_receiver.iter() {
             match msg {
                 WrappedMessage::BALANCE(balance) => {
-                    processor.handle_balance_msg(&mut witgen, balance);
+                    processor.handle_balance_msg(&mut manager, balance);
                 }
                 WrappedMessage::TRADE(trade) => {
                     let trade_id = trade.id;
-                    processor.handle_trade_msg(&mut witgen, trade);
+                    processor.handle_trade_msg(&mut manager, trade);
                     println!("trade {} test done", trade_id);
                 }
                 WrappedMessage::ORDER(order) => {
-                    processor.handle_order_msg(&mut witgen, order);
+                    processor.handle_order_msg(&mut manager, order);
                 }
                 WrappedMessage::USER(user) => {
-                    processor.handle_user_msg(&mut witgen, user);
+                    processor.handle_user_msg(&mut manager, user);
                 }
                 _ => {
                     //other msg is omitted
                 }
             }
         }
-        witgen.flush_with_nop();
+        manager.flush_with_nop();
 
-        for block in witgen.pop_all_blocks() {
+        for block in manager.pop_all_blocks() {
             block_sender.try_send(block).unwrap();
         }
 
-        let block_num = witgen.get_block_generate_num();
+        let block_num = manager.get_block_generate_num();
         cfg_if::cfg_if! {
             if #[cfg(feature = "persist_sled")] {
             if let Ok(path) = std::env::var("SLED_DB_PATH") {
                 let db = sled::open(&path).unwrap();
-                witgen.dump_to_sled(&db).unwrap();
+                manager.dump_to_sled(&db).unwrap();
             }
             }
         }
@@ -118,7 +118,7 @@ pub fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<L2Block>) ->
             .iter()
             .map(|block| CircuitTestData {
                 name: format!("{:04}", block.block_id),
-                input: serde_json::to_value(L2BlockSerde::from(block.witness.clone())).unwrap(),
+                input: serde_json::to_value(L2BlockSerde::from(block.detail.clone())).unwrap(),
                 output: None,
             })
             .collect(),

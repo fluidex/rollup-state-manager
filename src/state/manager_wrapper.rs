@@ -18,7 +18,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Instant;
 
 // TODO: too many unwrap here
-pub struct WitnessGenerator {
+pub struct ManagerWrapper {
     state: Arc<RwLock<GlobalState>>,
     n_tx: usize,
     // 0 <= len(buffered_txs) < n_tx
@@ -29,7 +29,7 @@ pub struct WitnessGenerator {
     verify_sig: bool,
 }
 
-impl WitnessGenerator {
+impl ManagerWrapper {
     pub fn print_config() {
         Tree::print_config();
     }
@@ -111,7 +111,7 @@ impl WitnessGenerator {
             .collect();
         let old_account_roots: Vec<Fr> = buffered_txs.iter().map(|tx| tx.root_before).collect();
         let new_account_roots: Vec<Fr> = buffered_txs.iter().map(|tx| tx.root_after).collect();
-        let witness = L2BlockDetail {
+        let detail = L2BlockDetail {
             old_root: *old_account_roots.first().unwrap(),
             new_root: *new_account_roots.last().unwrap(),
             txs_type,
@@ -123,7 +123,7 @@ impl WitnessGenerator {
             old_account_roots,
             new_account_roots,
         };
-        L2Block { block_id, witness }
+        L2Block { block_id, detail }
     }
     pub fn has_raw_tx(&self) -> bool {
         !self.buffered_txs.is_empty()

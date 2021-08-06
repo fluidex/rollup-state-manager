@@ -1,7 +1,7 @@
 pub mod account;
 pub mod global;
-pub mod witness_generator;
+pub mod manager_wrapper;
 
 pub use account::AccountState;
 pub use global::GlobalState;
-pub use witness_generator::WitnessGenerator;
+pub use manager_wrapper::ManagerWrapper;

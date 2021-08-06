@@ -15,7 +15,7 @@ use rollup_state_manager::grpc::run_grpc_server;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
 use rollup_state_manager::params;
 use rollup_state_manager::r#const::sled_db::*;
-use rollup_state_manager::state::{GlobalState, WitnessGenerator};
+use rollup_state_manager::state::{GlobalState, ManagerWrapper};
 use rollup_state_manager::test_utils::messages::WrappedMessage;
 use rollup_state_manager::types::l2::{L2Block, L2BlockSerde};
 use sqlx::postgres::PgPool;
@@ -69,10 +69,10 @@ fn process_msgs(
             None
         };
 
-        let witgen = WitnessGenerator::new(state, *params::NTXS, block_offset, *params::VERBOSE);
-        log::info!("genesis root {}", witgen.root().to_string());
+        let manager = ManagerWrapper::new(state, *params::NTXS, block_offset, *params::VERBOSE);
+        log::info!("genesis root {}", manager.root().to_string());
 
-        run_msg_processor(msg_receiver, block_sender, witgen)
+        run_msg_processor(msg_receiver, block_sender, manager)
     }))
 }
 
@@ -107,7 +107,7 @@ async fn run(offset: Option<i64>, db: Option<sled::Db>) {
 fn run_msg_processor(
     msg_receiver: crossbeam_channel::Receiver<WrappedMessage>,
     block_sender: crossbeam_channel::Sender<L2Block>,
-    mut witgen: WitnessGenerator,
+    mut manager: ManagerWrapper,
 ) -> anyhow::Result<()> {
     let rt: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -130,30 +130,30 @@ fn run_msg_processor(
                     log::debug!("recv new msg {:?}", msg);
                     match msg {
                         WrappedMessage::BALANCE(balance) => {
-                            processor.handle_balance_msg(&mut witgen, balance);
+                            processor.handle_balance_msg(&mut manager, balance);
                         }
                         WrappedMessage::TRADE(trade) => {
-                            processor.handle_trade_msg(&mut witgen, trade);
+                            processor.handle_trade_msg(&mut manager, trade);
                         }
                         WrappedMessage::ORDER(order) => {
-                            processor.handle_order_msg(&mut witgen, order);
+                            processor.handle_order_msg(&mut manager, order);
                         }
                         WrappedMessage::USER(user) => {
-                            processor.handle_user_msg(&mut witgen, user);
+                            processor.handle_user_msg(&mut manager, user);
                         }
                     }
                 }
                 Err(err) => match err {
                     RecvTimeoutError::Timeout => {
-                        if witgen.has_raw_tx() {
-                            witgen.flush_with_nop();
+                        if manager.has_raw_tx() {
+                            manager.flush_with_nop();
                         }
                     }
                     RecvTimeoutError::Disconnected => break,
                 },
             };
 
-            for block in witgen.pop_all_blocks() {
+            for block in manager.pop_all_blocks() {
                 if old_block_check && is_present_block(&db_pool, &block).await.unwrap() {
                     // Skips this old block.
                     old_block_num += 1;
@@ -166,7 +166,7 @@ fn run_msg_processor(
                 block_sender.try_send(block).unwrap();
             }
 
-            let block_num = witgen.get_block_generate_num() - old_block_num;
+            let block_num = manager.get_block_generate_num() - old_block_num;
             let secs = timing.elapsed().as_secs_f32();
             log::info!(
                 "generate {} blocks with block_size {} in {}s: average TPS: {}",
@@ -190,13 +190,13 @@ async fn is_present_block(pool: &PgPool, block: &L2Block) -> anyhow::Result<bool
     {
         Ok(row) => {
             let new_root: String = row.get(0);
-            let old_root: String = block.witness.new_root.to_string();
+            let old_root: String = block.detail.new_root.to_string();
             if new_root == old_root {
                 log::debug!("skip same l2 block {} {}", block.block_id, new_root);
             } else {
                 log::error!(
                     "new block {}",
-                    serde_json::to_string_pretty(&L2BlockSerde::from(block.witness.clone())).unwrap()
+                    serde_json::to_string_pretty(&L2BlockSerde::from(block.detail.clone())).unwrap()
                 );
                 assert_eq!(
                     new_root, old_root,
@@ -213,8 +213,8 @@ async fn is_present_block(pool: &PgPool, block: &L2Block) -> anyhow::Result<bool
 }
 
 async fn save_block_to_db(pool: &PgPool, block: &L2Block) -> anyhow::Result<()> {
-    let new_root = block.witness.new_root.to_string();
-    let witness = L2BlockSerde::from(block.witness.clone());
+    let new_root = block.detail.new_root.to_string();
+    let witness = L2BlockSerde::from(block.detail.clone());
     sqlx::query(&format!(
         "insert into {} (block_id, new_root, witness) values ($1, $2, $3)",
         tablenames::L2_BLOCK
@@ -229,7 +229,7 @@ async fn save_block_to_db(pool: &PgPool, block: &L2Block) -> anyhow::Result<()> 
 }
 
 async fn save_task_to_db(pool: &PgPool, block: L2Block) -> anyhow::Result<()> {
-    let input = L2BlockSerde::from(block.witness);
+    let input = L2BlockSerde::from(block.detail);
     let task_id = unique_task_id();
 
     sqlx::query("insert into task (task_id, circuit, block_id, input, status) values ($1, $2, $3, $4, $5)")
