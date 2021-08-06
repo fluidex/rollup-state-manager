@@ -4,7 +4,7 @@ use crate::types::merkle_tree::MerklePath;
 use fluidex_common::Fr;
 
 #[derive(Clone)]
-pub struct L2BlockWitness {
+pub struct L2BlockDetail {
     pub old_root: Fr,
     pub new_root: Fr,
     pub txs_type: Vec<TxType>,
@@ -20,5 +20,5 @@ pub struct L2BlockWitness {
 #[derive(Clone)]
 pub struct L2Block {
     pub block_id: usize,
-    pub witness: L2BlockWitness,
+    pub witness: L2BlockDetail,
 }
