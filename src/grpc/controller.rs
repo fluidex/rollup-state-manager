@@ -21,8 +21,28 @@ impl Controller {
         Self { db_pool, state }
     }
 
+    // TODO: offset can be optional?
+    // default 0? what about genesis block?
+    // default -1?
     pub async fn l2_blocks_query(&self, request: L2BlocksQueryRequest) -> Result<L2BlocksQueryResponse, Status> {
-        unimplemented!()
+        // db begin tx
+        // query sum
+
+        let stmt = format!(
+            "select block_id, new_root, witness, created_time
+            from {}
+            where block_id = $1
+            order by created_time desc limit {}",
+            tablenames::L2_BLOCK,
+            request.limit,
+        );
+
+        let blocks: Vec<l2_block::L2Block> = sqlx::query_as::(&stmt)
+            .bind(request.offset)
+            .fetch_all(db_pool)
+            .await;
+
+        unimplemented!();
     }
 
     pub async fn l2_block_query(&self, request: L2BlockQueryRequest) -> Result<L2BlockQueryResponse, Status> {
