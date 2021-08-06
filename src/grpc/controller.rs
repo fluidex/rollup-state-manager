@@ -3,6 +3,7 @@ use crate::grpc::rpc::*;
 use crate::state::global::GlobalState;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::L2BlockSerde;
+use core::cmp::{max, min};
 use fluidex_common::db::models::{l2_block, tablenames, task};
 use fluidex_common::db::DbType;
 use fluidex_common::types::FrExt;
@@ -19,6 +20,52 @@ impl Controller {
     pub async fn new(state: Arc<RwLock<GlobalState>>) -> Self {
         let db_pool = sqlx::postgres::PgPool::connect(Settings::db()).await.unwrap();
         Self { db_pool, state }
+    }
+
+    pub async fn l2_blocks_query(&self, request: L2BlocksQueryRequest) -> Result<L2BlocksQueryResponse, Status> {
+        let (total, blocks) = self.l2_blocks_db_query(request).await.map_err(|e| {
+            log::error!("{:?}", e);
+            Status::new(Code::Internal, "db l2_blocks query error")
+        })?;
+
+        Ok(L2BlocksQueryResponse {
+            total,
+            blocks: blocks
+                .iter()
+                .map(|b| l2_blocks_query_response::BlockSummary {
+                    block_height: b.block_id,
+                    merkle_root: b.new_root.clone(),
+                    block_time: FTimestamp::from(&b.created_time).0,
+                })
+                .collect(),
+        })
+    }
+
+    pub async fn l2_blocks_db_query(&self, request: L2BlocksQueryRequest) -> Result<(i64, Vec<l2_block::L2Block>), anyhow::Error> {
+        let mut tx = self.db_pool.begin().await?;
+
+        let count_query = format!("select block_id from {} order by block_id desc limit 1", tablenames::L2_BLOCK);
+        // "total"'s type needs to be consistent with block_id
+        let total: i64 = sqlx::query_scalar(&count_query).fetch_one(&mut tx).await?;
+
+        let limit = max(1, request.limit);
+        let limit = min(100, limit);
+        let blocks_query = format!(
+            "select block_id, new_root, witness, created_time
+            from {}
+            where block_id <= $1
+            order by block_id desc limit {}",
+            tablenames::L2_BLOCK,
+            limit,
+        );
+        let blocks: Vec<l2_block::L2Block> = sqlx::query_as::<_, l2_block::L2Block>(&blocks_query)
+            .bind(total - request.offset)
+            .fetch_all(&mut tx)
+            .await?;
+
+        tx.commit().await?;
+
+        Ok((total, blocks))
     }
 
     pub async fn l2_block_query(&self, request: L2BlockQueryRequest) -> Result<L2BlockQueryResponse, Status> {

@@ -1,4 +1,30 @@
 #[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, ::prost::Message)]
+pub struct L2BlocksQueryRequest {
+    #[prost(int64, tag = "1")]
+    pub offset: i64,
+    #[prost(int64, tag = "2")]
+    pub limit: i64,
+}
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, ::prost::Message)]
+pub struct L2BlocksQueryResponse {
+    #[prost(int64, tag = "1")]
+    pub total: i64,
+    #[prost(message, repeated, tag = "2")]
+    pub blocks: ::prost::alloc::vec::Vec<l2_blocks_query_response::BlockSummary>,
+}
+/// Nested message and enum types in `L2BlocksQueryResponse`.
+pub mod l2_blocks_query_response {
+    #[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, ::prost::Message)]
+    pub struct BlockSummary {
+        #[prost(int64, tag = "1")]
+        pub block_height: i64,
+        #[prost(string, tag = "2")]
+        pub merkle_root: ::prost::alloc::string::String,
+        #[prost(double, tag = "3")]
+        pub block_time: f64,
+    }
+}
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, ::prost::Message)]
 pub struct L2BlockQueryRequest {
     #[prost(int64, tag = "1")]
     pub block_id: i64,
@@ -90,6 +116,18 @@ pub mod rollup_state_client {
             let inner = tonic::client::Grpc::with_interceptor(inner, interceptor);
             Self { inner }
         }
+        pub async fn l2_blocks_query(
+            &mut self,
+            request: impl tonic::IntoRequest<super::L2BlocksQueryRequest>,
+        ) -> Result<tonic::Response<super::L2BlocksQueryResponse>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| tonic::Status::new(tonic::Code::Unknown, format!("Service was not ready: {}", e.into())))?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/rollup_state.RollupState/L2BlocksQuery");
+            self.inner.unary(request.into_request(), path, codec).await
+        }
         pub async fn l2_block_query(
             &mut self,
             request: impl tonic::IntoRequest<super::L2BlockQueryRequest>,
@@ -133,6 +171,10 @@ pub mod rollup_state_server {
     #[doc = "Generated trait containing gRPC methods that should be implemented for use with RollupStateServer."]
     #[async_trait]
     pub trait RollupState: Send + Sync + 'static {
+        async fn l2_blocks_query(
+            &self,
+            request: tonic::Request<super::L2BlocksQueryRequest>,
+        ) -> Result<tonic::Response<super::L2BlocksQueryResponse>, tonic::Status>;
         async fn l2_block_query(
             &self,
             request: tonic::Request<super::L2BlockQueryRequest>,
@@ -174,6 +216,34 @@ pub mod rollup_state_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
+                "/rollup_state.RollupState/L2BlocksQuery" => {
+                    #[allow(non_camel_case_types)]
+                    struct L2BlocksQuerySvc<T: RollupState>(pub Arc<T>);
+                    impl<T: RollupState> tonic::server::UnaryService<super::L2BlocksQueryRequest> for L2BlocksQuerySvc<T> {
+                        type Response = super::L2BlocksQueryResponse;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        fn call(&mut self, request: tonic::Request<super::L2BlocksQueryRequest>) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).l2_blocks_query(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let interceptor = inner.1.clone();
+                        let inner = inner.0;
+                        let method = L2BlocksQuerySvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = if let Some(interceptor) = interceptor {
+                            tonic::server::Grpc::with_interceptor(codec, interceptor)
+                        } else {
+                            tonic::server::Grpc::new(codec)
+                        };
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
                 "/rollup_state.RollupState/L2BlockQuery" => {
                     #[allow(non_camel_case_types)]
                     struct L2BlockQuerySvc<T: RollupState>(pub Arc<T>);

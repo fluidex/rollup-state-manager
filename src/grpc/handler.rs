@@ -18,6 +18,10 @@ impl Handler {
 
 #[tonic::async_trait]
 impl rollup_state_server::RollupState for Handler {
+    async fn l2_blocks_query(&self, request: Request<L2BlocksQueryRequest>) -> Result<Response<L2BlocksQueryResponse>, Status> {
+        Ok(Response::new(self.controller.l2_blocks_query(request.into_inner()).await?))
+    }
+
     async fn l2_block_query(&self, request: Request<L2BlockQueryRequest>) -> Result<Response<L2BlockQueryResponse>, Status> {
         Ok(Response::new(self.controller.l2_block_query(request.into_inner()).await?))
     }
