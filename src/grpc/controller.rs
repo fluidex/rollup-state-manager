@@ -3,6 +3,7 @@ use crate::grpc::rpc::*;
 use crate::state::global::GlobalState;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::L2BlockSerde;
+use core::cmp::{max, min};
 use fluidex_common::db::models::{l2_block, tablenames, task};
 use fluidex_common::db::DbType;
 use fluidex_common::types::FrExt;
@@ -50,13 +51,15 @@ impl Controller {
         // "total"'s type needs to be consistent with block_id
         let total: i64 = sqlx::query_scalar(&count_query).fetch_one(&mut tx).await?;
 
+        let limit = max(1, request.limit);
+        let limit = min(100, limit);
         let blocks_query = format!(
             "select block_id, new_root, witness, created_time
             from {}
             where block_id <= $1
             order by block_id desc limit {}",
             tablenames::L2_BLOCK,
-            request.limit,
+            limit,
         );
         let blocks: Vec<l2_block::L2Block> = sqlx::query_as::<_, l2_block::L2Block>(&blocks_query)
             .bind(total - request.offset)
