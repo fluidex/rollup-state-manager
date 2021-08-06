@@ -32,15 +32,18 @@ impl Controller {
             "select block_id, new_root, witness, created_time
             from {}
             where block_id = $1
-            order by created_time desc limit {}",
+            order by block_id desc limit {}",
             tablenames::L2_BLOCK,
             request.limit,
         );
-
-        let blocks: Vec<l2_block::L2Block> = sqlx::query_as::(&stmt)
+        let blocks: Vec<l2_block::L2Block> = sqlx::query_as::<_, l2_block::L2Block>(&stmt)
             .bind(request.offset)
-            .fetch_all(db_pool)
-            .await;
+            .fetch_all(&self.db_pool)
+            .await
+            .map_err(|e| {
+                log::error!("{:?}", e);
+                Status::new(Code::Internal, "db l2_blocks query error")
+            })?;
 
         unimplemented!();
     }
