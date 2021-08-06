@@ -25,27 +25,47 @@ impl Controller {
     // default 0? what about genesis block?
     // default -1?
     pub async fn l2_blocks_query(&self, request: L2BlocksQueryRequest) -> Result<L2BlocksQueryResponse, Status> {
-        // db begin tx
-        // query sum
+        let (total, blocks) = self.l2_blocks_db_query(request).await.map_err(|e| {
+            log::error!("{:?}", e);
+            Status::new(Code::Internal, "db l2_blocks query error")
+        })?;
 
-        let stmt = format!(
+        Ok(L2BlocksQueryResponse {
+            total: total.into(),
+            blocks: blocks
+                .iter()
+                .map(|b| l2_blocks_query_response::BlockSummary {
+                    block_height: b.block_id,
+                    merkle_root: b.new_root,
+                    block_time: b.created_time,
+                })
+                .collect(),
+        })
+    }
+
+    pub async fn l2_blocks_db_query(&self, request: L2BlocksQueryRequest) -> Result<(i32, Vec<l2_block::L2Block>), anyhow::Error> {
+        let mut tx = self.db_pool.begin().await?;
+
+        let count_query = format!("select block_id from {} order by block_id desc limit 1", tablenames::L2_BLOCK);
+        // "total"'s type needs to be consistent with block_id
+        let total: i32 = sqlx::query_scalar(&count_query).fetch_one(&mut tx).await?;
+
+        let blocks_query = format!(
             "select block_id, new_root, witness, created_time
             from {}
-            where block_id = $1
+            where block_id <= $1
             order by block_id desc limit {}",
             tablenames::L2_BLOCK,
             request.limit,
         );
-        let blocks: Vec<l2_block::L2Block> = sqlx::query_as::<_, l2_block::L2Block>(&stmt)
-            .bind(request.offset)
-            .fetch_all(&self.db_pool)
-            .await
-            .map_err(|e| {
-                log::error!("{:?}", e);
-                Status::new(Code::Internal, "db l2_blocks query error")
-            })?;
+        let blocks: Vec<l2_block::L2Block> = sqlx::query_as::<_, l2_block::L2Block>(&blocks_query)
+            .bind(total - request.offset)
+            .fetch_all(&mut tx)
+            .await?;
 
-        unimplemented!();
+        tx.commit().await?;
+
+        Ok((total, blocks))
     }
 
     pub async fn l2_block_query(&self, request: L2BlockQueryRequest) -> Result<L2BlockQueryResponse, Status> {
