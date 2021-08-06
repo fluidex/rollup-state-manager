@@ -36,19 +36,19 @@ impl Controller {
                 .iter()
                 .map(|b| l2_blocks_query_response::BlockSummary {
                     block_height: b.block_id,
-                    merkle_root: b.new_root,
-                    block_time: b.created_time,
+                    merkle_root: b.new_root.clone(),
+                    block_time: FTimestamp::from(&b.created_time).0,
                 })
                 .collect(),
         })
     }
 
-    pub async fn l2_blocks_db_query(&self, request: L2BlocksQueryRequest) -> Result<(i32, Vec<l2_block::L2Block>), anyhow::Error> {
+    pub async fn l2_blocks_db_query(&self, request: L2BlocksQueryRequest) -> Result<(i64, Vec<l2_block::L2Block>), anyhow::Error> {
         let mut tx = self.db_pool.begin().await?;
 
         let count_query = format!("select block_id from {} order by block_id desc limit 1", tablenames::L2_BLOCK);
         // "total"'s type needs to be consistent with block_id
-        let total: i32 = sqlx::query_scalar(&count_query).fetch_one(&mut tx).await?;
+        let total: i64 = sqlx::query_scalar(&count_query).fetch_one(&mut tx).await?;
 
         let blocks_query = format!(
             "select block_id, new_root, witness, created_time
