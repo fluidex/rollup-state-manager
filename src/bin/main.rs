@@ -69,10 +69,10 @@ fn process_msgs(
             None
         };
 
-        let witgen = ManagerWrapper::new(state, *params::NTXS, block_offset, *params::VERBOSE);
-        log::info!("genesis root {}", witgen.root().to_string());
+        let manager = ManagerWrapper::new(state, *params::NTXS, block_offset, *params::VERBOSE);
+        log::info!("genesis root {}", manager.root().to_string());
 
-        run_msg_processor(msg_receiver, block_sender, witgen)
+        run_msg_processor(msg_receiver, block_sender, manager)
     }))
 }
 
@@ -107,7 +107,7 @@ async fn run(offset: Option<i64>, db: Option<sled::Db>) {
 fn run_msg_processor(
     msg_receiver: crossbeam_channel::Receiver<WrappedMessage>,
     block_sender: crossbeam_channel::Sender<L2Block>,
-    mut witgen: ManagerWrapper,
+    mut manager: ManagerWrapper,
 ) -> anyhow::Result<()> {
     let rt: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -130,30 +130,30 @@ fn run_msg_processor(
                     log::debug!("recv new msg {:?}", msg);
                     match msg {
                         WrappedMessage::BALANCE(balance) => {
-                            processor.handle_balance_msg(&mut witgen, balance);
+                            processor.handle_balance_msg(&mut manager, balance);
                         }
                         WrappedMessage::TRADE(trade) => {
-                            processor.handle_trade_msg(&mut witgen, trade);
+                            processor.handle_trade_msg(&mut manager, trade);
                         }
                         WrappedMessage::ORDER(order) => {
-                            processor.handle_order_msg(&mut witgen, order);
+                            processor.handle_order_msg(&mut manager, order);
                         }
                         WrappedMessage::USER(user) => {
-                            processor.handle_user_msg(&mut witgen, user);
+                            processor.handle_user_msg(&mut manager, user);
                         }
                     }
                 }
                 Err(err) => match err {
                     RecvTimeoutError::Timeout => {
-                        if witgen.has_raw_tx() {
-                            witgen.flush_with_nop();
+                        if manager.has_raw_tx() {
+                            manager.flush_with_nop();
                         }
                     }
                     RecvTimeoutError::Disconnected => break,
                 },
             };
 
-            for block in witgen.pop_all_blocks() {
+            for block in manager.pop_all_blocks() {
                 if old_block_check && is_present_block(&db_pool, &block).await.unwrap() {
                     // Skips this old block.
                     old_block_num += 1;
@@ -166,7 +166,7 @@ fn run_msg_processor(
                 block_sender.try_send(block).unwrap();
             }
 
-            let block_num = witgen.get_block_generate_num() - old_block_num;
+            let block_num = manager.get_block_generate_num() - old_block_num;
             let secs = timing.elapsed().as_secs_f32();
             log::info!(
                 "generate {} blocks with block_size {} in {}s: average TPS: {}",

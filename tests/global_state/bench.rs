@@ -50,7 +50,7 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     // by clone accounts with same trades
     let loop_num = 50;
 
-    let mut witgen = ManagerWrapper::new(state, *params::NTXS, None, *params::VERBOSE);
+    let mut manager = ManagerWrapper::new(state, *params::NTXS, None, *params::VERBOSE);
     let timing = Instant::now();
     let mut inner_timing = Instant::now();
 
@@ -61,12 +61,12 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
                 WrappedMessage::USER(user) => {
                     let mut user = user.clone();
                     user.user_id += account_offset;
-                    processor.handle_user_msg(&mut witgen, user);
+                    processor.handle_user_msg(&mut manager, user);
                 }
                 WrappedMessage::BALANCE(balance) => {
                     let mut balance = balance.clone();
                     balance.user_id += account_offset;
-                    processor.handle_balance_msg(&mut witgen, balance);
+                    processor.handle_balance_msg(&mut manager, balance);
                 }
                 WrappedMessage::TRADE(trade) => {
                     let mut trade = trade.clone();
@@ -82,12 +82,12 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
                         o.user += account_offset;
                         o
                     });
-                    processor.handle_trade_msg(&mut witgen, trade);
+                    processor.handle_trade_msg(&mut manager, trade);
                 }
                 WrappedMessage::ORDER(order) => {
                     let mut order = order.clone();
                     order.order.user += account_offset;
-                    processor.handle_order_msg(&mut witgen, order);
+                    processor.handle_order_msg(&mut manager, order);
                 }
                 _ => unreachable!(),
             }
@@ -108,7 +108,7 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
         //println!("\nepoch {} done", i);
     }
 
-    let blocks: Vec<_> = witgen.pop_all_blocks();
+    let blocks: Vec<_> = manager.pop_all_blocks();
     println!(
         "bench for {} blocks (TPS: {})",
         blocks.len(),
