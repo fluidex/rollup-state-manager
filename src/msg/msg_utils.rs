@@ -1,6 +1,6 @@
 #![allow(clippy::let_and_return)]
 use crate::account::SignatureBJJ;
-use crate::state::WitnessGenerator;
+use crate::state::ManagerWrapper;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, OrderSide};
 use crate::types::matchengine::{self, messages};
@@ -94,7 +94,7 @@ pub fn exchange_order_to_rollup_order(origin: &matchengine::messages::Order) -> 
         }
     }
 }
-pub fn check_state(witgen: &WitnessGenerator, state: &messages::VerboseTradeState, trade: &messages::TradeMessage) {
+pub fn check_state(witgen: &ManagerWrapper, state: &messages::VerboseTradeState, trade: &messages::TradeMessage) {
     let token_pair = TokenPair::from(trade.market.as_str());
     let TokenIdPair(base_token_id, quote_token_id) = TokenIdPair::from(token_pair);
     for balance_state in &state.balance_states {

@@ -2,7 +2,7 @@
 #![allow(unreachable_patterns)]
 use anyhow::Result;
 use rollup_state_manager::params;
-use rollup_state_manager::state::{GlobalState, WitnessGenerator};
+use rollup_state_manager::state::{GlobalState, ManagerWrapper};
 use rollup_state_manager::test_utils::messages::{parse_msg, WrappedMessage};
 use rollup_state_manager::types::l2;
 use std::fs::{self, File};
@@ -50,7 +50,7 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     // by clone accounts with same trades
     let loop_num = 50;
 
-    let mut witgen = WitnessGenerator::new(state, *params::NTXS, None, *params::VERBOSE);
+    let mut witgen = ManagerWrapper::new(state, *params::NTXS, None, *params::VERBOSE);
     let timing = Instant::now();
     let mut inner_timing = Instant::now();
 

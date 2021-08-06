@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use rollup_state_manager::params;
-use rollup_state_manager::state::{GlobalState, WitnessGenerator};
+use rollup_state_manager::state::{GlobalState, ManagerWrapper};
 use rollup_state_manager::test_utils;
 use rollup_state_manager::test_utils::circuit::{write_test_case, CircuitTestCase, CircuitTestData};
 use rollup_state_manager::test_utils::messages::WrappedMessage;
@@ -31,7 +31,7 @@ fn replay_msgs(
             *params::ACCOUNTLEVELS,
             *params::VERBOSE,
         )));
-        let mut witgen = WitnessGenerator::new(state, *params::NTXS, None, *params::VERBOSE);
+        let mut witgen = ManagerWrapper::new(state, *params::NTXS, None, *params::VERBOSE);
 
         println!("genesis root {}", witgen.root());
 
@@ -118,7 +118,7 @@ pub fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<L2Block>) ->
             .iter()
             .map(|block| CircuitTestData {
                 name: format!("{:04}", block.block_id),
-                input: serde_json::to_value(L2BlockSerde::from(block.witness.clone())).unwrap(),
+                input: serde_json::to_value(L2BlockSerde::from(block.detail.clone())).unwrap(),
                 output: None,
             })
             .collect(),

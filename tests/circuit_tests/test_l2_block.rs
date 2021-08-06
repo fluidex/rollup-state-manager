@@ -2,8 +2,7 @@ use fluidex_common::rust_decimal::Decimal;
 use fluidex_common::types::{DecimalExt, FrExt};
 use fluidex_common::Fr;
 use rollup_state_manager::account::Account;
-use rollup_state_manager::state::global::GlobalState;
-use rollup_state_manager::state::witness_generator::WitnessGenerator;
+use rollup_state_manager::state::{GlobalState, ManagerWrapper};
 use rollup_state_manager::test_utils::circuit::{CircuitSource, CircuitTestCase, CircuitTestData};
 use rollup_state_manager::test_utils::types::prec_token_id;
 use rollup_state_manager::types::l2::{self, DepositTx, L2BlockSerde, L2Key, OrderInput, SpotTradeTx, TransferTx, WithdrawTx};
@@ -61,7 +60,7 @@ impl Block {
             self.verbose,
         )));
         let (sender, receiver) = crossbeam_channel::bounded(100);
-        let mut witgen = WitnessGenerator::new(state, self.n_txs, None, self.verbose);
+        let mut witgen = ManagerWrapper::new(state, self.n_txs, None, self.verbose);
 
         let token_id0 = 0;
         let token_id1 = 1;
@@ -223,7 +222,7 @@ impl Block {
             .enumerate()
             .map(|(i, block)| CircuitTestData {
                 name: format!("nonempty_block_{}", i),
-                input: json!(L2BlockSerde::from(block.witness)),
+                input: json!(L2BlockSerde::from(block.detail)),
                 output: None,
             })
             .collect()
@@ -237,7 +236,7 @@ impl Block {
             self.verbose,
         )));
         let (sender, receiver) = crossbeam_channel::bounded(100);
-        let mut witgen = WitnessGenerator::new(state, self.n_txs, None, self.verbose);
+        let mut witgen = ManagerWrapper::new(state, self.n_txs, None, self.verbose);
         // we need to have at least 1 account
         witgen.create_new_account(1).unwrap();
         witgen.nop();
@@ -250,7 +249,7 @@ impl Block {
         let block = receiver.recv().unwrap();
         CircuitTestData {
             name: "empty_block".to_owned(),
-            input: json!(L2BlockSerde::from(block.witness)),
+            input: json!(L2BlockSerde::from(block.detail)),
             output: None,
         }
     }

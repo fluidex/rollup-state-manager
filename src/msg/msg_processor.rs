@@ -1,5 +1,5 @@
 use crate::msg::msg_utils::bytes_to_sig;
-use crate::state::WitnessGenerator;
+use crate::state::ManagerWrapper;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, OrderInput, OrderSide};
 use crate::types::matchengine::messages;
@@ -32,7 +32,7 @@ impl Default for Processor {
 }
 
 impl Processor {
-    pub fn handle_user_msg(&mut self, witgen: &mut WitnessGenerator, message: messages::Message<messages::UserMessage>) {
+    pub fn handle_user_msg(&mut self, witgen: &mut ManagerWrapper, message: messages::Message<messages::UserMessage>) {
         let (user_info, offset) = message.into_parts();
         //println!("handle_user_msg {:#?}", user_info);
         let account_id = user_info.user_id;
@@ -62,7 +62,7 @@ impl Processor {
             )
             .unwrap();
     }
-    pub fn handle_balance_msg(&mut self, witgen: &mut WitnessGenerator, message: messages::Message<messages::BalanceMessage>) {
+    pub fn handle_balance_msg(&mut self, witgen: &mut ManagerWrapper, message: messages::Message<messages::BalanceMessage>) {
         let (deposit, offset) = message.into_parts();
         //println!("handle_balance_msg {:#?}", deposit);
         assert!(!deposit.change.is_sign_negative(), "only support deposit now");
@@ -121,7 +121,7 @@ impl Processor {
         self.balance_tx_total_time += timing.elapsed().as_secs_f32();
     }
 
-    pub fn handle_order_msg(&mut self, witgen: &mut WitnessGenerator, message: messages::Message<messages::OrderMessage>) {
+    pub fn handle_order_msg(&mut self, witgen: &mut ManagerWrapper, message: messages::Message<messages::OrderMessage>) {
         let (order, _) = message.into_parts();
         match order.event {
             messages::OrderEventType::FINISH => {
@@ -145,7 +145,7 @@ impl Processor {
             }
         }
     }
-    pub fn handle_trade_msg(&mut self, witgen: &mut WitnessGenerator, message: messages::Message<messages::TradeMessage>) {
+    pub fn handle_trade_msg(&mut self, witgen: &mut ManagerWrapper, message: messages::Message<messages::TradeMessage>) {
         let (trade, offset) = message.into_parts();
         //log::debug!("handle_trade_msg {:#?}", trade);
         if let Some(state_before) = &trade.state_before {
@@ -256,7 +256,7 @@ impl Processor {
             side: if is_ask { OrderSide::Sell } else { OrderSide::Buy },
         }
     }
-    fn check_order_sig(&mut self, witgen: &WitnessGenerator, order_to_put: &mut OrderInput) {
+    fn check_order_sig(&mut self, witgen: &ManagerWrapper, order_to_put: &mut OrderInput) {
         let msg = order_to_put.hash();
         let sig = order_to_put.sig.clone().unwrap();
         witgen

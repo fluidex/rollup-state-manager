@@ -20,5 +20,5 @@ pub struct L2BlockDetail {
 #[derive(Clone)]
 pub struct L2Block {
     pub block_id: usize,
-    pub witness: L2BlockDetail,
+    pub detail: L2BlockDetail,
 }
