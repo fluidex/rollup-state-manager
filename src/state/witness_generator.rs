@@ -7,7 +7,7 @@ use crate::config::Settings;
 #[cfg(feature = "persist_sled")]
 use crate::r#const::sled_db::*;
 use crate::types::l2::{
-    tx_detail_idx, DepositTx, FullSpotTradeTx, L2Block, L2BlockWitness, Order, RawTx, TransferTx, TxType, WithdrawTx, TX_LENGTH,
+    tx_detail_idx, DepositTx, FullSpotTradeTx, L2Block, L2BlockDetail, Order, RawTx, TransferTx, TxType, WithdrawTx, TX_LENGTH,
 };
 use crate::types::merkle_tree::Tree;
 use anyhow::{anyhow, bail};
@@ -111,7 +111,7 @@ impl WitnessGenerator {
             .collect();
         let old_account_roots: Vec<Fr> = buffered_txs.iter().map(|tx| tx.root_before).collect();
         let new_account_roots: Vec<Fr> = buffered_txs.iter().map(|tx| tx.root_after).collect();
-        let witness = L2BlockWitness {
+        let witness = L2BlockDetail {
             old_root: *old_account_roots.first().unwrap(),
             new_root: *new_account_roots.last().unwrap(),
             txs_type,
