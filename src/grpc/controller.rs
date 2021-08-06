@@ -51,7 +51,7 @@ impl Controller {
         let limit = max(1, request.limit);
         let limit = min(100, limit);
         let blocks_query = format!(
-            "select block_id, new_root, witness, created_time
+            "select block_id, new_root, detail, created_time
             from {}
             where block_id <= $1
             order by block_id desc limit {}",
@@ -80,9 +80,9 @@ impl Controller {
             task::TaskStatus::Proved => TaskStatus::Proved,
         };
 
-        let witness: L2BlockSerde = serde_json::from_value(l2_block.witness).unwrap();
-        let tx_num = witness.encoded_txs.len() as u64;
-        let txs = witness
+        let detail: L2BlockSerde = serde_json::from_value(l2_block.detail).unwrap();
+        let tx_num = detail.encoded_txs.len() as u64;
+        let txs = detail
             .encoded_txs
             .iter()
             .map(|tx| l2_block_query_response::Tx {
@@ -122,7 +122,7 @@ impl Controller {
 
 async fn get_l2_block_by_id(db_pool: &sqlx::Pool<DbType>, block_id: i64) -> Result<l2_block::L2Block, Status> {
     let stmt = format!(
-        "select block_id, new_root, witness, created_time
+        "select block_id, new_root, detail, created_time
         from {}
         where block_id = $1
         order by created_time desc limit 1",
