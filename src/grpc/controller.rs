@@ -22,6 +22,7 @@ impl Controller {
         Self { db_pool, state }
     }
 
+    // TODO: cache
     pub async fn l2_blocks_query(&self, request: L2BlocksQueryRequest) -> Result<L2BlocksQueryResponse, Status> {
         let (total, blocks) = self.l2_blocks_db_query(request).await.map_err(|e| {
             log::error!("{:?}", e);
@@ -41,6 +42,7 @@ impl Controller {
         })
     }
 
+    // TODO: cache
     pub async fn l2_blocks_db_query(&self, request: L2BlocksQueryRequest) -> Result<(i64, Vec<l2_block::L2Block>), anyhow::Error> {
         let mut tx = self.db_pool.begin().await?;
 
@@ -68,6 +70,7 @@ impl Controller {
         Ok((total, blocks))
     }
 
+    // TODO: cache
     pub async fn l2_block_query(&self, request: L2BlockQueryRequest) -> Result<L2BlockQueryResponse, Status> {
         let block_id = request.block_id;
         let l2_block = get_l2_block_by_id(&self.db_pool, block_id).await?;
@@ -120,6 +123,7 @@ impl Controller {
     }
 }
 
+// TODO: cache
 async fn get_l2_block_by_id(db_pool: &sqlx::Pool<DbType>, block_id: i64) -> Result<l2_block::L2Block, Status> {
     let stmt = format!(
         "select block_id, new_root, detail, created_time
