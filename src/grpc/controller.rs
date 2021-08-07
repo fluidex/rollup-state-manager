@@ -22,6 +22,7 @@ impl Controller {
         Self { db_pool, state }
     }
 
+    // TODO: cache
     pub async fn l2_blocks_query(&self, request: L2BlocksQueryRequest) -> Result<L2BlocksQueryResponse, Status> {
         let (total, blocks) = get_l2_blocks(&self.db_pool, request).await.map_err(|e| {
             log::error!("{:?}", e);
@@ -41,6 +42,7 @@ impl Controller {
         })
     }
 
+    // TODO: cache
     pub async fn l2_block_query(&self, request: L2BlockQueryRequest) -> Result<L2BlockQueryResponse, Status> {
         let block_id = request.block_id;
         let l2_block = get_l2_block_by_id(&self.db_pool, block_id).await?;
