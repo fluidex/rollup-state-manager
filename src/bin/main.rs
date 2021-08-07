@@ -232,14 +232,17 @@ async fn save_task_to_db(pool: &PgPool, block: L2Block) -> anyhow::Result<()> {
     let input = L2BlockSerde::from(block.detail);
     let task_id = unique_task_id();
 
-    sqlx::query("insert into task (task_id, circuit, block_id, input, status) values ($1, $2, $3, $4, $5)")
-        .bind(task_id)
-        .bind(CircuitType::BLOCK)
-        .bind(block.block_id as i64) // TODO: will it overflow?
-        .bind(sqlx::types::Json(input))
-        .bind(TaskStatus::Inited)
-        .execute(pool)
-        .await?;
+    sqlx::query(&format!(
+        "insert into {} (task_id, circuit, block_id, input, status) values ($1, $2, $3, $4, $5)",
+        tablenames::TASK
+    ))
+    .bind(task_id)
+    .bind(CircuitType::BLOCK)
+    .bind(block.block_id as i64) // TODO: will it overflow?
+    .bind(sqlx::types::Json(input))
+    .bind(TaskStatus::Inited)
+    .execute(pool)
+    .await?;
 
     Ok(())
 }

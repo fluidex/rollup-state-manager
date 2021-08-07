@@ -79,8 +79,8 @@ pub struct TokenBalanceQueryResponse {
 pub enum TaskStatus {
     Inited = 0,
     Witgening = 1,
-    Ready = 2,
-    Assigned = 3,
+    Witgened = 2,
+    Proving = 3,
     Proved = 4,
 }
 #[doc = r" Generated client implementations."]
