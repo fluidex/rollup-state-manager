@@ -74,7 +74,7 @@ message TokenBalanceQueryResponse {
 enum TaskStatus {
   INITED = 0;
   WITGENING = 1;
-  READY = 2;
-  ASSIGNED = 3;
+  WITGENED = 2;
+  PROVING = 3;
   PROVED = 4;
 }
