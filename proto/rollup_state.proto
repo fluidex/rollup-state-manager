@@ -7,8 +7,7 @@ import "google/api/annotations.proto";
 service RollupState {
   rpc L2BlocksQuery(L2BlocksQueryRequest) returns (L2BlocksQueryResponse) {
     option (google.api.http) = {
-      post : "/api/l2_blocks"
-      body : "*"
+      get : "/api/l2_blocks"
     };
   }
 
