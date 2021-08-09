@@ -1,10 +1,9 @@
 mod controller;
 mod handler;
-mod rpc;
 
 use crate::grpc::handler::Handler;
-use crate::grpc::rpc::rollup_state_server::RollupStateServer;
 use crate::state::GlobalState;
+use orchestra::rpc::rollup::rollup_state_server::RollupStateServer;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 

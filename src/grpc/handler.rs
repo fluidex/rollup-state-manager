@@ -1,6 +1,6 @@
 use crate::grpc::controller::Controller;
-use crate::grpc::rpc::*;
 use crate::state::global::GlobalState;
+use orchestra::rpc::rollup::*;
 use std::sync::{Arc, RwLock};
 use tonic::{Request, Response, Status};
 

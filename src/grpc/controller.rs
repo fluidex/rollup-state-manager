@@ -1,5 +1,4 @@
 use crate::config::Settings;
-use crate::grpc::rpc::*;
 use crate::state::global::GlobalState;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::L2BlockSerde;
@@ -8,6 +7,7 @@ use fluidex_common::db::models::{l2_block, tablenames, task};
 use fluidex_common::db::DbType;
 use fluidex_common::types::FrExt;
 use fluidex_common::utils::timeutil::FTimestamp;
+use orchestra::rpc::rollup::*;
 use std::sync::{Arc, RwLock};
 use tonic::{Code, Status};
 
