@@ -232,7 +232,13 @@ impl ManagerWrapper {
 
         let from_old_balance = state.get_token_balance(tx.from, tx.token_id);
         let to_old_balance = state.get_token_balance(tx.to, tx.token_id);
-        assert!(from_old_balance > tx.amount.to_fr(), "Transfer balance not enough");
+        //println!("transfer from {} to {} amount {} from_old_balance {}", tx.from, tx.to, tx.amount.to_fr(), from_old_balance);
+        assert!(
+            from_old_balance >= tx.amount.to_fr(),
+            "Transfer balance not enough {} < {}",
+            from_old_balance,
+            tx.amount.to_fr()
+        );
         let from_new_balance = from_old_balance.sub(&tx.amount.to_fr());
         let to_new_balance = to_old_balance.add(&tx.amount.to_fr());
 
@@ -270,12 +276,28 @@ impl ManagerWrapper {
         encoded_tx[tx_detail_idx::ENABLE_SIG_CHECK1] = Fr::one();
         encoded_tx[tx_detail_idx::DST_IS_NEW] = if transfer_to_new { Fr::one() } else { Fr::zero() };
 
-        state.set_token_balance(tx.from, tx.token_id, from_new_balance);
-        state.increase_nonce(tx.from);
+        /*
+                state.set_token_balance(tx.from, tx.token_id, from_new_balance);
+                state.increase_nonce(tx.from);
+                state.set_token_balance(tx.to, tx.token_id, to_new_balance);
+        */
+        let acc1_updates = AccountUpdates {
+            account_id: tx.from,
+            balance_updates: vec![(tx.token_id, from_new_balance)],
+            new_nonce: Some(state.get_account_nonce(tx.from).add(&Fr::one())),
+            ..Default::default()
+        };
+        let acc2_updates = AccountUpdates {
+            account_id: tx.to,
+            balance_updates: vec![(tx.token_id, to_new_balance)],
+            ..Default::default()
+        };
+        state.batch_update(vec![acc1_updates, acc2_updates], true);
 
         let proof_to = state.balance_full_proof(tx.to, tx.token_id);
-        state.set_token_balance(tx.to, tx.token_id, to_new_balance);
+
         if transfer_to_new {
+            // transfer_to_new is rarely used
             let l2key = tx.l2key.unwrap();
             state.set_account_l2_addr(tx.to, l2key.sign, l2key.ay, l2key.eth_addr);
         }
@@ -525,6 +547,7 @@ impl ManagerWrapper {
                 (trade.token_id_2to1, acc1_balance_buy_new),
             ],
             order_updates: vec![(order1_pos, order1.hash())],
+            ..Default::default()
         };
         let acc2_updates = AccountUpdates {
             account_id: acc_id2,
@@ -533,6 +556,7 @@ impl ManagerWrapper {
                 (trade.token_id_2to1, acc2_balance_sell_new),
             ],
             order_updates: vec![(order2_pos, order2.hash())],
+            ..Default::default()
         };
         state.batch_update(vec![acc1_updates, acc2_updates], true);
 

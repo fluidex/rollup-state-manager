@@ -1,23 +1,94 @@
 #![allow(dead_code)]
 #![allow(unreachable_patterns)]
 use anyhow::Result;
+use fluidex_common::rust_decimal_macros::dec;
+use fluidex_common::types::{Decimal, Float864};
+use rollup_state_manager::account::Account;
+use rollup_state_manager::msg::msg_processor;
 use rollup_state_manager::params;
 use rollup_state_manager::state::{GlobalState, ManagerWrapper};
 use rollup_state_manager::test_utils::messages::{parse_msg, WrappedMessage};
-use rollup_state_manager::types::l2;
+use rollup_state_manager::test_utils::types::{get_mnemonic_by_account_id, prec_token_id};
+use rollup_state_manager::types::l2::{self, TransferTx};
+use rollup_state_manager::types::matchengine::messages::{BalanceMessage, UserMessage};
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
+use std::option::Option::None;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 #[cfg(test)]
 use {pprof::protos::Message, std::io::Write};
 
-use rollup_state_manager::msg::msg_processor;
-use std::option::Option::None;
+fn bench_with_dummy_transfers() -> Result<()> {
+    GlobalState::print_config();
+    let state = Arc::new(RwLock::new(GlobalState::new(
+        *params::BALANCELEVELS,
+        *params::ORDERLEVELS,
+        *params::ACCOUNTLEVELS,
+        *params::VERBOSE,
+    )));
+
+    let mut processor = msg_processor::Processor {
+        enable_check_order_sig: false,
+        ..Default::default()
+    };
+
+    let mut manager = ManagerWrapper::new(state, *params::NTXS, None, *params::VERBOSE);
+
+    // step1: create users
+    let user1 = Account::from_mnemonic(1, &get_mnemonic_by_account_id(1)).unwrap();
+    let user2 = Account::from_mnemonic(2, &get_mnemonic_by_account_id(2)).unwrap();
+    let user1_msg = UserMessage {
+        user_id: user1.uid,
+        l1_address: user1.eth_addr_str(),
+        l2_pubkey: user1.bjj_pub_key(),
+    };
+    let user2_msg = UserMessage {
+        user_id: user2.uid,
+        l1_address: user2.eth_addr_str(),
+        l2_pubkey: user2.bjj_pub_key(),
+    };
+    println!("user1 {:?} user2 {:?}", user1_msg, user2_msg);
+    processor.handle_user_msg(&mut manager, user1_msg.into());
+    processor.handle_user_msg(&mut manager, user2_msg.into());
+
+    // step2: deposit assets
+
+    let balance = BalanceMessage {
+        timestamp: 0.0, // FIXME?
+        user_id: 1,
+        asset: "ETH".to_string(),
+        business: "useless".to_string(),
+        change: dec!(10000),
+        balance: dec!(10000),
+        detail: "none".to_string(),
+    };
+
+    processor.handle_balance_msg(&mut manager, balance.into());
+
+    // step3: bench transfer
+    let amount = Float864::from_decimal(&dec!(1), prec_token_id(0)).unwrap();
+    let mut transfer = TransferTx::new(1, 2, 0 /*ETH*/, amount);
+    let transfer_hash = transfer.hash();
+    let sig = user1.sign_hash(transfer_hash).unwrap();
+    transfer.sig = sig;
+
+    let timing = Instant::now();
+    for i in 0..10000 {
+        manager.transfer(transfer.clone(), None);
+        if i % 100 == 0 {
+            println!("{}%...", i / 100);
+        }
+    }
+    let elapsed = timing.elapsed();
+    println!("10000 transfer takes {:?}", elapsed);
+    println!("avg tps {}", 10000.0 / elapsed.as_secs_f64());
+    Ok(())
+}
 
 //if we use nightly build, we are able to use bench test ...
-fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
+fn bench_with_real_trades(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     let filepath = "tests/global_state/testdata/data.txt";
     let file = File::open(filepath)?;
     let messages: Vec<WrappedMessage> = BufReader::new(file)
@@ -118,8 +189,18 @@ fn bench_global_state(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
 }
 
 fn run_bench() -> Result<()> {
-    let circuit_repo = fs::canonicalize(PathBuf::from("circuits")).expect("invalid circuits repo path");
-    let _ = bench_global_state(&circuit_repo)?;
+    //let bench_type = "real_trades";
+    let bench_type = "dummy_transfers";
+    match bench_type {
+        "real_trades" => {
+            let circuit_repo = fs::canonicalize(PathBuf::from("circuits")).expect("invalid circuits repo path");
+            let _ = bench_with_real_trades(&circuit_repo)?;
+        }
+        "dummy_transfers" => {
+            bench_with_dummy_transfers()?;
+        }
+        _ => {}
+    }
     Ok(())
 }
 
