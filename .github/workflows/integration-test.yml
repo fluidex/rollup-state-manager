@@ -86,8 +86,7 @@ jobs:
           npm install
 
       - name: Pull git submodule
-        run: |
-          git submodule update --init --recursive
+        run: git submodule update --init --recursive
 
       - name: Up docker-compose
         run: docker-compose --file "./orchestra/docker/docker-compose.yaml" up --detach
