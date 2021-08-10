@@ -108,7 +108,7 @@ async fn get_l2_blocks(
     let limit = max(1, request.limit);
     let limit = min(100, limit);
     let blocks_query = format!(
-        "select block_id, new_root, detail, created_time
+        "select block_id, new_root, status, detail, created_time
             from {}
             where block_id <= $1
             order by block_id desc limit {}",
