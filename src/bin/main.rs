@@ -10,6 +10,7 @@ use fluidex_common::db::{
     MIGRATOR,
 };
 use fluidex_common::non_blocking_tracing;
+use fluidex_common::types::FrExt;
 use rollup_state_manager::config::Settings;
 use rollup_state_manager::grpc::run_grpc_server;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
