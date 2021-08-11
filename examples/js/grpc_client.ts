@@ -1,6 +1,6 @@
 import * as caller from "@eeston/grpc-caller";
 
-const file = "../../proto/rollup_state.proto";
+const file = "../../orchestra/proto/rollup/rollup.proto";
 const load = {
   keepCase: true,
   longs: String,

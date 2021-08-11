@@ -2091,6 +2091,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "orchestra"
+version = "0.1.0"
+source = "git+https://github.com/Fluidex/orchestra.git?branch=master#b3b45ccb205c5769d1b4ec7bf05c1c4127ebd84d"
+dependencies = [
+ "prost",
+ "serde 1.0.126",
+ "tonic",
+ "tonic-build",
+]
+
+[[package]]
 name = "parity-scale-codec"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2673,8 +2684,8 @@ dependencies = [
  "log",
  "num",
  "once_cell",
+ "orchestra",
  "pprof",
- "prost",
  "rand",
  "rayon",
  "regex",
@@ -2687,7 +2698,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tonic",
- "tonic-build",
 ]
 
 [[package]]
