@@ -18,15 +18,20 @@ class Client {
   }
 
   async l2BlockQuery(block_id): Promise<Map<string, any>> {
-    return (await this.client.l2BlockQuery({ block_id }));
+    return await this.client.l2BlockQuery({ block_id });
   }
-  async tokenBalanceQuery(account_id, token_id, token_address, token_name): Promise<Map<string, any>> {
-    return (await this.client.tokenBalanceQuery({
+  async tokenBalanceQuery(
+    account_id,
+    token_id,
+    token_address,
+    token_name
+  ): Promise<Map<string, any>> {
+    return await this.client.tokenBalanceQuery({
       account_id,
       token_id,
       token_address,
-      token_name,
-    }));
+      token_name
+    });
   }
 }
 

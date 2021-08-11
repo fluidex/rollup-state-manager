@@ -70,6 +70,7 @@ fn process_msgs(
         };
 
         let manager = ManagerWrapper::new(state, *params::NTXS, block_offset, *params::VERBOSE);
+        // TODO: change to to_hex_string, remove 'Fr(' and ')'
         log::info!("genesis root {}", manager.root().to_string());
 
         run_msg_processor(msg_receiver, block_sender, manager)
@@ -190,7 +191,7 @@ async fn is_present_block(pool: &PgPool, block: &L2Block) -> anyhow::Result<bool
     {
         Ok(row) => {
             let new_root: String = row.get(0);
-            let old_root: String = block.detail.new_root.to_string();
+            let old_root: String = block.detail.new_root.to_hex_string();
             if new_root == old_root {
                 log::debug!("skip same l2 block {} {}", block.block_id, new_root);
             } else {
@@ -213,7 +214,7 @@ async fn is_present_block(pool: &PgPool, block: &L2Block) -> anyhow::Result<bool
 }
 
 async fn save_block_to_db(pool: &PgPool, block: &L2Block) -> anyhow::Result<()> {
-    let new_root = block.detail.new_root.to_string();
+    let new_root = block.detail.new_root.to_hex_string();
     let detail = L2BlockSerde::from(block.detail.clone());
     sqlx::query(&format!(
         "insert into {} (block_id, new_root, detail) values ($1, $2, $3)",
