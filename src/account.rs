@@ -243,6 +243,9 @@ impl Account {
     pub fn bjj_pub_key(&self) -> String {
         self.l2_account.bjj_pub_key.clone()
     }
+    pub fn eth_addr_str(&self) -> String {
+        String::from("0x") + &hex::encode(self.eth_addr.as_bytes())
+    }
     pub fn eth_addr(&self) -> Fr {
         from_hex(&hex::encode(self.eth_addr.as_bytes())).unwrap()
     }

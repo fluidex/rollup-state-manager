@@ -39,11 +39,12 @@ pub struct OrderProof {
     pub account_path: Vec<[Fr; 1]>,
     pub root: Fr,
 }
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct AccountUpdates {
     pub account_id: u32,
     pub balance_updates: Vec<(u32, Fr)>,
     pub order_updates: Vec<(u32, Fr)>,
+    pub new_nonce: Option<Fr>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -411,6 +412,9 @@ impl GlobalState {
 
             let mut account_updates = vec![];
             for update in updates {
+                if let Some(nonce) = update.new_nonce {
+                    self.account_states.get_mut(&update.account_id).unwrap().update_nonce(nonce);
+                }
                 let account_hash = self.recalculate_account_state_hash(update.account_id);
                 account_updates.push((update.account_id, account_hash));
             }
@@ -426,6 +430,9 @@ impl GlobalState {
                 }
                 for order_update in update.order_updates {
                     self.set_order_leaf_hash_raw(account_id, order_update.0, order_update.1);
+                }
+                if let Some(nonce) = update.new_nonce {
+                    self.account_states.get_mut(&update.account_id).unwrap().update_nonce(nonce);
                 }
                 self.flush_account_state(account_id);
             }

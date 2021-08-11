@@ -84,7 +84,7 @@ pub struct FullSpotTradeTx {
     pub taker_order: Option<order::Order>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TransferTx {
     pub from: u32,
     pub to: u32,
