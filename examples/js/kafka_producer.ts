@@ -14,11 +14,11 @@ class Producer {
     await producer.connect();
   }
 
-  async send(messages, topic="unifyevents") {
+  async send(messages, topic = "unifyevents") {
     await this.producer.send({
       topic,
-      messages,
-    })
+      messages
+    });
   }
 
   async Stop() {
