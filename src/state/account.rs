@@ -1,4 +1,4 @@
-// from https://github1s.com/Fluidex/circuits/blob/HEAD/test/common.ts
+// from https://github1s.com/fluidex/circuits/blob/HEAD/test/common.ts
 pub use crate::types::merkle_tree::MerklePath;
 
 use fluidex_common::ff::Field;

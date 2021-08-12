@@ -423,7 +423,7 @@ mod tests {
     #[test]
     fn test_account() {
         // Step1: test l2 keypair
-        // https://github.com/Fluidex/circuits/blob/afeeda76e1309f3d8a14ec77ea082cb176acc90a/helper.ts/account_test.ts#L32
+        // https://github.com/fluidex/circuits/blob/afeeda76e1309f3d8a14ec77ea082cb176acc90a/helper.ts/account_test.ts#L32
         let seed = hex::decode("87b34b2b842db0cc945659366068053f325ff227fd9c6788b2504ac2c4c5dc2a").unwrap();
         let acc: L2Account = L2Account::new(seed).unwrap();
         let priv_bigint = acc.priv_key.scalar_key().to_string();
@@ -469,7 +469,7 @@ mod tests {
 
         // Step3: l1 sig -> l2 keypair
         // mnemonic => L1 account & eth addr & L2 account
-        // https://github.com/Fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/account_test.ts#L7
+        // https://github.com/fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/account_test.ts#L7
         let mnemonic = Mnemonic::<English>::new_from_phrase("radar blur cabbage chef fix engine embark joy scheme fiction master release")
             .expect("should generate mnemonic from phrase");
         let acc = Account::from_mnemonic(0, &mnemonic).expect("should generate account from mnemonic");
@@ -483,7 +483,7 @@ mod tests {
         );
 
         // priv key => L1 account & eth addr & L2 account
-        // https://github.com/Fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/account_test.ts#L25
+        // https://github.com/fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/account_test.ts#L25
         let priv_key = SigningKey::from_bytes(&hex::decode("0b22f852cd07386bce533f2038821fdcebd9c5ced9e3cd51e3a05d421dbfd785").unwrap())
             .expect("should generate signing key from bytes");
         let acc = Account::from_priv_key(0, &priv_key).expect("should generate account from priv key");
@@ -497,7 +497,7 @@ mod tests {
         );
 
         // signature => L1 public key & eth addr & L2 account
-        // https://github.com/Fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/account_test.ts#L37
+        // https://github.com/fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/account_test.ts#L37
         let signature = EthersSignature::from_str("9982364bf709fecdf830a71f417182e3a7f717a6363180ff33784e2823935f8b55932a5353fb128fc7e3d6c4aed57138adce772ce594338a8f4985d6668627b31c").expect("should generate signature from string");
         let acc = Account::from_signature(0, &signature).expect("should generate account from signature");
         assert_eq!(
@@ -512,7 +512,7 @@ mod tests {
 
     #[test]
     fn test_order_signature() {
-        // https://github.com/Fluidex/rollup-state-manager/blob/master/tests/data/accounts.jsonl account id 1
+        // https://github.com/fluidex/rollup-state-manager/blob/master/tests/data/accounts.jsonl account id 1
         let mnemonic = Mnemonic::<English>::new_from_phrase("olympic comfort palm large heavy verb acid lion attract vast dash memory olympic syrup announce sure body cruise flip merge fabric frame question result")
             .expect("should generate mnemonic from phrase");
         let acc = Account::from_mnemonic(0, &mnemonic).expect("should generate account from mnemonic");

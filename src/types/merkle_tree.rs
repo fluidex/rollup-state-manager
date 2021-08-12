@@ -1,4 +1,4 @@
-// https://github1s.com/Fluidex/circuits/blob/HEAD/helper.ts/binary_merkle_tree.ts
+// https://github1s.com/fluidex/circuits/blob/HEAD/helper.ts/binary_merkle_tree.ts
 use std::iter::Iterator;
 
 use fluidex_common::serde::FrBytes;

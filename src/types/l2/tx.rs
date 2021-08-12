@@ -163,7 +163,7 @@ pub const AMOUNT_LEN: usize = 9;
 pub const FR_LEN: usize = 32;
 //pub type PUBDATA = [u8; PUBDATA_LEN];
 
-// https://github.com/Fluidex/circuits/issues/144
+// https://github.com/fluidex/circuits/issues/144
 impl DepositTx {
     pub fn to_pubdata(&self) -> Vec<u8> {
         let mut result = vec![TxType::Deposit as u8];

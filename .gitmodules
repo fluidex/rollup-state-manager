@@ -1,6 +1,6 @@
 [submodule "circuits"]
 	path = circuits
-	url = https://github.com/Fluidex/circuits
+	url = https://github.com/fluidex/circuits
 [submodule "orchestra"]
 	path = orchestra
-	url = https://github.com/Fluidex/orchestra.git
+	url = https://github.com/fluidex/orchestra.git

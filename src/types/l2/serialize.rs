@@ -10,7 +10,7 @@ use std::str::FromStr;
 
 pub struct FrStr(pub Fr);
 
-// TODO: May use or integrate serializers and deserializers with `https://github.com/Fluidex/common-rs/blob/master/src/serde.rs`.
+// TODO: May use or integrate serializers and deserializers with `https://github.com/fluidex/common-rs/blob/master/src/serde.rs`.
 
 impl Serialize for FrStr {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {

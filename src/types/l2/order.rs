@@ -28,7 +28,7 @@ pub struct OrderInput {
 }
 impl OrderInput {
     pub fn hash(&self) -> Fr {
-        // copy from https://github.com/Fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/state-utils.ts#L38
+        // copy from https://github.com/fluidex/circuits/blob/d6e06e964b9d492f1fa5513bcc2295e7081c540d/helper.ts/state-utils.ts#L38
         // TxType::PlaceOrder
         let magic_head = Fr::from_u32(4);
         let data = Fr::hash(&[
@@ -128,7 +128,7 @@ impl Order {
         //debug_assert!(self.filled_buy <= self.total_buy, "too much filled buy");
         //debug_assert!(self.filled_sell <= self.total_sell, "too much filled sell");
         // TODO: one side fill is enough
-        // https://github.com/Fluidex/circuits/blob/4f952f63aa411529c466de2f6e9f8ceeac9ceb00/src/spot_trade.circom#L42
+        // https://github.com/fluidex/circuits/blob/4f952f63aa411529c466de2f6e9f8ceeac9ceb00/src/spot_trade.circom#L42
         //self.filled_buy >= self.total_buy || self.filled_sell >= self.total_sell
         (self.side == OrderSide::Buy && self.filled_buy >= self.total_buy)
             || (self.side == OrderSide::Sell && self.filled_sell >= self.total_sell)
