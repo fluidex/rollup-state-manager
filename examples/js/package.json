@@ -5,6 +5,7 @@
   "dependencies": {
     "@eeston/grpc-caller": "^0.20.2",
     "@grpc/grpc-js": "^1.2.5",
+    "axios": "^0.21.1",
     "dotenv": "^8.2.0",
     "grpc": "^1.24.2",
     "kafkajs": "^1.11.0"
