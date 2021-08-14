@@ -25,7 +25,7 @@ pub fn parse_msg(line: String) -> Result<WrappedMessage> {
                 Ok(WrappedMessage::BALANCE(data.into()))
             }
             "DepositMessage" => {
-                let data: DepositMessage = serde_json::from_value(val).map_err(|e| anyhow!("wrong balance: {}", e))?;
+                let data: DepositMessage = serde_json::from_value(val).map_err(|e| anyhow!("wrong deposit: {}", e))?;
                 Ok(WrappedMessage::DEPOSIT(data.into()))
             }
             "OrderMessage" => {
@@ -41,7 +41,7 @@ pub fn parse_msg(line: String) -> Result<WrappedMessage> {
                 Ok(WrappedMessage::USER(data.into()))
             }
             "WithdrawMessage" => {
-                let data: WithdrawMessage = serde_json::from_value(val).map_err(|e| anyhow!("wrong balance: {}", e))?;
+                let data: WithdrawMessage = serde_json::from_value(val).map_err(|e| anyhow!("wrong withdraw: {}", e))?;
                 Ok(WrappedMessage::WITHDRAW(data.into()))
             }
             other => Err(anyhow!("unrecognized type field {}", other)),
