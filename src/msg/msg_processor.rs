@@ -62,64 +62,64 @@ impl Processor {
             )
             .unwrap();
     }
-    pub fn handle_balance_msg(&mut self, manager: &mut ManagerWrapper, message: messages::Message<messages::BalanceMessage>) {
-        let (deposit, offset) = message.into_parts();
-        //println!("handle_balance_msg {:#?}", deposit);
-        assert!(!deposit.change.is_sign_negative(), "only support deposit now");
-        let token_id = get_token_id_by_name(&deposit.asset);
-        let account_id = deposit.user_id;
-        let is_old = manager.has_account(account_id);
+    // pub fn handle_balance_msg(&mut self, manager: &mut ManagerWrapper, message: messages::Message<messages::BalanceMessage>) {
+    //     let (deposit, offset) = message.into_parts();
+    //     //println!("handle_balance_msg {:#?}", deposit);
+    //     assert!(!deposit.change.is_sign_negative(), "only support deposit now");
+    //     let token_id = get_token_id_by_name(&deposit.asset);
+    //     let account_id = deposit.user_id;
+    //     let is_old = manager.has_account(account_id);
 
-        // we now use UserMessage to create new user
-        assert!(is_old);
+    //     // we now use UserMessage to create new user
+    //     assert!(is_old);
 
-        let balance_before = deposit.balance - deposit.change;
-        assert!(!balance_before.is_sign_negative(), "invalid balance {:?}", deposit);
+    //     let balance_before = deposit.balance - deposit.change;
+    //     assert!(!balance_before.is_sign_negative(), "invalid balance {:?}", deposit);
 
-        let expected_balance_before = manager.get_token_balance(deposit.user_id, token_id);
-        assert_eq!(expected_balance_before, balance_before.to_fr(prec_token_id(token_id)));
+    //     let expected_balance_before = manager.get_token_balance(deposit.user_id, token_id);
+    //     assert_eq!(expected_balance_before, balance_before.to_fr(prec_token_id(token_id)));
 
-        let timing = Instant::now();
-        let amount = deposit.change.to_amount(prec_token_id(token_id));
+    //     let timing = Instant::now();
+    //     let amount = deposit.change.to_amount(prec_token_id(token_id));
 
-        if is_old {
-            manager
-                .deposit(
-                    l2::DepositTx {
-                        token_id,
-                        account_id,
-                        amount,
-                        l2key: None,
-                    },
-                    offset,
-                )
-                .unwrap();
-        } else {
-            /*
-            let account = self.accounts.entry(account_id).or_insert_with(|| {
-                // create deterministic keypair for debugging
-                //println!("create debug account {}", account_id);
-                let mnemonic = get_mnemonic_by_account_id(account_id);
-                Account::from_mnemonic::<English>(account_id, &mnemonic).unwrap()
-            });
+    //     if is_old {
+    //         manager
+    //             .deposit(
+    //                 l2::DepositTx {
+    //                     token_id,
+    //                     account_id,
+    //                     amount,
+    //                     l2key: None,
+    //                 },
+    //                 offset,
+    //             )
+    //             .unwrap();
+    //     } else {
+    //         /*
+    //         let account = self.accounts.entry(account_id).or_insert_with(|| {
+    //             // create deterministic keypair for debugging
+    //             //println!("create debug account {}", account_id);
+    //             let mnemonic = get_mnemonic_by_account_id(account_id);
+    //             Account::from_mnemonic::<English>(account_id, &mnemonic).unwrap()
+    //         });
 
-            manager
-                .deposit(l2::DepositTx {
-                    token_id,
-                    account_id,
-                    amount,
-                    l2key: Some(l2::L2Key {
-                        eth_addr: account.eth_addr(),
-                        sign: account.sign(),
-                        ay: account.ay(),
-                    }),
-                })
-                .unwrap();
-                */
-        }
+    //         manager
+    //             .deposit(l2::DepositTx {
+    //                 token_id,
+    //                 account_id,
+    //                 amount,
+    //                 l2key: Some(l2::L2Key {
+    //                     eth_addr: account.eth_addr(),
+    //                     sign: account.sign(),
+    //                     ay: account.ay(),
+    //                 }),
+    //             })
+    //             .unwrap();
+    //             */
+    //     }
 
-        self.balance_tx_total_time += timing.elapsed().as_secs_f32();
-    }
+    //     self.balance_tx_total_time += timing.elapsed().as_secs_f32();
+    // }
     pub fn handle_deposit_msg(&mut self, manager: &mut ManagerWrapper, message: messages::Message<messages::DepositMessage>) {
         let (deposit, offset) = message.into_parts();
         assert!(!deposit.change.is_sign_negative(), "should be a deposit");
