@@ -131,9 +131,6 @@ fn run_msg_processor(
                 Ok(msg) => {
                     log::debug!("recv new msg {:?}", msg);
                     match msg {
-                        WrappedMessage::BALANCE(balance) => {
-                            processor.handle_balance_msg(&mut manager, balance);
-                        }
                         WrappedMessage::DEPOSIT(balance) => {
                             processor.handle_deposit_msg(&mut manager, balance);
                         }
@@ -149,6 +146,7 @@ fn run_msg_processor(
                         WrappedMessage::WITHDRAW(balance) => {
                             processor.handle_withdraw_msg(&mut manager, balance);
                         }
+                        _ => unreachable!(),
                     }
                 }
                 Err(err) => match err {
