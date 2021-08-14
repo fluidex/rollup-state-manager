@@ -134,6 +134,9 @@ fn run_msg_processor(
                         WrappedMessage::BALANCE(balance) => {
                             processor.handle_balance_msg(&mut manager, balance);
                         }
+                        WrappedMessage::DEPOSIT(balance) => {
+                            processor.handle_deposit_msg(&mut manager, balance);
+                        }
                         WrappedMessage::TRADE(trade) => {
                             processor.handle_trade_msg(&mut manager, trade);
                         }
@@ -142,6 +145,9 @@ fn run_msg_processor(
                         }
                         WrappedMessage::USER(user) => {
                             processor.handle_user_msg(&mut manager, user);
+                        }
+                        WrappedMessage::WITHDRAW(balance) => {
+                            processor.handle_withdraw_msg(&mut manager, balance);
                         }
                     }
                 }

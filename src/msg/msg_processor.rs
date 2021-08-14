@@ -120,7 +120,39 @@ impl Processor {
 
         self.balance_tx_total_time += timing.elapsed().as_secs_f32();
     }
+    pub fn handle_deposit_msg(&mut self, manager: &mut ManagerWrapper, message: messages::Message<messages::DepositMessage>) {
+        let (deposit, offset) = message.into_parts();
+        assert!(!deposit.change.is_sign_negative(), "should be a deposit");
 
+        let token_id = get_token_id_by_name(&deposit.asset);
+        let account_id = deposit.user_id;
+
+        let balance_before = deposit.balance - deposit.change;
+        assert!(!balance_before.is_sign_negative(), "invalid balance {:?}", deposit);
+
+        let expected_balance_before = manager.get_token_balance(deposit.user_id, token_id);
+        assert_eq!(expected_balance_before, balance_before.to_fr(prec_token_id(token_id)));
+
+        let timing = Instant::now();
+        let amount = deposit.change.to_amount(prec_token_id(token_id));
+
+        manager
+            .deposit(
+                l2::DepositTx {
+                    token_id,
+                    account_id,
+                    amount,
+                    l2key: None,
+                },
+                offset,
+            )
+            .unwrap();
+
+        self.balance_tx_total_time += timing.elapsed().as_secs_f32();
+    }
+    pub fn handle_withdraw_msg(&mut self, _manager: &mut ManagerWrapper, _message: messages::Message<messages::WithdrawMessage>) {
+        // TODO: Handles Withdraw messages.
+    }
     pub fn handle_order_msg(&mut self, manager: &mut ManagerWrapper, message: messages::Message<messages::OrderMessage>) {
         let (order, _) = message.into_parts();
         match order.event {

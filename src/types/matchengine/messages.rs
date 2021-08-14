@@ -148,12 +148,36 @@ pub struct BalanceMessage {
     pub detail: String,
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct DepositMessage {
+    pub timestamp: f64,
+    pub user_id: u32,
+    pub asset: String,
+    pub business: String,
+    pub change: Decimal,
+    pub balance: Decimal,
+    pub detail: String,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct WithdrawMessage {
+    pub timestamp: f64,
+    pub user_id: u32,
+    pub asset: String,
+    pub business: String,
+    pub change: Decimal,
+    pub balance: Decimal,
+    pub detail: String,
+}
+
 pub trait TxMessage {}
 
 impl TxMessage for BalanceMessage {}
+impl TxMessage for DepositMessage {}
 impl TxMessage for TradeMessage {}
 impl TxMessage for OrderMessage {}
 impl TxMessage for UserMessage {}
+impl TxMessage for WithdrawMessage {}
 
 impl<T: TxMessage> Message<T> {
     pub fn new(message: T, offset: i64) -> Self {
