@@ -57,7 +57,7 @@ async function registerUser() {
 async function depositBalance() {
   await kafkaProducer.send([
     {
-      key: "balances",
+      key: "deposits",
       value: JSON.stringify(kafkaBalanceValue)
     }
   ]);

@@ -1,5 +1,5 @@
 use crate::test_utils::messages::{parse_msg, WrappedMessage};
-use crate::types::matchengine::messages::{BalanceMessage, OrderMessage, TradeMessage, UserMessage};
+use crate::types::matchengine::messages::{DepositMessage, OrderMessage, TradeMessage, TransferMessage, UserMessage, WithdrawMessage};
 //use fluidex_common::message::consumer::{Simple, SimpleConsumer, SimpleMessageHandler};
 use fluidex_common::rdkafka;
 use rdkafka::consumer::{Consumer, ConsumerContext, MessageStream, StreamConsumer};
@@ -29,10 +29,12 @@ pub fn load_msgs_from_file(
 }
 
 const UNIFY_TOPIC: &str = "unifyevents";
-const MSG_TYPE_BALANCES: &str = "balances";
-const MSG_TYPE_USERS: &str = "registeruser";
+const MSG_TYPE_DEPOSITS: &str = "deposits";
 const MSG_TYPE_ORDERS: &str = "orders";
 const MSG_TYPE_TRADES: &str = "trades";
+const MSG_TYPE_TRANSFERS: &str = "transfers";
+const MSG_TYPE_USERS: &str = "registeruser";
+const MSG_TYPE_WITHDRAWS: &str = "withdraws";
 
 pub fn load_msgs_from_mq(
     brokers: &str,
@@ -138,9 +140,9 @@ impl MessageWriter {
         self.offset = offset;
 
         let message = match msg_type {
-            MSG_TYPE_BALANCES => {
-                let data: BalanceMessage = serde_json::from_str(msg_payload).unwrap();
-                WrappedMessage::BALANCE((data, offset).into())
+            MSG_TYPE_DEPOSITS => {
+                let data: DepositMessage = serde_json::from_str(msg_payload).unwrap();
+                WrappedMessage::DEPOSIT((data, offset).into())
             }
             MSG_TYPE_ORDERS => {
                 let data: OrderMessage = serde_json::from_str(msg_payload).unwrap();
@@ -154,7 +156,15 @@ impl MessageWriter {
                 let data: UserMessage = serde_json::from_str(msg_payload).unwrap();
                 WrappedMessage::USER((data, offset).into())
             }
-            _ => unreachable!(),
+            MSG_TYPE_TRANSFERS => {
+                let data: TransferMessage = serde_json::from_str(msg_payload).unwrap();
+                WrappedMessage::TRANSFER((data, offset).into())
+            }
+            MSG_TYPE_WITHDRAWS => {
+                let data: WithdrawMessage = serde_json::from_str(msg_payload).unwrap();
+                WrappedMessage::WITHDRAW((data, offset).into())
+            }
+            _ => return,
         };
 
         self.sender.try_send(message).unwrap();

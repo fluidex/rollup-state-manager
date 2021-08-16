@@ -137,23 +137,49 @@ pub struct TradeMessage {
     pub state_after: Option<VerboseTradeState>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct BalanceMessage {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DepositMessage {
     pub timestamp: f64,
     pub user_id: u32,
     pub asset: String,
     pub business: String,
     pub change: Decimal,
     pub balance: Decimal,
+    pub balance_available: Decimal,
+    pub balance_frozen: Decimal,
     pub detail: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WithdrawMessage {
+    pub timestamp: f64,
+    pub user_id: u32,
+    pub asset: String,
+    pub business: String,
+    pub change: Decimal,
+    pub balance: Decimal,
+    pub balance_available: Decimal,
+    pub balance_frozen: Decimal,
+    pub detail: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TransferMessage {
+    pub time: f64,
+    pub user_from: u32,
+    pub user_to: u32,
+    pub asset: String,
+    pub amount: Decimal,
 }
 
 pub trait TxMessage {}
 
-impl TxMessage for BalanceMessage {}
-impl TxMessage for TradeMessage {}
+impl TxMessage for DepositMessage {}
 impl TxMessage for OrderMessage {}
+impl TxMessage for TradeMessage {}
+impl TxMessage for TransferMessage {}
 impl TxMessage for UserMessage {}
+impl TxMessage for WithdrawMessage {}
 
 impl<T: TxMessage> Message<T> {
     pub fn new(message: T, offset: i64) -> Self {

@@ -131,17 +131,23 @@ fn run_msg_processor(
                 Ok(msg) => {
                     log::debug!("recv new msg {:?}", msg);
                     match msg {
-                        WrappedMessage::BALANCE(balance) => {
-                            processor.handle_balance_msg(&mut manager, balance);
-                        }
-                        WrappedMessage::TRADE(trade) => {
-                            processor.handle_trade_msg(&mut manager, trade);
+                        WrappedMessage::DEPOSIT(deposit) => {
+                            processor.handle_deposit_msg(&mut manager, deposit);
                         }
                         WrappedMessage::ORDER(order) => {
                             processor.handle_order_msg(&mut manager, order);
                         }
+                        WrappedMessage::TRADE(trade) => {
+                            processor.handle_trade_msg(&mut manager, trade);
+                        }
+                        WrappedMessage::TRANSFER(transfer) => {
+                            processor.handle_transfer_msg(&mut manager, transfer);
+                        }
                         WrappedMessage::USER(user) => {
                             processor.handle_user_msg(&mut manager, user);
+                        }
+                        WrappedMessage::WITHDRAW(withdraw) => {
+                            processor.handle_withdraw_msg(&mut manager, withdraw);
                         }
                     }
                 }

@@ -10,7 +10,7 @@ use rollup_state_manager::state::{GlobalState, ManagerWrapper};
 use rollup_state_manager::test_utils::messages::{parse_msg, WrappedMessage};
 use rollup_state_manager::test_utils::types::{get_mnemonic_by_account_id, prec_token_id};
 use rollup_state_manager::types::l2::{self, TransferTx};
-use rollup_state_manager::types::matchengine::messages::{BalanceMessage, UserMessage};
+use rollup_state_manager::types::matchengine::messages::{DepositMessage, UserMessage};
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::option::Option::None;
@@ -55,17 +55,19 @@ fn bench_with_dummy_transfers() -> Result<()> {
 
     // step2: deposit assets
 
-    let balance = BalanceMessage {
+    let deposit = DepositMessage {
         timestamp: 0.0, // FIXME?
         user_id: 1,
         asset: "ETH".to_string(),
         business: "useless".to_string(),
         change: dec!(10000),
         balance: dec!(10000),
+        balance_available: dec!(0),
+        balance_frozen: dec!(0),
         detail: "none".to_string(),
     };
 
-    processor.handle_balance_msg(&mut manager, balance.into());
+    processor.handle_deposit_msg(&mut manager, deposit.into());
 
     // step3: bench transfer
     let amount = Float864::from_decimal(&dec!(1), prec_token_id(0)).unwrap();
@@ -129,15 +131,15 @@ fn bench_with_real_trades(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
         let account_offset = i * account_num;
         for msg in messages.iter() {
             match msg {
-                WrappedMessage::USER(user) => {
-                    let mut user = user.clone();
-                    user.user_id += account_offset;
-                    processor.handle_user_msg(&mut manager, user);
+                WrappedMessage::DEPOSIT(deposit) => {
+                    let mut deposit = deposit.clone();
+                    deposit.user_id += account_offset;
+                    processor.handle_deposit_msg(&mut manager, deposit);
                 }
-                WrappedMessage::BALANCE(balance) => {
-                    let mut balance = balance.clone();
-                    balance.user_id += account_offset;
-                    processor.handle_balance_msg(&mut manager, balance);
+                WrappedMessage::ORDER(order) => {
+                    let mut order = order.clone();
+                    order.order.user += account_offset;
+                    processor.handle_order_msg(&mut manager, order);
                 }
                 WrappedMessage::TRADE(trade) => {
                     let mut trade = trade.clone();
@@ -155,10 +157,21 @@ fn bench_with_real_trades(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
                     });
                     processor.handle_trade_msg(&mut manager, trade);
                 }
-                WrappedMessage::ORDER(order) => {
-                    let mut order = order.clone();
-                    order.order.user += account_offset;
-                    processor.handle_order_msg(&mut manager, order);
+                WrappedMessage::TRANSFER(transfer) => {
+                    let mut transfer = transfer.clone();
+                    transfer.user_from += account_offset;
+                    transfer.user_to += account_offset;
+                    processor.handle_transfer_msg(&mut manager, transfer);
+                }
+                WrappedMessage::USER(user) => {
+                    let mut user = user.clone();
+                    user.user_id += account_offset;
+                    processor.handle_user_msg(&mut manager, user);
+                }
+                WrappedMessage::WITHDRAW(withdraw) => {
+                    let mut withdraw = withdraw.clone();
+                    withdraw.user_id += account_offset;
+                    processor.handle_withdraw_msg(&mut manager, withdraw);
                 }
                 _ => unreachable!(),
             }

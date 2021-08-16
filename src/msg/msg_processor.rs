@@ -62,16 +62,12 @@ impl Processor {
             )
             .unwrap();
     }
-    pub fn handle_balance_msg(&mut self, manager: &mut ManagerWrapper, message: messages::Message<messages::BalanceMessage>) {
+    pub fn handle_deposit_msg(&mut self, manager: &mut ManagerWrapper, message: messages::Message<messages::DepositMessage>) {
         let (deposit, offset) = message.into_parts();
-        //println!("handle_balance_msg {:#?}", deposit);
-        assert!(!deposit.change.is_sign_negative(), "only support deposit now");
+        assert!(!deposit.change.is_sign_negative(), "should be a deposit");
+
         let token_id = get_token_id_by_name(&deposit.asset);
         let account_id = deposit.user_id;
-        let is_old = manager.has_account(account_id);
-
-        // we now use UserMessage to create new user
-        assert!(is_old);
 
         let balance_before = deposit.balance - deposit.change;
         assert!(!balance_before.is_sign_negative(), "invalid balance {:?}", deposit);
@@ -82,45 +78,24 @@ impl Processor {
         let timing = Instant::now();
         let amount = deposit.change.to_amount(prec_token_id(token_id));
 
-        if is_old {
-            manager
-                .deposit(
-                    l2::DepositTx {
-                        token_id,
-                        account_id,
-                        amount,
-                        l2key: None,
-                    },
-                    offset,
-                )
-                .unwrap();
-        } else {
-            /*
-            let account = self.accounts.entry(account_id).or_insert_with(|| {
-                // create deterministic keypair for debugging
-                //println!("create debug account {}", account_id);
-                let mnemonic = get_mnemonic_by_account_id(account_id);
-                Account::from_mnemonic::<English>(account_id, &mnemonic).unwrap()
-            });
-
-            manager
-                .deposit(l2::DepositTx {
+        manager
+            .deposit(
+                l2::DepositTx {
                     token_id,
                     account_id,
                     amount,
-                    l2key: Some(l2::L2Key {
-                        eth_addr: account.eth_addr(),
-                        sign: account.sign(),
-                        ay: account.ay(),
-                    }),
-                })
-                .unwrap();
-                */
-        }
+                    l2key: None,
+                },
+                offset,
+            )
+            .unwrap();
 
         self.balance_tx_total_time += timing.elapsed().as_secs_f32();
     }
-
+    pub fn handle_withdraw_msg(&mut self, _manager: &mut ManagerWrapper, _message: messages::Message<messages::WithdrawMessage>) {
+        // TODO: Handles Withdraw messages.
+        unimplemented!()
+    }
     pub fn handle_order_msg(&mut self, manager: &mut ManagerWrapper, message: messages::Message<messages::OrderMessage>) {
         let (order, _) = message.into_parts();
         match order.event {
@@ -198,7 +173,9 @@ impl Processor {
             check_state(manager, state_after, &trade);
         }
     }
-
+    pub fn handle_transfer_msg(&mut self, _manager: &mut ManagerWrapper, _message: messages::Message<messages::TransferMessage>) {
+        // TODO gupeng
+    }
     fn trade_into_spot_tx(&self, trade: &messages::TradeMessage) -> l2::SpotTradeTx {
         //allow information can be obtained from trade
         let id_pair = TokenIdPair::from(TokenPair::from(trade.market.as_str()));
