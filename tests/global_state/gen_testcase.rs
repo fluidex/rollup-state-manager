@@ -40,19 +40,25 @@ fn replay_msgs(
         let timing = Instant::now();
         for msg in msg_receiver.iter() {
             match msg {
-                WrappedMessage::BALANCE(balance) => {
-                    processor.handle_balance_msg(&mut manager, balance);
+                WrappedMessage::DEPOSIT(deposit) => {
+                    processor.handle_deposit_msg(&mut manager, deposit);
+                }
+                WrappedMessage::ORDER(order) => {
+                    processor.handle_order_msg(&mut manager, order);
                 }
                 WrappedMessage::TRADE(trade) => {
                     let trade_id = trade.id;
                     processor.handle_trade_msg(&mut manager, trade);
                     println!("trade {} test done", trade_id);
                 }
-                WrappedMessage::ORDER(order) => {
-                    processor.handle_order_msg(&mut manager, order);
+                WrappedMessage::TRANSFER(transfer) => {
+                    processor.handle_transfer_msg(&mut manager, transfer);
                 }
                 WrappedMessage::USER(user) => {
                     processor.handle_user_msg(&mut manager, user);
+                }
+                WrappedMessage::WITHDRAW(withdraw) => {
+                    processor.handle_withdraw_msg(&mut manager, withdraw);
                 }
                 _ => {
                     //other msg is omitted
