@@ -94,6 +94,7 @@ impl Processor {
     }
     pub fn handle_withdraw_msg(&mut self, _manager: &mut ManagerWrapper, _message: messages::Message<messages::WithdrawMessage>) {
         // TODO: Handles Withdraw messages.
+        unimplemented!()
     }
     pub fn handle_order_msg(&mut self, manager: &mut ManagerWrapper, message: messages::Message<messages::OrderMessage>) {
         let (order, _) = message.into_parts();
