@@ -16,17 +16,19 @@ use std::time::Instant;
 use super::msg_utils::{check_state, exchange_order_to_rollup_order, TokenIdPair, TokenPair};
 
 pub struct Processor {
-    pub trade_tx_total_time: f32,
-    pub balance_tx_total_time: f32,
     pub enable_check_order_sig: bool,
+    pub balance_tx_total_time: f32,
+    pub trade_tx_total_time: f32,
+    pub transfer_tx_total_time: f32,
 }
 
 impl Default for Processor {
     fn default() -> Self {
         Processor {
-            trade_tx_total_time: 0.0,
-            balance_tx_total_time: 0.0,
             enable_check_order_sig: true,
+            balance_tx_total_time: 0.0,
+            trade_tx_total_time: 0.0,
+            transfer_tx_total_time: 0.0,
         }
     }
 }
@@ -173,8 +175,22 @@ impl Processor {
             check_state(manager, state_after, &trade);
         }
     }
-    pub fn handle_transfer_msg(&mut self, _manager: &mut ManagerWrapper, _message: messages::Message<messages::TransferMessage>) {
-        // TODO gupeng
+    pub fn handle_transfer_msg(&mut self, manager: &mut ManagerWrapper, message: messages::Message<messages::TransferMessage>) {
+        let (transfer, offset) = message.into_parts();
+        let amount = transfer.amount;
+        assert!(!amount.is_sign_negative(), "Transfer amount must not be negative");
+
+        let token_id = get_token_id_by_name(&transfer.asset);
+        let from = transfer.user_from;
+        let from_balance = manager.get_token_balance(from, token_id).to_decimal(prec_token_id(token_id));
+        assert!(from_balance >= amount, "From user must have sufficient balance");
+
+        let to = transfer.user_to;
+        let amount = amount.to_amount(prec_token_id(token_id));
+
+        let timing = Instant::now();
+        manager.transfer(l2::TransferTx::new(from, to, token_id, amount), offset);
+        self.transfer_tx_total_time += timing.elapsed().as_secs_f32();
     }
     fn trade_into_spot_tx(&self, trade: &messages::TradeMessage) -> l2::SpotTradeTx {
         //allow information can be obtained from trade
