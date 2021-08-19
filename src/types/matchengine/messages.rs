@@ -170,6 +170,8 @@ pub struct TransferMessage {
     pub user_to: u32,
     pub asset: String,
     pub amount: Decimal,
+    #[serde(with = "HexArray")]
+    pub signature: [u8; 64],
 }
 
 pub trait TxMessage {}

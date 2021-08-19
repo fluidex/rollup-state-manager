@@ -246,6 +246,7 @@ impl ManagerWrapper {
         encoded_tx[tx_detail_idx::ACCOUNT_ID1] = Fr::from_u32(tx.from);
         encoded_tx[tx_detail_idx::ACCOUNT_ID2] = Fr::from_u32(tx.to);
         encoded_tx[tx_detail_idx::TOKEN_ID1] = Fr::from_u32(tx.token_id);
+        encoded_tx[tx_detail_idx::TOKEN_ID2] = Fr::from_u32(tx.token_id);
         encoded_tx[tx_detail_idx::AMOUNT] = tx.amount.to_fr();
 
         encoded_tx[tx_detail_idx::BALANCE1] = from_old_balance;

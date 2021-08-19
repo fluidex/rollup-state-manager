@@ -30,7 +30,7 @@ fn bench_with_dummy_transfers() -> Result<()> {
     )));
 
     let mut processor = msg_processor::Processor {
-        enable_check_order_sig: false,
+        enable_check_sig: false,
         ..Default::default()
     };
 
@@ -113,7 +113,7 @@ fn bench_with_real_trades(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
 
     //amplify the records: in each iter we run records on a group of new accounts
     let mut processor = msg_processor::Processor {
-        enable_check_order_sig: false,
+        enable_check_sig: false,
         ..Default::default()
     };
 

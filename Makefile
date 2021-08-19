@@ -1,8 +1,10 @@
 BUILD_MODE="debug"
 CURRENTDATE=`date +"%Y-%m-%d"`
 
-ci:
+test:
 	cargo test --features "persist_sled" --
+
+lint:
 	cargo fmt --all -- --check
 	cargo clippy --features persist_sled -- -D warnings
 
