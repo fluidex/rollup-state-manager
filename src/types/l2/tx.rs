@@ -109,6 +109,18 @@ impl TransferTx {
     }
 
     pub fn hash(&self) -> Fr {
+        // adhoc ... FIXME
+        // fluidex.js / dingir-exchange does not handle precision correctly now
+        let amount = Fr::from_u32(self.amount.to_fr().to_i64() as u32 / 1000000);
+        Fr::hash(&[
+            Fr::from_u32(TxType::Transfer as u32),
+            Fr::from_u32(self.token_id),
+            amount,
+            Fr::from_u32(self.from),
+            self.from_nonce,
+            Fr::from_u32(self.to),
+        ])
+        /*
         let data = Fr::hash(&[
             Fr::from_u32(TxType::Transfer as u32),
             Fr::from_u32(self.token_id),
@@ -118,6 +130,7 @@ impl TransferTx {
         // i think we don't need to sign old_balance_from/to_nonce/old_balance_to?
         let data = Fr::hash(&[data, Fr::from_u32(self.from), self.from_nonce]);
         Fr::hash(&[data, Fr::from_u32(self.to)])
+        */
     }
 }
 

@@ -101,12 +101,7 @@ impl From<OrderInput> for Order {
             token_sell: order_input.token_sell,
             total_sell: order_input.total_sell,
             total_buy: order_input.total_buy,
-            sig: Signature {
-                hash: order_input.hash(),
-                s: Fr::from_bigint(order_input.sig.clone().unwrap().s),
-                r8x: order_input.sig.clone().unwrap().r_b8.x,
-                r8y: order_input.sig.clone().unwrap().r_b8.y,
-            },
+            sig: Signature::from_raw(order_input.hash(), &order_input.sig.clone().unwrap()),
             account_id: order_input.account_id,
             side: order_input.side,
             filled_sell: Fr::zero(),

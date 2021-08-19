@@ -1,3 +1,4 @@
+use crate::account::SignatureBJJ;
 use crate::msg::msg_utils::bytes_to_sig;
 use crate::state::ManagerWrapper;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
@@ -16,7 +17,7 @@ use std::time::Instant;
 use super::msg_utils::{check_state, exchange_order_to_rollup_order, TokenIdPair, TokenPair};
 
 pub struct Processor {
-    pub enable_check_order_sig: bool,
+    pub enable_check_sig: bool,
     pub balance_tx_total_time: f32,
     pub trade_tx_total_time: f32,
     pub transfer_tx_total_time: f32,
@@ -25,7 +26,7 @@ pub struct Processor {
 impl Default for Processor {
     fn default() -> Self {
         Processor {
-            enable_check_order_sig: true,
+            enable_check_sig: true,
             balance_tx_total_time: 0.0,
             trade_tx_total_time: 0.0,
             transfer_tx_total_time: 0.0,
@@ -133,9 +134,9 @@ impl Processor {
         let mut taker_order: Option<l2::Order> = None;
         let mut maker_order: Option<l2::Order> = None;
         if let Some(ask_order_origin) = &trade.ask_order {
-            let mut ask_order_input = exchange_order_to_rollup_order(&ask_order_origin);
-            if self.enable_check_order_sig {
-                self.check_order_sig(&manager, &mut ask_order_input);
+            let ask_order_input = exchange_order_to_rollup_order(&ask_order_origin);
+            if self.enable_check_sig {
+                self.check_order_sig(&manager, &ask_order_input);
             }
             assert!(!manager.has_order(ask_order_input.account_id, ask_order_input.order_id));
             let ask_order = l2::Order::from(ask_order_input);
@@ -149,9 +150,9 @@ impl Processor {
             };
         }
         if let Some(bid_order_origin) = &trade.bid_order {
-            let mut bid_order_input = exchange_order_to_rollup_order(&bid_order_origin);
-            if self.enable_check_order_sig {
-                self.check_order_sig(&manager, &mut bid_order_input);
+            let bid_order_input = exchange_order_to_rollup_order(&bid_order_origin);
+            if self.enable_check_sig {
+                self.check_order_sig(&manager, &bid_order_input);
             }
             assert!(!manager.has_order(bid_order_input.account_id, bid_order_input.order_id));
             let bid_order = l2::Order::from(bid_order_input);
@@ -189,7 +190,13 @@ impl Processor {
         let amount = amount.to_amount(prec_token_id(token_id));
 
         let timing = Instant::now();
-        manager.transfer(l2::TransferTx::new(from, to, token_id, amount), offset);
+        let raw_sig = bytes_to_sig(transfer.signature);
+        let mut transfer_tx = l2::TransferTx::new(from, to, token_id, amount);
+        transfer_tx.sig = crate::account::Signature::from_raw(transfer_tx.hash(), &raw_sig);
+        if self.enable_check_sig {
+            self.check_transfer_sig(&manager, &transfer_tx, &raw_sig);
+        }
+        manager.transfer(transfer_tx, offset);
         self.transfer_tx_total_time += timing.elapsed().as_secs_f32();
     }
     fn trade_into_spot_tx(&self, trade: &messages::TradeMessage) -> l2::SpotTradeTx {
@@ -249,12 +256,19 @@ impl Processor {
             side: if is_ask { OrderSide::Sell } else { OrderSide::Buy },
         }
     }
-    fn check_order_sig(&mut self, manager: &ManagerWrapper, order_to_put: &mut OrderInput) {
+    fn check_order_sig(&mut self, manager: &ManagerWrapper, order_to_put: &OrderInput) {
         let msg = order_to_put.hash();
         let sig = order_to_put.sig.clone().unwrap();
         manager
             .check_sig(order_to_put.account_id, &msg, &sig)
             .unwrap_or_else(|_| panic!("invalid sig for order {:?}", order_to_put));
+    }
+
+    fn check_transfer_sig(&mut self, manager: &ManagerWrapper, transfer: &l2::TransferTx, sig: &SignatureBJJ) {
+        let msg = transfer.hash();
+        manager
+            .check_sig(transfer.from, &msg, &sig)
+            .unwrap_or_else(|_| panic!("invalid sig for transfer {:?}", transfer));
     }
 
     pub fn take_bench(&mut self) -> (f32, f32) {

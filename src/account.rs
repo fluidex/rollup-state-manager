@@ -53,6 +53,17 @@ pub struct Signature {
     pub r8y: Fr,
 }
 
+impl Signature {
+    pub fn from_raw(hash: Fr, sig: &SignatureBJJ) -> Self {
+        Self {
+            hash,
+            s: Fr::from_bigint(sig.clone().s),
+            r8x: sig.clone().r_b8.x,
+            r8y: sig.clone().r_b8.y,
+        }
+    }
+}
+
 impl Default for Signature {
     fn default() -> Self {
         Self {
@@ -74,6 +85,7 @@ pub struct L2Account {
 }
 
 pub type SignatureBJJ = babyjubjub_rs::Signature;
+
 /*
 // don't change struct fields here!!!
 #[derive(Debug, Clone)]

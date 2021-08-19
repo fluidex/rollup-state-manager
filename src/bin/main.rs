@@ -2,15 +2,17 @@
 #![allow(dead_code)]
 
 use crossbeam_channel::RecvTimeoutError;
-use fluidex_common::db::{
-    models::{
-        tablenames,
-        task::{CircuitType, TaskStatus},
-    },
-    MIGRATOR,
-};
 use fluidex_common::non_blocking_tracing;
-use fluidex_common::types::FrExt;
+use fluidex_common::{
+    db::{
+        models::{
+            tablenames,
+            task::{CircuitType, TaskStatus},
+        },
+        MIGRATOR,
+    },
+    types::FrExt,
+};
 use rollup_state_manager::config::Settings;
 use rollup_state_manager::grpc::run_grpc_server;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
