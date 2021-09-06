@@ -102,6 +102,7 @@ impl Processor {
         let token_id = get_token_id_by_name(&withdraw.asset);
         let account_id = withdraw.user_id;
 
+        // balance_before = balance_after + withdraw_amount = balance_after - (-withdraw_amount) = balance - change
         let balance_before = withdraw.balance - withdraw.change;
         assert!(!balance_before.is_sign_negative(), "invalid balance {:?}", withdraw);
 
