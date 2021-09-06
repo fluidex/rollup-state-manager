@@ -122,10 +122,14 @@ impl Block {
         transfer_tx1.sig = account1.sign_hash(hash).unwrap();
         manager.transfer(transfer_tx1, None);
 
-        let mut withdraw_tx = WithdrawTx::new(account_id0, token_id0, Decimal::new(150, 0).to_amount(prec_token_id(token_id0)));
+        let mut withdraw_tx = WithdrawTx::new(
+            account_id0,
+            token_id0,
+            Decimal::new(150, 0).to_amount(prec_token_id(token_id0)),
+            manager.get_token_balance(account_id0, token_id0),
+        );
         manager.fill_withdraw_tx(&mut withdraw_tx);
         let hash = withdraw_tx.hash();
-        // hash = common.hashWithdraw(fullWithdrawTx);
         withdraw_tx.sig = account0.sign_hash(hash).unwrap();
         manager.withdraw(withdraw_tx, None);
 
