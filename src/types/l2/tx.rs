@@ -158,13 +158,17 @@ impl WithdrawTx {
     }
 
     pub fn hash(&self) -> Fr {
-        let data = Fr::hash(&[
+        // adhoc ... FIXME
+        // fluidex.js / dingir-exchange does not handle precision correctly now
+        let amount = Fr::from_u32(self.amount.to_fr().to_i64() as u32 / 1000000);
+        Fr::hash(&[
             Fr::from_u32(TxType::Withdraw as u32),
+            Fr::from_u32(self.account_id),
             Fr::from_u32(self.token_id),
-            self.amount.to_fr(),
-        ]);
-        // do we really need to sign oldBalance?
-        Fr::hash(&[data, Fr::from_u32(self.account_id), self.nonce, self.old_balance])
+            amount,
+            self.nonce,
+            self.old_balance,
+        ])
     }
 }
 
