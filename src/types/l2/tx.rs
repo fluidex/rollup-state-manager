@@ -146,13 +146,13 @@ pub struct WithdrawTx {
 }
 
 impl WithdrawTx {
-    pub fn new(account_id: u32, token_id: u32, amount: AmountType, old_balance: Fr) -> Self {
+    pub fn new(account_id: u32, token_id: u32, amount: AmountType, _old_balance: Fr) -> Self {
         Self {
             account_id,
             token_id,
             amount,
             nonce: Fr::zero(),
-            old_balance,
+            old_balance: Fr::zero(), // TODO: Use real `old_balance` for hash.
             sig: Signature::default(),
         }
     }
