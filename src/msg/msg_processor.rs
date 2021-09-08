@@ -110,7 +110,7 @@ impl Processor {
         assert_eq!(expected_balance_before, balance_before.to_fr(prec_token_id(token_id)));
 
         let precision = prec_token_id(token_id);
-        let amount = withdraw.change.to_amount(precision);
+        let amount = (-withdraw.change).to_amount(precision);
 
         let timing = Instant::now();
         let raw_sig = bytes_to_sig(withdraw.signature);
