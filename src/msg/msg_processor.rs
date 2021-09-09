@@ -95,9 +95,32 @@ impl Processor {
 
         self.balance_tx_total_time += timing.elapsed().as_secs_f32();
     }
-    pub fn handle_withdraw_msg(&mut self, _manager: &mut ManagerWrapper, _message: messages::Message<messages::WithdrawMessage>) {
-        // TODO: Handles Withdraw messages.
-        unimplemented!()
+    pub fn handle_withdraw_msg(&mut self, manager: &mut ManagerWrapper, message: messages::Message<messages::WithdrawMessage>) {
+        let (withdraw, offset) = message.into_parts();
+        assert!(!withdraw.change.is_sign_positive(), "should be a withdraw");
+
+        let token_id = get_token_id_by_name(&withdraw.asset);
+        let account_id = withdraw.user_id;
+
+        // balance_before = balance_after + withdraw_amount = balance_after - (-withdraw_amount) = balance - change
+        let balance_before = withdraw.balance - withdraw.change;
+        assert!(!balance_before.is_sign_negative(), "invalid balance {:?}", withdraw);
+
+        let expected_balance_before = manager.get_token_balance(account_id, token_id);
+        assert_eq!(expected_balance_before, balance_before.to_fr(prec_token_id(token_id)));
+
+        let precision = prec_token_id(token_id);
+        let amount = (-withdraw.change).to_amount(precision);
+
+        let timing = Instant::now();
+        let raw_sig = bytes_to_sig(withdraw.signature);
+        let mut withdraw_tx = l2::WithdrawTx::new(account_id, token_id, amount, balance_before.to_fr(precision));
+        withdraw_tx.sig = crate::account::Signature::from_raw(withdraw_tx.hash(), &raw_sig);
+        if self.enable_check_sig {
+            check_withdraw_sig(&manager, &withdraw_tx, &raw_sig);
+        }
+        manager.withdraw(withdraw_tx, offset);
+        self.transfer_tx_total_time += timing.elapsed().as_secs_f32();
     }
     pub fn handle_order_msg(&mut self, manager: &mut ManagerWrapper, message: messages::Message<messages::OrderMessage>) {
         let (order, _) = message.into_parts();
@@ -194,7 +217,7 @@ impl Processor {
         let mut transfer_tx = l2::TransferTx::new(from, to, token_id, amount);
         transfer_tx.sig = crate::account::Signature::from_raw(transfer_tx.hash(), &raw_sig);
         if self.enable_check_sig {
-            self.check_transfer_sig(&manager, &transfer_tx, &raw_sig);
+            check_transfer_sig(&manager, &transfer_tx, &raw_sig);
         }
         manager.transfer(transfer_tx, offset);
         self.transfer_tx_total_time += timing.elapsed().as_secs_f32();
@@ -264,17 +287,24 @@ impl Processor {
             .unwrap_or_else(|_| panic!("invalid sig for order {:?}", order_to_put));
     }
 
-    fn check_transfer_sig(&mut self, manager: &ManagerWrapper, transfer: &l2::TransferTx, sig: &SignatureBJJ) {
-        let msg = transfer.hash();
-        manager
-            .check_sig(transfer.from, &msg, &sig)
-            .unwrap_or_else(|_| panic!("invalid sig for transfer {:?}", transfer));
-    }
-
     pub fn take_bench(&mut self) -> (f32, f32) {
         let ret = (self.trade_tx_total_time, self.balance_tx_total_time);
         self.trade_tx_total_time = 0.0;
         self.balance_tx_total_time = 0.0;
         ret
     }
+}
+
+fn check_transfer_sig(manager: &ManagerWrapper, transfer: &l2::TransferTx, sig: &SignatureBJJ) {
+    let msg = transfer.hash();
+    manager
+        .check_sig(transfer.from, &msg, &sig)
+        .unwrap_or_else(|_| panic!("invalid sig for transfer {:?}", transfer));
+}
+
+fn check_withdraw_sig(manager: &ManagerWrapper, withdraw: &l2::WithdrawTx, sig: &SignatureBJJ) {
+    let msg = withdraw.hash();
+    manager
+        .check_sig(withdraw.account_id, &msg, &sig)
+        .unwrap_or_else(|_| panic!("invalid sig for withdraw {:?}", withdraw));
 }

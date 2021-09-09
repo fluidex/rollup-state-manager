@@ -161,6 +161,8 @@ pub struct WithdrawMessage {
     pub balance_available: Decimal,
     pub balance_frozen: Decimal,
     pub detail: String,
+    #[serde(with = "HexArray")]
+    pub signature: [u8; 64],
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
