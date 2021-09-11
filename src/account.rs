@@ -18,7 +18,7 @@ use ethers::{
             },
             Secp256k1,
         },
-        types::{Address, H256},
+        types::{Address, H256, U256},
     },
     prelude::coins_bip39::{English, Mnemonic, Wordlist},
     signers::to_eip155_v,
@@ -297,8 +297,12 @@ lazy_static! {
 /// Converts ethers core signature to recoverable signature
 /// Copied from https://github.com/gakonst/ethers-rs/blob/01cc80769c291fc80f5b1e9173b7b580ae6b6413/ethers-core/src/types/signature.rs#L120
 fn convert_signature(signature: &EthersSignature) -> Result<RecoverableSignature, Error> {
-    let gar: &GenericArray<u8, U32> = GenericArray::from_slice(signature.r.as_bytes());
-    let gas: &GenericArray<u8, U32> = GenericArray::from_slice(signature.s.as_bytes());
+    let mut bytes_r = [0u8; 32];
+    let mut bytes_s = [0u8; 32];
+    signature.r.to_big_endian(&mut bytes_r);
+    let gar: &GenericArray<u8, U32> = GenericArray::from_slice(&bytes_r);
+    signature.s.to_big_endian(&mut bytes_s);
+    let gas: &GenericArray<u8, U32> = GenericArray::from_slice(&bytes_s);
     let sig = K256Signature::from_scalars(*gar, *gas)?;
     RecoverableSignature::new(&sig, recoverable::Id::new(normalize_recovery_id(signature.v)).unwrap())
 }
@@ -331,12 +335,12 @@ fn sign_msg_with_signing_key(priv_key: &SigningKey, msg: &str) -> EthersSignatur
     let digest = Sha256Proxy::from(msg_hash);
     let recoverable_sig: RecoverableSignature = priv_key.sign_digest(digest);
 
-    let v = to_eip155_v(recoverable_sig.recovery_id(), None);
+    let v = to_eip155_v(recoverable_sig.recovery_id(), 2);
 
     let r_bytes: FieldBytes<Secp256k1> = recoverable_sig.r().into();
     let s_bytes: FieldBytes<Secp256k1> = recoverable_sig.s().into();
-    let r = H256::from_slice(&r_bytes.as_slice());
-    let s = H256::from_slice(&s_bytes.as_slice());
+    let r = U256::from_big_endian(&r_bytes.as_slice());
+    let s = U256::from_big_endian(&s_bytes.as_slice());
 
     EthersSignature { r, s, v }
 }
