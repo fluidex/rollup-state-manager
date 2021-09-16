@@ -335,8 +335,8 @@ fn sign_msg_with_signing_key(priv_key: &SigningKey, msg: &str) -> EthersSignatur
     let digest = Sha256Proxy::from(msg_hash);
     let recoverable_sig: RecoverableSignature = priv_key.sign_digest(digest);
 
-    //TODO: what if we want to use different CHAIN_ID for layer 1, but keep using 1 for layer 2?
-    let v = to_eip155_v(recoverable_sig.recovery_id(), *CHAIN_ID as u64);
+    //TODO: we should allow specifing chainID, here we just use ethereum mainnet's chainID
+    let v = to_eip155_v(recoverable_sig.recovery_id(), 1);
 
     let r_bytes: FieldBytes<Secp256k1> = recoverable_sig.r().into();
     let s_bytes: FieldBytes<Secp256k1> = recoverable_sig.s().into();

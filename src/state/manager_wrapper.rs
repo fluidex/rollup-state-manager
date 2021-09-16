@@ -9,6 +9,7 @@ use crate::r#const::sled_db::*;
 use crate::types::l2::{
     tx_detail_idx, DepositTx, FullSpotTradeTx, L2Block, L2BlockDetail, Order, RawTx, TransferTx, TxType, WithdrawTx, TX_LENGTH,
 };
+use ethers::core::types::U256;
 use crate::types::merkle_tree::Tree;
 use anyhow::{anyhow, bail};
 use fluidex_common::babyjubjub_rs::{self, Point};
@@ -114,6 +115,7 @@ impl ManagerWrapper {
         let detail = L2BlockDetail {
             old_root: *old_account_roots.first().unwrap(),
             new_root: *new_account_roots.last().unwrap(),
+            txdata_hash: U256::zero(),
             txs_type,
             encoded_txs,
             balance_path_elements,

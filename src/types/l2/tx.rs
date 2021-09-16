@@ -4,7 +4,7 @@ use crate::types::merkle_tree::MerklePath;
 use anyhow::bail;
 use anyhow::Result;
 use fluidex_common::ff::Field;
-use fluidex_common::types::{Float864, FrExt};
+use fluidex_common::types::{Float864, Float40, FrExt};
 use fluidex_common::Fr;
 use std::convert::TryInto;
 
@@ -38,7 +38,9 @@ pub struct RawTx {
     // debug info
     // extra: any;
 }
-pub type AmountType = Float864;
+
+pub type AmountType = Float40;
+
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct L2Key {
@@ -213,7 +215,9 @@ impl DepositTx {
         let token_id = (u16::from_be_bytes(data[idx..(idx + TOKEN_ID_LEN)].try_into()?)) as u32;
         idx += TOKEN_ID_LEN;
 
-        let amount = AmountType::decode(&data[idx..(idx + AMOUNT_LEN)])?;
+        //TODO: temporary compatible to pubdata using float864 encoding
+        let wide_float = Float864::decode(&data[idx..(idx + AMOUNT_LEN)])?;
+        let amount = AmountType::from_decimal(&wide_float.to_decimal(0), 0)?;
         idx += AMOUNT_LEN;
 
         let ay = Fr::from_slice(&data[idx..(idx + FR_LEN)])?;

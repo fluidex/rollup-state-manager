@@ -1,12 +1,14 @@
 use super::tx::TxType;
 use crate::types::merkle_tree::MerklePath;
 
+use ethers::core::types::U256;
 use fluidex_common::Fr;
 
 #[derive(Clone)]
 pub struct L2BlockDetail {
     pub old_root: Fr,
     pub new_root: Fr,
+    pub txdata_hash: U256,
     pub txs_type: Vec<TxType>,
     pub encoded_txs: Vec<Vec<Fr>>,
     pub balance_path_elements: Vec<[MerklePath; 4]>,

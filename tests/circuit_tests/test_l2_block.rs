@@ -5,7 +5,7 @@ use rollup_state_manager::account::Account;
 use rollup_state_manager::state::{GlobalState, ManagerWrapper};
 use rollup_state_manager::test_utils::circuit::{CircuitSource, CircuitTestCase, CircuitTestData};
 use rollup_state_manager::test_utils::types::prec_token_id;
-use rollup_state_manager::types::l2::{self, DepositTx, L2BlockSerde, L2Key, OrderInput, SpotTradeTx, TransferTx, WithdrawTx};
+use rollup_state_manager::types::l2::{self, AmountType, DepositTx, L2BlockSerde, L2Key, OrderInput, SpotTradeTx, TransferTx, WithdrawTx};
 use serde_json::json;
 
 use rollup_state_manager::params;
@@ -88,7 +88,7 @@ impl Block {
                 DepositTx {
                     token_id: token_id0,
                     account_id: account_id0,
-                    amount: Decimal::new(300, 0).to_amount(prec_token_id(token_id0)),
+                    amount: AmountType::from_decimal(&Decimal::new(300, 0), prec_token_id(token_id0)).unwrap(),
                     l2key: None,
                 },
                 None,
@@ -99,7 +99,7 @@ impl Block {
             account_id0,
             account_id1,
             token_id0,
-            Decimal::new(100, 0).to_amount(prec_token_id(token_id0)),
+            AmountType::from_decimal(&Decimal::new(100, 0), prec_token_id(token_id0)).unwrap(),
         );
         transfer_tx0.l2key = Some(L2Key {
             eth_addr: account1.eth_addr(),
@@ -115,7 +115,7 @@ impl Block {
             account_id1,
             account_id0,
             token_id0,
-            Decimal::new(50, 0).to_amount(prec_token_id(token_id0)),
+            AmountType::from_decimal(&Decimal::new(50, 0), prec_token_id(token_id0)).unwrap(),
         );
         transfer_tx1.from_nonce = manager.get_account_nonce(account_id1);
         let hash = transfer_tx1.hash();
@@ -125,7 +125,7 @@ impl Block {
         let mut withdraw_tx = WithdrawTx::new(
             account_id0,
             token_id0,
-            Decimal::new(150, 0).to_amount(prec_token_id(token_id0)),
+            AmountType::from_decimal(&Decimal::new(150, 0), prec_token_id(token_id0)).unwrap(),
             manager.get_token_balance(account_id0, token_id0),
         );
         manager.fill_withdraw_tx(&mut withdraw_tx);
@@ -142,7 +142,7 @@ impl Block {
                 DepositTx {
                     account_id: account_id1,
                     token_id: token_id0,
-                    amount: Decimal::new(199, 0).to_amount(prec_token_id(token_id0)),
+                    amount: AmountType::from_decimal(&Decimal::new(199, 0), prec_token_id(token_id0)).unwrap(),
                     l2key: None,
                 },
                 None,
@@ -153,7 +153,7 @@ impl Block {
                 DepositTx {
                     account_id: account_id2,
                     token_id: token_id1,
-                    amount: Decimal::new(1990, 0).to_amount(prec_token_id(token_id1)),
+                    amount: AmountType::from_decimal(&Decimal::new(1990, 0), prec_token_id(token_id1)).unwrap(),
                     l2key: Some(L2Key {
                         eth_addr: account2.eth_addr(),
                         sign: account2.sign(),
@@ -201,8 +201,8 @@ impl Block {
             order2_account_id: account_id2,
             token_id_1to2: token_id0,
             token_id_2to1: token_id1,
-            amount_1to2: Decimal::new(amount_1to2, 0).to_amount(prec_token_id(token_id0)),
-            amount_2to1: Decimal::new(amount_2to1, 0).to_amount(prec_token_id(token_id1)),
+            amount_1to2: AmountType::from_decimal(&Decimal::new(amount_1to2, 0), prec_token_id(token_id0)).unwrap(),
+            amount_2to1: AmountType::from_decimal(&Decimal::new(amount_2to1, 0), prec_token_id(token_id1)).unwrap(),
             order1_id: order_id1,
             order2_id: order_id2,
         };

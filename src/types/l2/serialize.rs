@@ -212,6 +212,10 @@ pub struct L2BlockSerde {
     pub old_root: FrStr,
     #[serde(rename = "newRoot")]
     pub new_root: FrStr,
+    #[serde(rename = "txDataHashHi")]
+    pub txdata_hash_hi: u128,
+    #[serde(rename = "txDataHashLo")]
+    pub txdata_hash_lo: u128,
     #[serde(rename = "txsType")]
     pub txs_type: Vec<l2::TxType>,
     #[serde(rename = "encodedTxs")]
@@ -252,6 +256,8 @@ impl From<l2::L2BlockDetail> for L2BlockSerde {
         L2BlockSerde {
             old_root: origin.old_root.into(),
             new_root: origin.new_root.into(),
+            txdata_hash_lo: origin.txdata_hash.low_u128(),
+            txdata_hash_hi: (origin.txdata_hash >> 128u8).low_u128(),
             txs_type: origin.txs_type,
             encoded_txs: origin
                 .encoded_txs
