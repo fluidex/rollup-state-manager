@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 #[cfg(test)]
+#[cfg(not(feature = "windows_build"))]
 use {pprof::protos::Message, std::io::Write};
 
 fn bench_with_dummy_transfers() -> Result<()> {
@@ -218,6 +219,7 @@ fn run_bench() -> Result<()> {
 }
 
 #[cfg(test)]
+#[cfg(not(feature = "windows_build"))]
 fn profile_bench() {
     let guard = pprof::ProfilerGuard::new(100).unwrap();
 
