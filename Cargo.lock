@@ -1172,7 +1172,7 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 [[package]]
 name = "fluidex-common"
 version = "0.1.0"
-source = "git+https://github.com/fluidex/common-rs?branch=master#4483601613f34d281029d36a00756bb560ca5962"
+source = "git+https://github.com/fluidex/common-rs?branch=master#9b5a93bf54b757c23fc4c065711c300fd9c2cf6c"
 dependencies = [
  "babyjubjub-rs",
  "backtrace",
