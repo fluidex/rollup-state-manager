@@ -257,7 +257,7 @@ impl BitEncodeContext {
 pub const AMOUNT_LEN: u32 = 5;
 
 pub struct TxDataEncoder {
-    ctx: BitEncodeContext,
+    ctx: Option<BitEncodeContext>,
     pub account_bits: u32,
     pub token_bits: u32,
 }
@@ -266,10 +266,14 @@ impl TxDataEncoder {
 
     pub fn new(balance_levels: u32, account_levels: u32) -> Self {
         TxDataEncoder {
-            ctx: BitEncodeContext::new(),
+            ctx: Some(BitEncodeContext::new()),
             account_bits: account_levels,
             token_bits: balance_levels,
         }
+    }
+
+    pub fn reset(&mut self){
+        self.ctx.replace(BitEncodeContext::new());
     }
 
     pub fn pubdata_len_bits(&self) -> u32 {
@@ -277,26 +281,27 @@ impl TxDataEncoder {
     }
 
     pub fn encode_account(&mut self, account_id: u32) -> Result<()> {
-        self.ctx.encode_primint(account_id, self.account_bits)
+        self.ctx.as_mut().unwrap().encode_primint(account_id, self.account_bits)
     }
 
     pub fn encode_token(&mut self, token_id: u32) -> Result<()> {
-        self.ctx.encode_primint(token_id, self.token_bits)
+        self.ctx.as_mut().unwrap().encode_primint(token_id, self.token_bits)
     }
 
     pub fn encode_amount(&mut self, amount: &AmountType) -> Result<()> {
         let encoded_big = amount.to_encoded_int()?;
         assert_eq!(AMOUNT_LEN, AmountType::encode_len() as u32);
-        self.ctx.encode_primint(encoded_big.to_u128().unwrap(), AMOUNT_LEN * 8)
+        self.ctx.as_mut().unwrap().encode_primint(encoded_big.to_u128().unwrap(), AMOUNT_LEN * 8)
     }
 
     pub fn encode_fr(&mut self, fr: &Fr, bits: u32) -> Result<()> {
-        self.ctx.encode_primint(fr.to_i64(), bits)
+        self.ctx.as_mut().unwrap().encode_primint(fr.to_i64(), bits)
     }
 
-    pub fn to_hash(self) -> U256{
-        let encoded_bytes = self.ctx.seal();
-        println!("{:x?}", &encoded_bytes);
+    //finish encoding, output the result hash, and prepare for next encoding
+    pub fn encode_end(&mut self) -> U256{
+        let encoded_bytes = self.ctx.replace(BitEncodeContext::new()).unwrap().seal();
+//        println!("{:x?}", &encoded_bytes);
         U256::from_big_endian(&sha2::Sha256::digest(&encoded_bytes))
     }
     
@@ -437,7 +442,7 @@ fn test_tx_pubdata() {
     tx_nop.encode_pubdata(&mut tx_encoder).unwrap();
     tx_nop.encode_pubdata(&mut tx_encoder).unwrap();
 
-    let hash = tx_encoder.to_hash();
+    let hash = tx_encoder.encode_end();
     //preimage should be: 4af0b5a4000025477400000013a1dd00000000000000000000000000000000
     assert_eq!(hash.low_u128(), 273971448787759175191113939742247265668u128);
 }

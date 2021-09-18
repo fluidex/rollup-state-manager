@@ -7,9 +7,8 @@ use crate::config::Settings;
 #[cfg(feature = "persist_sled")]
 use crate::r#const::sled_db::*;
 use crate::types::l2::{
-    tx_detail_idx, DepositTx, FullSpotTradeTx, L2Block, L2BlockDetail, Order, RawTx, TransferTx, TxType, WithdrawTx, TX_LENGTH,
+    tx_detail_idx, DepositTx, FullSpotTradeTx, L2Block, L2BlockDetail, Order, RawTx, TransferTx, TxType, WithdrawTx, TX_LENGTH, AmountType, TxDataEncoder,
 };
-use ethers::core::types::U256;
 use crate::types::merkle_tree::Tree;
 use anyhow::{anyhow, bail};
 use fluidex_common::babyjubjub_rs::{self, Point};
@@ -26,8 +25,13 @@ pub struct ManagerWrapper {
     buffered_txs: Vec<RawTx>,
     block_generate_num: usize,
     //buffered_blocks: Vec<L2Block>,
+    tx_data_encoder: TxDataEncoder,
     verbose: bool,
     verify_sig: bool,
+}
+
+fn encode_amount_to_fr(amount: &AmountType) -> anyhow::Result<Fr> {
+    Ok(Fr::from_bigint(amount.clone().to_encoded_int()?))
 }
 
 impl ManagerWrapper {
@@ -35,12 +39,19 @@ impl ManagerWrapper {
         Tree::print_config();
     }
     pub fn new(state: Arc<RwLock<GlobalState>>, n_tx: usize, block_offset: Option<usize>, verbose: bool) -> Self {
+
+        let tx_data_encoder = {
+            let st = state.read().unwrap();
+            TxDataEncoder::new(st.balance_bits() as u32, st.account_bits() as u32)
+        };
+
         Self {
             state,
             n_tx,
             buffered_txs: Vec::new(),
             block_generate_num: block_offset.unwrap_or(0),
             //buffered_blocks: Vec::new(),
+            tx_data_encoder,
             verbose,
             verify_sig: true,
         }
@@ -87,7 +98,7 @@ impl ManagerWrapper {
         self.mut_state().set_token_balance(account_id, token_id, balance);
     }
 
-    pub fn forge_with_txs(block_id: usize, buffered_txs: &[RawTx]) -> L2Block {
+    pub fn forge_with_txs(block_id: usize, buffered_txs: &[RawTx], encoder: &mut TxDataEncoder) -> L2Block {
         let txs_type = buffered_txs.iter().map(|tx| tx.tx_type).collect();
         let encoded_txs = buffered_txs.iter().map(|tx| tx.payload.clone()).collect();
         let balance_path_elements = buffered_txs
@@ -112,10 +123,12 @@ impl ManagerWrapper {
             .collect();
         let old_account_roots: Vec<Fr> = buffered_txs.iter().map(|tx| tx.root_before).collect();
         let new_account_roots: Vec<Fr> = buffered_txs.iter().map(|tx| tx.root_after).collect();
+        //calc tx-pubdata's hash
+        buffered_txs.iter().for_each(|tx| tx.encode_pubdata(encoder).unwrap());
         let detail = L2BlockDetail {
             old_root: *old_account_roots.first().unwrap(),
             new_root: *new_account_roots.last().unwrap(),
-            txdata_hash: U256::zero(),
+            txdata_hash: encoder.encode_end(),
             txs_type,
             encoded_txs,
             balance_path_elements,
@@ -152,7 +165,7 @@ impl ManagerWrapper {
         let nonce = acc.nonce;
 
         let mut encoded_tx = [Fr::zero(); TX_LENGTH];
-        encoded_tx[tx_detail_idx::AMOUNT] = tx.amount.to_fr();
+        encoded_tx[tx_detail_idx::AMOUNT] = encode_amount_to_fr(&tx.amount)?;
 
         encoded_tx[tx_detail_idx::TOKEN_ID1] = Fr::from_u32(tx.token_id);
         encoded_tx[tx_detail_idx::ACCOUNT_ID1] = Fr::from_u32(tx.account_id);
@@ -249,7 +262,7 @@ impl ManagerWrapper {
         encoded_tx[tx_detail_idx::ACCOUNT_ID2] = Fr::from_u32(tx.to);
         encoded_tx[tx_detail_idx::TOKEN_ID1] = Fr::from_u32(tx.token_id);
         encoded_tx[tx_detail_idx::TOKEN_ID2] = Fr::from_u32(tx.token_id);
-        encoded_tx[tx_detail_idx::AMOUNT] = tx.amount.to_fr();
+        encoded_tx[tx_detail_idx::AMOUNT] = encode_amount_to_fr(&tx.amount).unwrap();
 
         encoded_tx[tx_detail_idx::BALANCE1] = from_old_balance;
         encoded_tx[tx_detail_idx::NONCE1] = from_account.nonce;
@@ -342,7 +355,7 @@ impl ManagerWrapper {
         // first, generate the tx
         let mut encoded_tx = [Fr::zero(); TX_LENGTH];
 
-        encoded_tx[tx_detail_idx::AMOUNT] = tx.amount.to_fr();
+        encoded_tx[tx_detail_idx::AMOUNT] = encode_amount_to_fr(&tx.amount).unwrap();
 
         encoded_tx[tx_detail_idx::TOKEN_ID1] = Fr::from_u32(token_id);
         encoded_tx[tx_detail_idx::ACCOUNT_ID1] = Fr::from_u32(account_id);
@@ -493,8 +506,8 @@ impl ManagerWrapper {
         encoded_tx[tx_detail_idx::OLD_ORDER2_FILLED_BUY] = old_order2_in_tree.filled_buy;
         encoded_tx[tx_detail_idx::OLD_ORDER2_AMOUNT_BUY] = old_order2_in_tree.total_buy;
 
-        encoded_tx[tx_detail_idx::AMOUNT] = trade.amount_1to2.to_fr();
-        encoded_tx[tx_detail_idx::AMOUNT2] = trade.amount_2to1.to_fr();
+        encoded_tx[tx_detail_idx::AMOUNT] = encode_amount_to_fr(&trade.amount_1to2).unwrap();
+        encoded_tx[tx_detail_idx::AMOUNT2] = encode_amount_to_fr(&trade.amount_2to1).unwrap();
         encoded_tx[tx_detail_idx::ORDER1_POS] = Fr::from_u32(order1_pos);
         encoded_tx[tx_detail_idx::ORDER2_POS] = Fr::from_u32(order2_pos);
 
@@ -649,7 +662,7 @@ impl ManagerWrapper {
         let mut i = 0;
         let len = self.buffered_txs.len();
         while i + self.n_tx <= len {
-            let block = Self::forge_with_txs(self.block_generate_num, &self.buffered_txs[i..i + self.n_tx]);
+            let block = Self::forge_with_txs(self.block_generate_num, &self.buffered_txs[i..i + self.n_tx], &mut self.tx_data_encoder);
             blocks.push(block);
 
             self.block_generate_num += 1;
@@ -706,4 +719,69 @@ impl ManagerWrapper {
     fn mut_state(&self) -> RwLockWriteGuard<'_, GlobalState> {
         self.state.write().unwrap()
     }
+}
+
+#[cfg(test)]
+mod test {
+
+    use fluidex_common::rust_decimal::Decimal;
+    //use crate::account::Signature;
+    use super::*;
+    use crate::types::l2::L2Key;
+    use crate::config::Settings;
+
+    fn dummy_l2key() -> L2Key {
+        L2Key {
+            eth_addr: Fr::zero(),
+            sign: Fr::zero(),
+            ay: Fr::zero(),
+        }
+    }
+
+    #[test]
+    fn test_state_pubdata() {
+
+        let mut s = Settings::new();
+        //don't persist
+        s.persist_every_n_block = 1000;
+        Settings::set(s);
+
+        let gs = GlobalState::new(2,3,2,false);
+        let mut wrapper = ManagerWrapper::new(Arc::new(RwLock::new(gs)), 2, None, false);
+
+        //notice offset is of no use if we do not persist tx locally ...
+        //testing example picked from circuit/test/testdata/msg_float.jsonl
+        //block 1
+        wrapper.deposit(DepositTx {
+            account_id: 0,
+            token_id: 1,
+            amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
+            l2key: Some(dummy_l2key()),
+        }, None).unwrap();
+        wrapper.deposit(DepositTx {
+            account_id: 0,
+            token_id: 0,
+            amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
+            l2key: Some(dummy_l2key()),
+        }, None).unwrap();
+
+        //block 2
+        wrapper.deposit(DepositTx {
+            account_id: 1,
+            token_id: 1,
+            amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
+            l2key: Some(dummy_l2key()),
+        }, None).unwrap();
+        wrapper.deposit(DepositTx {
+            account_id: 1,
+            token_id: 0,
+            amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
+            l2key: Some(dummy_l2key()),
+        }, None).unwrap();
+
+        let blks = wrapper.pop_all_blocks();
+        assert_eq!(blks[0].detail.txdata_hash.low_u128(), 298571517759234780085007816947765249360u128);
+        assert_eq!(blks[1].detail.txdata_hash.low_u128(), 296940437820416654432875895781101051776u128);
+    }
+
 }
