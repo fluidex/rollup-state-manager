@@ -1,15 +1,15 @@
 use super::order;
-use super::{tx_detail_idx};
+use super::tx_detail_idx;
 use crate::account::Signature;
 use crate::types::merkle_tree::MerklePath;
-use anyhow::{anyhow};
+use anyhow::anyhow;
 use anyhow::Result;
+use ethers::core::types::U256;
 use fluidex_common::ff::Field;
+use fluidex_common::num_bigint::BigInt;
 use fluidex_common::types::{Float40, FrExt};
 use fluidex_common::Fr;
-use fluidex_common::num_bigint::BigInt;
-use num::{Zero, One, PrimInt, ToPrimitive};
-use ethers::core::types::{U256};
+use num::{One, PrimInt, ToPrimitive, Zero};
 use sha2::Digest;
 
 #[derive(Copy, Clone)]
@@ -45,7 +45,6 @@ pub struct RawTx {
 
 pub type AmountType = Float40;
 
-
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct L2Key {
     pub eth_addr: Fr,
@@ -61,9 +60,7 @@ pub enum L2Tx {
 }
 
 #[derive(Debug)]
-pub struct NopTx {
-
-}
+pub struct NopTx {}
 
 #[derive(Debug)]
 pub struct DepositTx {
@@ -192,8 +189,7 @@ struct BitEncodeContext {
 }
 
 impl BitEncodeContext {
-
-    pub fn new() -> Self{
+    pub fn new() -> Self {
         BitEncodeContext {
             encoding_buf: Vec::new(),
             applying_bit: 0,
@@ -210,7 +206,7 @@ impl BitEncodeContext {
 
     fn apply_bit(&mut self, is_zero: bool) {
         let mask = [128, 64, 32, 16, 8, 4, 2, 1];
-        
+
         if !is_zero {
             self.encoding_char += mask[self.applying_bit];
         }
@@ -226,7 +222,7 @@ impl BitEncodeContext {
         self.encoding_buf
     }
 
-    fn encode_primint<T: PrimInt + Zero + One>(&mut self, n: T, bits: u32) -> Result<()>{
+    fn encode_primint<T: PrimInt + Zero + One>(&mut self, n: T, bits: u32) -> Result<()> {
         let mut n = n;
         let mut i = bits;
 
@@ -238,20 +234,20 @@ impl BitEncodeContext {
 
         if n != T::zero() {
             Err(anyhow!("can not encode number within specified bits"))
-        }else {
+        } else {
             Ok(())
         }
     }
 
     fn encode_bytes(&mut self, bts: &[u8]) {
         for ch in bts {
-          self.encode_primint(*ch, 8).unwrap();
+            self.encode_primint(*ch, 8).unwrap();
         }
     }
 
     fn encode_str(&mut self, s: &str) {
         self.encode_bytes(s.as_bytes())
-    }    
+    }
 }
 
 pub const AMOUNT_LEN: u32 = 5;
@@ -263,7 +259,6 @@ pub struct TxDataEncoder {
 }
 
 impl TxDataEncoder {
-
     pub fn new(balance_levels: u32, account_levels: u32) -> Self {
         TxDataEncoder {
             ctx: Some(BitEncodeContext::new()),
@@ -272,7 +267,7 @@ impl TxDataEncoder {
         }
     }
 
-    pub fn reset(&mut self){
+    pub fn reset(&mut self) {
         self.ctx.replace(BitEncodeContext::new());
     }
 
@@ -291,7 +286,10 @@ impl TxDataEncoder {
     pub fn encode_amount(&mut self, amount: &AmountType) -> Result<()> {
         let encoded_big = amount.to_encoded_int()?;
         assert_eq!(AMOUNT_LEN, AmountType::encode_len() as u32);
-        self.ctx.as_mut().unwrap().encode_primint(encoded_big.to_u128().unwrap(), AMOUNT_LEN * 8)
+        self.ctx
+            .as_mut()
+            .unwrap()
+            .encode_primint(encoded_big.to_u128().unwrap(), AMOUNT_LEN * 8)
     }
 
     pub fn encode_fr(&mut self, fr: &Fr, bits: u32) -> Result<()> {
@@ -299,12 +297,11 @@ impl TxDataEncoder {
     }
 
     //finish encoding, output the result hash, and prepare for next encoding
-    pub fn encode_end(&mut self) -> U256{
+    pub fn encode_end(&mut self) -> U256 {
         let encoded_bytes = self.ctx.replace(BitEncodeContext::new()).unwrap().seal();
-//        println!("{:x?}", &encoded_bytes);
+        //        println!("{:x?}", &encoded_bytes);
         U256::from_big_endian(&sha2::Sha256::digest(&encoded_bytes))
     }
-    
 }
 
 impl RawTx {
@@ -313,7 +310,7 @@ impl RawTx {
         encoder.encode_fr(&payload[tx_detail_idx::ACCOUNT_ID1], encoder.account_bits)?;
         encoder.encode_fr(&payload[tx_detail_idx::ACCOUNT_ID2], encoder.account_bits)?;
         encoder.encode_fr(&payload[tx_detail_idx::TOKEN_ID1], encoder.token_bits)?;
-        encoder.encode_fr(&payload[tx_detail_idx::AMOUNT], AMOUNT_LEN*8)?;
+        encoder.encode_fr(&payload[tx_detail_idx::AMOUNT], AMOUNT_LEN * 8)?;
         Ok(())
     }
 }
@@ -324,7 +321,7 @@ impl NopTx {
         encoder.encode_account(0)?;
         encoder.encode_token(0)?;
         encoder.encode_amount(&AmountType::from_encoded_bigint(BigInt::from(0)).unwrap())
-    }    
+    }
 }
 
 impl DepositTx {
@@ -405,7 +402,6 @@ impl DepositToOldTx {
 #[cfg(test)]
 #[test]
 fn test_tx_pubdata() {
-
     let mut tx_encoder = TxDataEncoder::new(3, 3);
 
     let tx1 = DepositTx {
@@ -437,8 +433,8 @@ fn test_tx_pubdata() {
     };
 
     tx3.encode_pubdata(&mut tx_encoder).unwrap();
-    
-    let tx_nop = NopTx{};
+
+    let tx_nop = NopTx {};
     tx_nop.encode_pubdata(&mut tx_encoder).unwrap();
     tx_nop.encode_pubdata(&mut tx_encoder).unwrap();
 

@@ -7,7 +7,8 @@ use crate::config::Settings;
 #[cfg(feature = "persist_sled")]
 use crate::r#const::sled_db::*;
 use crate::types::l2::{
-    tx_detail_idx, DepositTx, FullSpotTradeTx, L2Block, L2BlockDetail, Order, RawTx, TransferTx, TxType, WithdrawTx, TX_LENGTH, AmountType, TxDataEncoder,
+    tx_detail_idx, AmountType, DepositTx, FullSpotTradeTx, L2Block, L2BlockDetail, Order, RawTx, TransferTx, TxDataEncoder, TxType,
+    WithdrawTx, TX_LENGTH,
 };
 use crate::types::merkle_tree::Tree;
 use anyhow::{anyhow, bail};
@@ -31,7 +32,7 @@ pub struct ManagerWrapper {
 }
 
 fn encode_amount_to_fr(amount: &AmountType) -> anyhow::Result<Fr> {
-    Ok(Fr::from_bigint(amount.clone().to_encoded_int()?))
+    Ok(Fr::from_bigint((*amount).to_encoded_int()?))
 }
 
 impl ManagerWrapper {
@@ -39,7 +40,6 @@ impl ManagerWrapper {
         Tree::print_config();
     }
     pub fn new(state: Arc<RwLock<GlobalState>>, n_tx: usize, block_offset: Option<usize>, verbose: bool) -> Self {
-
         let tx_data_encoder = {
             let st = state.read().unwrap();
             TxDataEncoder::new(st.balance_bits() as u32, st.account_bits() as u32)
@@ -662,7 +662,11 @@ impl ManagerWrapper {
         let mut i = 0;
         let len = self.buffered_txs.len();
         while i + self.n_tx <= len {
-            let block = Self::forge_with_txs(self.block_generate_num, &self.buffered_txs[i..i + self.n_tx], &mut self.tx_data_encoder);
+            let block = Self::forge_with_txs(
+                self.block_generate_num,
+                &self.buffered_txs[i..i + self.n_tx],
+                &mut self.tx_data_encoder,
+            );
             blocks.push(block);
 
             self.block_generate_num += 1;
@@ -727,8 +731,8 @@ mod test {
     use fluidex_common::rust_decimal::Decimal;
     //use crate::account::Signature;
     use super::*;
-    use crate::types::l2::L2Key;
     use crate::config::Settings;
+    use crate::types::l2::L2Key;
 
     fn dummy_l2key() -> L2Key {
         L2Key {
@@ -740,48 +744,66 @@ mod test {
 
     #[test]
     fn test_state_pubdata() {
-
         let mut s = Settings::new();
         //don't persist
         s.persist_every_n_block = 1000;
         Settings::set(s);
 
-        let gs = GlobalState::new(2,3,2,false);
+        let gs = GlobalState::new(2, 3, 2, false);
         let mut wrapper = ManagerWrapper::new(Arc::new(RwLock::new(gs)), 2, None, false);
 
         //notice offset is of no use if we do not persist tx locally ...
         //testing example picked from circuit/test/testdata/msg_float.jsonl
         //block 1
-        wrapper.deposit(DepositTx {
-            account_id: 0,
-            token_id: 1,
-            amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
-            l2key: Some(dummy_l2key()),
-        }, None).unwrap();
-        wrapper.deposit(DepositTx {
-            account_id: 0,
-            token_id: 0,
-            amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
-            l2key: Some(dummy_l2key()),
-        }, None).unwrap();
+        wrapper
+            .deposit(
+                DepositTx {
+                    account_id: 0,
+                    token_id: 1,
+                    amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
+                    l2key: Some(dummy_l2key()),
+                },
+                None,
+            )
+            .unwrap();
+        wrapper
+            .deposit(
+                DepositTx {
+                    account_id: 0,
+                    token_id: 0,
+                    amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
+                    l2key: Some(dummy_l2key()),
+                },
+                None,
+            )
+            .unwrap();
 
         //block 2
-        wrapper.deposit(DepositTx {
-            account_id: 1,
-            token_id: 1,
-            amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
-            l2key: Some(dummy_l2key()),
-        }, None).unwrap();
-        wrapper.deposit(DepositTx {
-            account_id: 1,
-            token_id: 0,
-            amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
-            l2key: Some(dummy_l2key()),
-        }, None).unwrap();
+        wrapper
+            .deposit(
+                DepositTx {
+                    account_id: 1,
+                    token_id: 1,
+                    amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
+                    l2key: Some(dummy_l2key()),
+                },
+                None,
+            )
+            .unwrap();
+        wrapper
+            .deposit(
+                DepositTx {
+                    account_id: 1,
+                    token_id: 0,
+                    amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
+                    l2key: Some(dummy_l2key()),
+                },
+                None,
+            )
+            .unwrap();
 
         let blks = wrapper.pop_all_blocks();
         assert_eq!(blks[0].detail.txdata_hash.low_u128(), 298571517759234780085007816947765249360u128);
         assert_eq!(blks[1].detail.txdata_hash.low_u128(), 296940437820416654432875895781101051776u128);
     }
-
 }

@@ -16,6 +16,12 @@ pub struct Settings {
     pub persist_every_n_block: usize,
 }
 
+impl Default for Settings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Settings {
     /// Initializes with parsing config file in env var `CONFIG`.
     ///
@@ -41,7 +47,7 @@ impl Settings {
             db: String::new(),
             persist_dir: Box::from(Path::new(".")),
             persist_every_n_block: 0,
-        }        
+        }
     }
 
     /// Sets the contents of this cell to the singleton `Settings`

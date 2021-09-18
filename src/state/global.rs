@@ -139,9 +139,15 @@ impl GlobalState {
         Tree::print_config();
     }
 
-    pub fn balance_bits(&self) -> usize { self.balance_levels }
-    pub fn order_bits(&self) -> usize { self.order_levels }
-    pub fn account_bits(&self) -> usize { self.account_levels }
+    pub fn balance_bits(&self) -> usize {
+        self.balance_levels
+    }
+    pub fn order_bits(&self) -> usize {
+        self.order_levels
+    }
+    pub fn account_bits(&self) -> usize {
+        self.account_levels
+    }
 
     pub fn new(balance_levels: usize, order_levels: usize, account_levels: usize, verbose: bool) -> Self {
         log::debug!(
