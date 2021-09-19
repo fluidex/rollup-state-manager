@@ -257,7 +257,9 @@ impl From<l2::L2BlockDetail> for L2BlockSerde {
             old_root: origin.old_root.into(),
             new_root: origin.new_root.into(),
             txdata_hash_lo: Fr::from_slice(&origin.txdata_hash.low_u128().to_be_bytes()).unwrap().into(),
-            txdata_hash_hi: Fr::from_slice(&(origin.txdata_hash >> 128u8).low_u128().to_be_bytes()).unwrap().into(),
+            txdata_hash_hi: Fr::from_slice(&(origin.txdata_hash >> 128u8).low_u128().to_be_bytes())
+                .unwrap()
+                .into(),
             txs_type: origin.txs_type,
             encoded_txs: origin
                 .encoded_txs
