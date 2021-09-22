@@ -297,7 +297,7 @@ impl TxDataEncoder {
     }
 
     //finish encoding, output the result hash, and prepare for next encoding
-    pub fn encode_end(&mut self) -> U256 {
+    pub fn finish(&mut self) -> U256 {
         let encoded_bytes = self.ctx.replace(BitEncodeContext::new()).unwrap().seal();
         //        println!("{:x?}", &encoded_bytes);
         U256::from_big_endian(&sha2::Sha256::digest(&encoded_bytes))
@@ -438,7 +438,7 @@ fn test_tx_pubdata() {
     tx_nop.encode_pubdata(&mut tx_encoder).unwrap();
     tx_nop.encode_pubdata(&mut tx_encoder).unwrap();
 
-    let hash = tx_encoder.encode_end();
+    let hash = tx_encoder.finish();
     //preimage should be: 4af0b5a4000025477400000013a1dd00000000000000000000000000000000
     assert_eq!(hash.low_u128(), 273971448787759175191113939742247265668u128);
 }

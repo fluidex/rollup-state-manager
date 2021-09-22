@@ -128,7 +128,7 @@ impl ManagerWrapper {
         let detail = L2BlockDetail {
             old_root: *old_account_roots.first().unwrap(),
             new_root: *new_account_roots.last().unwrap(),
-            txdata_hash: encoder.encode_end(),
+            txdata_hash: encoder.finish(),
             txs_type,
             encoded_txs,
             balance_path_elements,
