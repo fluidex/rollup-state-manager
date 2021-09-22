@@ -2,7 +2,7 @@
 #![allow(unreachable_patterns)]
 use anyhow::Result;
 use fluidex_common::rust_decimal_macros::dec;
-use fluidex_common::types::{Decimal, Float864};
+use fluidex_common::types::{Decimal, Float40};
 use rollup_state_manager::account::Account;
 use rollup_state_manager::msg::msg_processor;
 use rollup_state_manager::params;
@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 #[cfg(test)]
+#[cfg(not(feature = "windows_build"))]
 use {pprof::protos::Message, std::io::Write};
 
 fn bench_with_dummy_transfers() -> Result<()> {
@@ -70,7 +71,7 @@ fn bench_with_dummy_transfers() -> Result<()> {
     processor.handle_deposit_msg(&mut manager, deposit.into());
 
     // step3: bench transfer
-    let amount = Float864::from_decimal(&dec!(1), prec_token_id(0)).unwrap();
+    let amount = Float40::from_decimal(&dec!(1), prec_token_id(0)).unwrap();
     let mut transfer = TransferTx::new(1, 2, 0 /*ETH*/, amount);
     let transfer_hash = transfer.hash();
     let sig = user1.sign_hash(transfer_hash).unwrap();
@@ -218,6 +219,7 @@ fn run_bench() -> Result<()> {
 }
 
 #[cfg(test)]
+#[cfg(not(feature = "windows_build"))]
 fn profile_bench() {
     let guard = pprof::ProfilerGuard::new(100).unwrap();
 

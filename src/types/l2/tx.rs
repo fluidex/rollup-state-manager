@@ -1,12 +1,16 @@
 use super::order;
+use super::tx_detail_idx;
 use crate::account::Signature;
 use crate::types::merkle_tree::MerklePath;
-use anyhow::bail;
+use anyhow::anyhow;
 use anyhow::Result;
+use ethers::core::types::U256;
 use fluidex_common::ff::Field;
-use fluidex_common::types::{Float864, FrExt};
+use fluidex_common::num_bigint::BigInt;
+use fluidex_common::types::{Float40, FrExt};
 use fluidex_common::Fr;
-use std::convert::TryInto;
+use num::{One, PrimInt, ToPrimitive, Zero};
+use sha2::Digest;
 
 #[derive(Copy, Clone)]
 #[repr(u8)]
@@ -38,7 +42,8 @@ pub struct RawTx {
     // debug info
     // extra: any;
 }
-pub type AmountType = Float864;
+
+pub type AmountType = Float40;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct L2Key {
@@ -53,6 +58,9 @@ pub enum L2Tx {
     FullSpotTrade(FullSpotTradeTx),
     Withdraw(WithdrawTx),
 }
+
+#[derive(Debug)]
+pub struct NopTx {}
 
 #[derive(Debug)]
 pub struct DepositTx {
@@ -172,78 +180,188 @@ impl WithdrawTx {
     }
 }
 
-// DepositToNew 1 + 4 + 2 + 9 + 32 + 1 + 32 = 81
-pub const PUBDATA_LEN: usize = 81;
-pub const ACCOUNT_ID_LEN: usize = 4;
-pub const TOKEN_ID_LEN: usize = 2;
-pub const AMOUNT_LEN: usize = 9;
-pub const FR_LEN: usize = 32;
-//pub type PUBDATA = [u8; PUBDATA_LEN];
-
 // https://github.com/fluidex/circuits/issues/144
-impl DepositTx {
-    pub fn to_pubdata(&self) -> Vec<u8> {
-        let mut result = vec![TxType::Deposit as u8];
-        result.append(&mut self.account_id.to_be_bytes().to_vec());
-        result.append(&mut (self.token_id as u16).to_be_bytes().to_vec());
-        result.append(&mut self.amount.encode());
-        let l2key = self.l2key.clone().unwrap_or_default();
-        result.append(&mut (l2key.ay.to_vec_be()));
-        result.append(&mut [l2key.sign.to_bool().unwrap() as u8].to_vec());
-        result.append(&mut (l2key.eth_addr.to_vec_be()));
-        //println!("{}, {}", result.len(), PUBDATA_LEN);
-        assert!(result.len() <= PUBDATA_LEN);
-        result.append(&mut vec![0; PUBDATA_LEN - result.len()]);
-        result
+// https://github.com/fluidex/circuits/pull/181
+struct BitEncodeContext {
+    encoding_buf: Vec<u8>,
+    applying_bit: usize,
+    encoding_char: u8,
+}
+
+impl BitEncodeContext {
+    pub fn new() -> Self {
+        BitEncodeContext {
+            encoding_buf: Vec::new(),
+            applying_bit: 0,
+            encoding_char: 0,
+        }
     }
-    pub fn from_pubdata(data: &[u8]) -> Result<Self> {
-        if data.len() != PUBDATA_LEN {
-            bail!("invalid len for DepositTx");
+
+    fn next_byte(&mut self) {
+        assert_eq!(self.applying_bit, 8);
+        self.encoding_buf.push(self.encoding_char);
+        self.applying_bit = 0;
+        self.encoding_char = 0u8;
+    }
+
+    fn apply_bit(&mut self, is_zero: bool) {
+        let mask = [128, 64, 32, 16, 8, 4, 2, 1];
+
+        if !is_zero {
+            self.encoding_char += mask[self.applying_bit];
         }
-        let mut idx: usize = 0;
+        self.applying_bit += 1;
 
-        if data[0] != TxType::Deposit as u8 {
-            bail!("invalid type for DepositTx");
+        if self.applying_bit == 8 {
+            self.next_byte();
         }
-        idx += 1;
+    }
 
-        let account_id = u32::from_be_bytes(data[idx..(idx + ACCOUNT_ID_LEN)].try_into()?);
-        idx += ACCOUNT_ID_LEN;
+    fn seal(mut self) -> Vec<u8> {
+        self.encoding_buf.push(self.encoding_char);
+        self.encoding_buf
+    }
 
-        let token_id = (u16::from_be_bytes(data[idx..(idx + TOKEN_ID_LEN)].try_into()?)) as u32;
-        idx += TOKEN_ID_LEN;
+    fn encode_primint<T: PrimInt + Zero + One>(&mut self, n: T, bits: u32) -> Result<()> {
+        let mut n = n;
+        let mut i = bits;
 
-        let amount = AmountType::decode(&data[idx..(idx + AMOUNT_LEN)])?;
-        idx += AMOUNT_LEN;
-
-        let ay = Fr::from_slice(&data[idx..(idx + FR_LEN)])?;
-        idx += FR_LEN;
-        if ay.is_zero() {
-            return Ok(Self {
-                account_id,
-                token_id,
-                amount,
-                l2key: None,
-            });
+        while i > 0 {
+            self.apply_bit((n & T::one()) == T::zero());
+            n = n.unsigned_shr(1);
+            i -= 1;
         }
 
-        let sign = Fr::from_slice(&data[idx..(idx + 1)])?;
-        idx += 1;
-        if sign != Fr::one() && sign != Fr::zero() {
-            bail!("invalid l2 account sign");
+        if n != T::zero() {
+            Err(anyhow!("can not encode number within specified bits"))
+        } else {
+            Ok(())
         }
+    }
 
-        let eth_addr = Fr::from_slice(&data[idx..(idx + FR_LEN)])?;
-        //idx += FR_LEN;
+    fn encode_bytes(&mut self, bts: &[u8]) {
+        for ch in bts {
+            self.encode_primint(*ch, 8).unwrap();
+        }
+    }
 
-        Ok(Self {
-            account_id,
-            token_id,
-            amount,
-            l2key: Some(L2Key { eth_addr, sign, ay }),
-        })
+    fn encode_str(&mut self, s: &str) {
+        self.encode_bytes(s.as_bytes())
     }
 }
+
+pub const AMOUNT_LEN: u32 = 5;
+
+pub struct TxDataEncoder {
+    ctx: Option<BitEncodeContext>,
+    pub account_bits: u32,
+    pub token_bits: u32,
+}
+
+impl TxDataEncoder {
+    pub fn new(balance_levels: u32, account_levels: u32) -> Self {
+        TxDataEncoder {
+            ctx: Some(BitEncodeContext::new()),
+            account_bits: account_levels,
+            token_bits: balance_levels,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.ctx.replace(BitEncodeContext::new());
+    }
+
+    pub fn pubdata_len_bits(&self) -> u32 {
+        self.account_bits + self.token_bits + AMOUNT_LEN * 8
+    }
+
+    pub fn encode_account(&mut self, account_id: u32) -> Result<()> {
+        self.ctx.as_mut().unwrap().encode_primint(account_id, self.account_bits)
+    }
+
+    pub fn encode_token(&mut self, token_id: u32) -> Result<()> {
+        self.ctx.as_mut().unwrap().encode_primint(token_id, self.token_bits)
+    }
+
+    pub fn encode_amount(&mut self, amount: &AmountType) -> Result<()> {
+        let encoded_big = amount.to_encoded_int()?;
+        assert_eq!(AMOUNT_LEN, AmountType::encode_len() as u32);
+        self.ctx
+            .as_mut()
+            .unwrap()
+            .encode_primint(encoded_big.to_u128().unwrap(), AMOUNT_LEN * 8)
+    }
+
+    pub fn encode_fr(&mut self, fr: &Fr, bits: u32) -> Result<()> {
+        self.ctx.as_mut().unwrap().encode_primint(fr.to_i64(), bits)
+    }
+
+    //finish encoding, output the result hash, and prepare for next encoding
+    pub fn finish(&mut self) -> U256 {
+        let encoded_bytes = self.ctx.replace(BitEncodeContext::new()).unwrap().seal();
+        //        println!("{:x?}", &encoded_bytes);
+        U256::from_big_endian(&sha2::Sha256::digest(&encoded_bytes))
+    }
+}
+
+impl RawTx {
+    pub fn encode_pubdata(&self, encoder: &mut TxDataEncoder) -> Result<()> {
+        let payload = &self.payload;
+        encoder.encode_fr(&payload[tx_detail_idx::ACCOUNT_ID1], encoder.account_bits)?;
+        encoder.encode_fr(&payload[tx_detail_idx::ACCOUNT_ID2], encoder.account_bits)?;
+        encoder.encode_fr(&payload[tx_detail_idx::TOKEN_ID1], encoder.token_bits)?;
+        encoder.encode_fr(&payload[tx_detail_idx::AMOUNT], AMOUNT_LEN * 8)?;
+        Ok(())
+    }
+}
+
+impl NopTx {
+    pub fn encode_pubdata(&self, encoder: &mut TxDataEncoder) -> Result<()> {
+        encoder.encode_account(0)?;
+        encoder.encode_account(0)?;
+        encoder.encode_token(0)?;
+        encoder.encode_amount(&AmountType::from_encoded_bigint(BigInt::from(0)).unwrap())
+    }
+}
+
+impl DepositTx {
+    pub fn encode_pubdata(&self, encoder: &mut TxDataEncoder) -> Result<()> {
+        encoder.encode_account(self.account_id)?;
+        encoder.encode_account(self.account_id)?;
+        encoder.encode_token(self.token_id)?;
+        encoder.encode_amount(&self.amount)
+    }
+}
+
+impl TransferTx {
+    pub fn encode_pubdata(&self, encoder: &mut TxDataEncoder) -> Result<()> {
+        encoder.encode_account(self.from)?;
+        encoder.encode_account(self.to)?;
+        encoder.encode_token(self.token_id)?;
+        encoder.encode_amount(&self.amount)
+    }
+}
+
+impl SpotTradeTx {
+    pub fn encode_pubdata(&self, encoder: &mut TxDataEncoder) -> Result<()> {
+        //TODO: spot trade is not completely encoded yet
+        encoder.encode_account(self.order1_account_id)?;
+        encoder.encode_account(self.order2_account_id)?;
+        encoder.encode_token(self.token_id_1to2)?;
+        encoder.encode_amount(&self.amount_1to2)
+    }
+}
+
+impl WithdrawTx {
+    pub fn encode_pubdata(&self, encoder: &mut TxDataEncoder) -> Result<()> {
+        //TODO: should we encode amount as minus?
+        encoder.encode_account(self.account_id)?;
+        encoder.encode_account(self.account_id)?;
+        encoder.encode_token(self.token_id)?;
+        encoder.encode_amount(&self.amount)
+    }
+}
+
 /*
 impl DepositToOldTx {
     pub fn to_pubdata(&self) -> Vec<u8> {
@@ -283,25 +401,48 @@ impl DepositToOldTx {
 */
 #[cfg(test)]
 #[test]
-fn test_deposit_to_old_pubdata() {
-    let tx = DepositTx {
-        account_id: 1323,
-        token_id: 232,
-        amount: AmountType {
-            significand: 756,
-            exponent: 11,
-        },
+fn test_tx_pubdata() {
+    let mut tx_encoder = TxDataEncoder::new(3, 3);
+
+    let tx1 = DepositTx {
+        account_id: 2,
+        token_id: 5,
+        amount: AmountType::from_encoded_bigint(BigInt::from(1234567)).unwrap(),
         l2key: None,
     };
-    let pubdata1 = tx.to_pubdata();
-    println!("pubdata {:?}", pubdata1);
-    let tx2 = DepositTx::from_pubdata(&pubdata1).unwrap();
-    assert_eq!(tx.account_id, tx2.account_id);
-    assert_eq!(tx.token_id, tx2.token_id);
-    assert_eq!(tx.amount.to_bigint(), tx2.amount.to_bigint());
-    assert!(tx2.l2key.is_none());
-}
 
+    tx1.encode_pubdata(&mut tx_encoder).unwrap();
+
+    let tx2 = DepositTx {
+        account_id: 2,
+        token_id: 5,
+        amount: AmountType::from_encoded_bigint(BigInt::from(3000)).unwrap(),
+        l2key: None,
+    };
+
+    tx2.encode_pubdata(&mut tx_encoder).unwrap();
+
+    let tx3 = TransferTx {
+        from: 2,
+        to: 6,
+        token_id: 5,
+        amount: AmountType::from_encoded_bigint(BigInt::from(6000)).unwrap(),
+        l2key: None,
+        from_nonce: Fr::zero(),
+        sig: Signature::default(),
+    };
+
+    tx3.encode_pubdata(&mut tx_encoder).unwrap();
+
+    let tx_nop = NopTx {};
+    tx_nop.encode_pubdata(&mut tx_encoder).unwrap();
+    tx_nop.encode_pubdata(&mut tx_encoder).unwrap();
+
+    let hash = tx_encoder.finish();
+    //preimage should be: 4af0b5a4000025477400000013a1dd00000000000000000000000000000000
+    assert_eq!(hash.low_u128(), 273971448787759175191113939742247265668u128);
+}
+/*
 #[cfg(test)]
 #[test]
 fn test_deposit_to_new_pubdata() {
@@ -326,3 +467,4 @@ fn test_deposit_to_new_pubdata() {
     assert_eq!(tx.amount.to_bigint(), tx2.amount.to_bigint());
     assert_eq!(tx.l2key.unwrap(), tx2.l2key.unwrap());
 }
+*/

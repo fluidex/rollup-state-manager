@@ -9,11 +9,17 @@ static SETTINGS: OnceCell<Settings> = OnceCell::new();
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Settings {
-    brokers: String,
-    grpc_addr: String,
-    db: String,
-    persist_dir: Box<Path>,
-    persist_every_n_block: usize,
+    pub brokers: String,
+    pub grpc_addr: String,
+    pub db: String,
+    pub persist_dir: Box<Path>,
+    pub persist_every_n_block: usize,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Settings {
@@ -32,6 +38,16 @@ impl Settings {
             .unwrap();
 
         Self::set(conf.try_into().unwrap());
+    }
+
+    pub fn new() -> Self {
+        Settings {
+            brokers: String::new(),
+            grpc_addr: String::new(),
+            db: String::new(),
+            persist_dir: Box::from(Path::new(".")),
+            persist_every_n_block: 0,
+        }
     }
 
     /// Sets the contents of this cell to the singleton `Settings`

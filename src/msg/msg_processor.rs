@@ -2,13 +2,13 @@ use crate::account::SignatureBJJ;
 use crate::msg::msg_utils::bytes_to_sig;
 use crate::state::ManagerWrapper;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
-use crate::types::l2::{self, OrderInput, OrderSide};
+use crate::types::l2::{self, AmountType, OrderInput, OrderSide};
 use crate::types::matchengine::messages;
 
 use fluidex_common::babyjubjub_rs::{self, Point};
 use fluidex_common::ff::Field;
 use fluidex_common::rust_decimal::Decimal;
-use fluidex_common::types::{DecimalExt, Float864, FrExt};
+use fluidex_common::types::{DecimalExt, FrExt};
 use fluidex_common::Fr;
 use num::Zero;
 use std::convert::TryInto;
@@ -45,7 +45,7 @@ impl Processor {
         let bjj_compressed: [u8; 32] = l2_pubkey.try_into().unwrap();
         let l2_pubkey_point: Point = babyjubjub_rs::decompress_point(bjj_compressed).unwrap();
         let fake_token_id = 0;
-        let fake_amount = Float864::from_decimal(&Decimal::zero(), prec_token_id(fake_token_id)).unwrap();
+        let fake_amount = AmountType::from_decimal(&Decimal::zero(), prec_token_id(fake_token_id)).unwrap();
         let eth_addr = Fr::from_str(&user_info.l1_address);
         let sign = if bjj_compressed[31] & 0x80 != 0x00 { Fr::one() } else { Fr::zero() };
         // TODO: remove '0x' from eth addr?
@@ -79,7 +79,11 @@ impl Processor {
         assert_eq!(expected_balance_before, balance_before.to_fr(prec_token_id(token_id)));
 
         let timing = Instant::now();
-        let amount = deposit.change.to_amount(prec_token_id(token_id));
+        let amount = AmountType::from_decimal(&deposit.change, prec_token_id(token_id)).unwrap();
+
+        /*
+        let rounding = deposit.change - amount.to_decimal(prec_token_id(token_id));
+        */
 
         manager
             .deposit(
@@ -110,7 +114,7 @@ impl Processor {
         assert_eq!(expected_balance_before, balance_before.to_fr(prec_token_id(token_id)));
 
         let precision = prec_token_id(token_id);
-        let amount = (-withdraw.change).to_amount(precision);
+        let amount = AmountType::from_decimal(&-withdraw.change, precision).unwrap();
 
         let timing = Instant::now();
         let raw_sig = bytes_to_sig(withdraw.signature);
@@ -210,7 +214,7 @@ impl Processor {
         assert!(from_balance >= amount, "From user must have sufficient balance");
 
         let to = transfer.user_to;
-        let amount = amount.to_amount(prec_token_id(token_id));
+        let amount = AmountType::from_decimal(&amount, prec_token_id(token_id)).unwrap();
 
         let timing = Instant::now();
         let raw_sig = bytes_to_sig(transfer.signature);
@@ -232,8 +236,8 @@ impl Processor {
                 order2_account_id: trade.bid_user_id,
                 token_id_1to2: id_pair.0,
                 token_id_2to1: id_pair.1,
-                amount_1to2: trade.amount.to_amount(prec_token_id(id_pair.0)),
-                amount_2to1: trade.quote_amount.to_amount(prec_token_id(id_pair.1)),
+                amount_1to2: AmountType::from_decimal(&trade.amount, prec_token_id(id_pair.0)).unwrap(),
+                amount_2to1: AmountType::from_decimal(&trade.quote_amount, prec_token_id(id_pair.1)).unwrap(),
                 order1_id: trade.ask_order_id as u32,
                 order2_id: trade.bid_order_id as u32,
             },
@@ -242,8 +246,8 @@ impl Processor {
                 order2_account_id: trade.ask_user_id,
                 token_id_1to2: id_pair.1,
                 token_id_2to1: id_pair.0,
-                amount_1to2: trade.quote_amount.to_amount(prec_token_id(id_pair.1)),
-                amount_2to1: trade.amount.to_amount(prec_token_id(id_pair.0)),
+                amount_1to2: AmountType::from_decimal(&trade.quote_amount, prec_token_id(id_pair.1)).unwrap(),
+                amount_2to1: AmountType::from_decimal(&trade.amount, prec_token_id(id_pair.0)).unwrap(),
                 order1_id: trade.bid_order_id as u32,
                 order2_id: trade.ask_order_id as u32,
             },
