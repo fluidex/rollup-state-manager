@@ -92,11 +92,11 @@ jobs:
           path: examples/js/
           key: node_modules-${{ hashFiles('examples/js/package-lock.json') }}
 
-      - name: npm ci
+      - name: npm i
         if: steps.npm_cache.outputs.cache-hit != 'true'
         run: |
           cd ./examples/js/
-          npm ci
+          npm i
 
       - name: Up docker-compose
         run: docker-compose --file "./orchestra/docker/docker-compose.yaml" up --detach
