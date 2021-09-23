@@ -34,6 +34,12 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v2
 
+      - name: Pull git submodule
+        run: git submodule update --init --recursive
+
+      - name: Install libpq
+        run: sudo apt-get install libpq-dev
+
       - name: Install 1.53.0 toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -41,14 +47,6 @@ jobs:
           toolchain: 1.53.0
           override: true
           components: rustfmt, clippy
-
-      - name: Install libpq
-        run: sudo apt-get install libpq-dev
-
-      - name: Install Node.js 14
-        uses: actions/setup-node@v2
-        with:
-          node-version: '14'
 
       - name: Cache cargo registry
         uses: actions/cache@v2
@@ -80,13 +78,25 @@ jobs:
           printf "[build]\nrustc-wrapper = \"/home/runner/.cargo/bin/sccache\"" >> ~/.cargo/config
           ~/.cargo/bin/sccache -s
 
-      - name: NPM install
+      - name: Install Node.js 14
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+          # cache: 'npm'
+          # cache-dependency-path: examples/js/package-lock.json
+
+      - name: Cache node_modules
+        id: npm_cache
+        uses: actions/cache@v2
+        with:
+          path: examples/js/
+          key: node_modules-${{ hashFiles('examples/js/package-lock.json') }}
+
+      - name: npm ci
+        if: steps.npm_cache.outputs.cache-hit != 'true'
         run: |
           cd ./examples/js/
-          npm install
-
-      - name: Pull git submodule
-        run: git submodule update --init --recursive
+          npm ci
 
       - name: Up docker-compose
         run: docker-compose --file "./orchestra/docker/docker-compose.yaml" up --detach
