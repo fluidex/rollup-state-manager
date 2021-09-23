@@ -33,6 +33,19 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v2
 
+      - name: Install 1.53.0 toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: 1.53.0
+          override: true
+          components: rustfmt, clippy
+
+      - name: Install Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+
       - name: Cache cargo registry
         uses: actions/cache@v2
         with:
@@ -62,19 +75,6 @@ jobs:
           chmod +x ~/.cargo/bin/sccache
           printf "[build]\nrustc-wrapper = \"/home/runner/.cargo/bin/sccache\"" >> ~/.cargo/config
           ~/.cargo/bin/sccache -s
-
-      - name: Install 1.53.0 toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: 1.53.0
-          override: true
-          components: rustfmt, clippy
-
-      - name: Install Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: '16'
 
       - name: Test export_circuit
         run: bash tests/circuit_tests/test.sh
