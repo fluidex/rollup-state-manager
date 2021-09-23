@@ -7,7 +7,7 @@ class Producer {
     const brokers = process.env.KAFKA_BROKERS;
     const kafka = new Kafka.Kafka({
       brokers: (brokers || "127.0.0.1:9092").split(","),
-      logLevel: Kafka.logLevel.WARN,
+      logLevel: Kafka.logLevel.WARN
     });
     const producer = kafka.producer();
     this.producer = producer;
@@ -17,7 +17,7 @@ class Producer {
   async send(messages, topic = "unifyevents") {
     await this.producer.send({
       topic,
-      messages,
+      messages
     });
   }
 

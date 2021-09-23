@@ -6,7 +6,7 @@ const load = {
   longs: String,
   enums: String,
   defaults: true,
-  oneofs: true,
+  oneofs: true
 };
 
 class Client {
@@ -30,7 +30,7 @@ class Client {
       account_id,
       token_id,
       token_address,
-      token_name,
+      token_name
     });
   }
 }
