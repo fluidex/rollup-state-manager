@@ -17,6 +17,7 @@ pub struct L2BlockDetail {
     pub order_roots: Vec<[Fr; 2]>,
     pub old_account_roots: Vec<Fr>,
     pub new_account_roots: Vec<Fr>,
+    pub txdata: Vec<u8>,
 }
 
 #[derive(Clone)]
