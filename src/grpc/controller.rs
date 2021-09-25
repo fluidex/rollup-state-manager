@@ -49,8 +49,6 @@ impl Controller {
 
         let status = match get_task_status_by_block_id(&self.db_pool, block_id).await? {
             task::TaskStatus::Inited => TaskStatus::Inited,
-            task::TaskStatus::Witgening => TaskStatus::Witgening,
-            task::TaskStatus::Witgened => TaskStatus::Witgened,
             task::TaskStatus::Proving => TaskStatus::Proving,
             task::TaskStatus::Proved => TaskStatus::Proved,
         };
