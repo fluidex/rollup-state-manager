@@ -96,7 +96,7 @@ jobs:
         if: steps.npm_cache.outputs.cache-hit != 'true'
         run: |
           cd ./examples/js/
-          npm i
+          npm ci
 
       - name: Up docker-compose
         run: docker-compose --file "./orchestra/docker/docker-compose.yaml" up --detach

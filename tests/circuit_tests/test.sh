@@ -16,7 +16,7 @@ git submodule update --init --recursive
 if [ -z ${CI+x} ]; then git pull --recurse-submodules; fi
 cargo run --bin gen_export_circuit_testcase # debug mode for fast compile
 
-cd $REPO_DIR/circuits; npm i
+cd $REPO_DIR/circuits; npm ci
 snarkit --version || npm -g install snarkit
 snarkit test testdata/Block_$NTXS"_"$BALANCELEVELS"_"$ORDERLEVELS"_"$ACCOUNTLEVELS/ --force_recompile --backend=wasm
 snarkit test testdata/CheckLeafUpdate_2/ --force_recompile --backend=wasm

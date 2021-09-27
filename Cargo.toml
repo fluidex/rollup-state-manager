@@ -33,7 +33,7 @@ sled = { version = "0.34", optional = true }
 sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "postgres", "chrono", "decimal" ] }
 thiserror = "1.0.25"
 tokio = { version = "1.6.0", features = [ "full" ] }
-tonic = "0.4.0"
+tonic = "0.5.2"
 
 [dev-dependencies]
 pprof = { version = "0.4", features = [ "flamegraph", "protobuf" ] }
