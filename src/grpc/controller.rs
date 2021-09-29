@@ -3,7 +3,7 @@ use crate::state::global::GlobalState;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::L2BlockSerde;
 use core::cmp::{max, min};
-use fluidex_common::db::models::{l2_block, tablenames, task};
+use fluidex_common::db::models::{l2_block, tablenames};
 use fluidex_common::db::DbType;
 use fluidex_common::types::FrExt;
 use fluidex_common::utils::timeutil::FTimestamp;
@@ -47,10 +47,10 @@ impl Controller {
         let block_id = request.block_id;
         let l2_block = get_l2_block_by_id(&self.db_pool, block_id).await?;
 
-        let status = match get_task_status_by_block_id(&self.db_pool, block_id).await? {
-            task::TaskStatus::Inited => TaskStatus::Inited,
-            task::TaskStatus::Proving => TaskStatus::Proving,
-            task::TaskStatus::Proved => TaskStatus::Proved,
+        let status = match get_status_by_block_id(&self.db_pool, block_id).await? {
+            l2_block::BlockStatus::Uncommited => BlockStatus::Uncommited,
+            l2_block::BlockStatus::Commited => BlockStatus::Proving,
+            l2_block::BlockStatus::Verified => BlockStatus::Proved,
         };
 
         let detail: L2BlockSerde = serde_json::from_value(l2_block.detail).unwrap();
@@ -149,17 +149,17 @@ async fn get_l2_block_by_id(db_pool: &sqlx::Pool<DbType>, block_id: i64) -> Resu
     }
 }
 
-async fn get_task_status_by_block_id(db_pool: &sqlx::Pool<DbType>, block_id: i64) -> Result<task::TaskStatus, Status> {
+async fn get_status_by_block_id(db_pool: &sqlx::Pool<DbType>, block_id: i64) -> Result<l2_block::BlockStatus, Status> {
     let stmt = format!(
         "select status
         from {}
         where block_id = $1
         order by created_time desc limit 1",
-        tablenames::TASK,
+        tablenames::L2_BLOCK,
     );
     match sqlx::query_as(&stmt).bind(block_id).fetch_one(db_pool).await {
-        Ok((task_status,)) => Ok(task_status),
-        Err(sqlx::Error::RowNotFound) => Err(Status::new(Code::NotFound, "db task record not found")),
-        Err(_) => Err(Status::new(Code::Internal, "db table task fetch error")),
+        Ok((status,)) => Ok(status),
+        Err(sqlx::Error::RowNotFound) => Err(Status::new(Code::NotFound, "db l2_block record not found")),
+        Err(_) => Err(Status::new(Code::Internal, "db table l2_block fetch error")),
     }
 }
