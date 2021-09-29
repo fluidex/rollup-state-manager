@@ -49,8 +49,8 @@ impl Controller {
 
         let status = match get_status_by_block_id(&self.db_pool, block_id).await? {
             l2_block::BlockStatus::Uncommited => BlockStatus::Uncommited,
-            l2_block::BlockStatus::Commited => BlockStatus::Proving,
-            l2_block::BlockStatus::Verified => BlockStatus::Proved,
+            l2_block::BlockStatus::Commited => BlockStatus::Commited,
+            l2_block::BlockStatus::Verified => BlockStatus::Verified,
         };
 
         let detail: L2BlockSerde = serde_json::from_value(l2_block.detail).unwrap();
