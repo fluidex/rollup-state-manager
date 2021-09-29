@@ -69,7 +69,7 @@ async function getL2BlockByIdTest() {
   assert.equal(res["txs"].length, 2);
   assert.equal(res["tx_num"], "2");
   assert.equal(res["real_tx_num"], "2");
-  assert.equal(res["status"], "INITED");
+  assert.equal(res["status"], "UNCOMMITED");
   assert.equal(
     res["new_root"],
     "0x1cd19866300cc822c6ead46a420ecf2b4dacd26b49d3a5cbf737761f3fa2dd01"
