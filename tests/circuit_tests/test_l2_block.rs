@@ -74,7 +74,7 @@ impl Block {
         let account2 = Account::new(account_id2);
 
         // mock existing account0 data
-        manager.set_account_l2_addr(account_id0, account0.sign(), account0.ay(), account0.eth_addr());
+        manager.set_account_l2_addr(account_id0, account0.sign(), account0.ay());
         for i in 0..2u32.pow(self.balance_levels as u32) {
             manager.set_token_balance(account_id0, i, Fr::from_u32(20 + i));
         }

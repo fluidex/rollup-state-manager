@@ -208,13 +208,10 @@ impl GlobalState {
         let tree = self.account_tree.clone();
         tree.lock().unwrap().set_value(account_id, hash);
     }
-    pub fn set_account_l2_addr(&mut self, account_id: u32, sign: Fr, ay: Fr, eth_addr: Fr) {
+    pub fn set_account_l2_addr(&mut self, account_id: u32, sign: Fr, ay: Fr) {
         let account = self.account_states.get_mut(&account_id).unwrap();
-        account.update_l2_addr(sign, ay, eth_addr);
+        account.update_l2_addr(sign, ay);
         self.account_tree.lock().unwrap().set_value(account_id, account.hash());
-    }
-    pub fn get_l1_addr(&self, account_id: u32) -> Fr {
-        return self.account_states.get(&account_id).unwrap().eth_addr;
     }
     pub fn get_account_nonce(&self, account_id: u32) -> Fr {
         self.get_account(account_id).nonce
