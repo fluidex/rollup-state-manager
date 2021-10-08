@@ -180,7 +180,6 @@ impl ManagerWrapper {
         encoded_tx[tx_detail_idx::NONCE2] = nonce;
         if deposit_to_new {
             let l2key = tx.l2key.clone().unwrap();
-            encoded_tx[tx_detail_idx::ETH_ADDR2] = l2key.eth_addr;
             encoded_tx[tx_detail_idx::SIGN2] = l2key.sign;
             encoded_tx[tx_detail_idx::AY2] = l2key.ay;
         } else {
@@ -273,7 +272,6 @@ impl ManagerWrapper {
             let l2key = tx.l2key.clone().unwrap();
             encoded_tx[tx_detail_idx::AY2] = l2key.ay;
             encoded_tx[tx_detail_idx::SIGN2] = l2key.sign;
-            encoded_tx[tx_detail_idx::ETH_ADDR2] = l2key.eth_addr;
         } else {
             encoded_tx[tx_detail_idx::AY2] = to_account.ay;
             encoded_tx[tx_detail_idx::SIGN2] = to_account.sign;
