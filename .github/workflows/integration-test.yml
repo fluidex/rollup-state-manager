@@ -78,10 +78,10 @@ jobs:
           printf "[build]\nrustc-wrapper = \"/home/runner/.cargo/bin/sccache\"" >> ~/.cargo/config
           ~/.cargo/bin/sccache -s
 
-      - name: Install Node.js 14
+      - name: Install Node.js 16
         uses: actions/setup-node@v2
         with:
-          node-version: '14'
+          node-version: '16'
           # cache: 'npm'
           # cache-dependency-path: examples/js/package-lock.json
 
