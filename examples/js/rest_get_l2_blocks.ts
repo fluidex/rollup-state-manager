@@ -22,7 +22,7 @@ async function getL2BlocksTest() {
   assert.equal(block["block_height"], "1");
   assert.equal(
     block["merkle_root"],
-    "0x2db7473a800f079e86d214eb16c8a0d85cb4c4b172dab43c1a493e1132bdb312"
+    "0x1f237e688aef284ee8df484f0787334a06ce4ed490bfd868bc2c581a7eaa9c8c"
   );
 
   console.log("getL2BlocksTest passed");
