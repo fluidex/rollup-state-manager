@@ -72,7 +72,7 @@ async function getL2BlockByIdTest() {
   assert.equal(res["status"], "UNCOMMITED");
   assert.equal(
     res["new_root"],
-    "0x1cd19866300cc822c6ead46a420ecf2b4dacd26b49d3a5cbf737761f3fa2dd01"
+    "0x29b6ba8438d7a56e30c8946cf2b7c8ed2b8db52cc64f1f4840b215209c3c593c"
   );
 
   console.log("getL2BlockByIdTest passed");

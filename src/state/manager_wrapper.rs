@@ -82,8 +82,8 @@ impl ManagerWrapper {
     pub fn get_account_order_by_id(&self, account_id: u32, order_id: u32) -> Order {
         self.state().get_account_order_by_id(account_id, order_id)
     }
-    pub fn set_account_l2_addr(&mut self, account_id: u32, sign: Fr, ay: Fr, eth_addr: Fr) {
-        self.mut_state().set_account_l2_addr(account_id, sign, ay, eth_addr);
+    pub fn set_account_l2_addr(&mut self, account_id: u32, sign: Fr, ay: Fr) {
+        self.mut_state().set_account_l2_addr(account_id, sign, ay);
     }
     pub fn set_account_nonce(&mut self, account_id: u32, nonce: Fr) {
         self.mut_state().set_account_nonce(account_id, nonce);
@@ -171,7 +171,6 @@ impl ManagerWrapper {
         encoded_tx[tx_detail_idx::ACCOUNT_ID1] = Fr::from_u32(tx.account_id);
         encoded_tx[tx_detail_idx::BALANCE1] = old_balance;
         encoded_tx[tx_detail_idx::NONCE1] = nonce;
-        encoded_tx[tx_detail_idx::ETH_ADDR1] = acc.eth_addr;
         encoded_tx[tx_detail_idx::SIGN1] = acc.sign;
         encoded_tx[tx_detail_idx::AY1] = acc.ay;
 
@@ -181,11 +180,9 @@ impl ManagerWrapper {
         encoded_tx[tx_detail_idx::NONCE2] = nonce;
         if deposit_to_new {
             let l2key = tx.l2key.clone().unwrap();
-            encoded_tx[tx_detail_idx::ETH_ADDR2] = l2key.eth_addr;
             encoded_tx[tx_detail_idx::SIGN2] = l2key.sign;
             encoded_tx[tx_detail_idx::AY2] = l2key.ay;
         } else {
-            encoded_tx[tx_detail_idx::ETH_ADDR2] = acc.eth_addr;
             encoded_tx[tx_detail_idx::SIGN2] = acc.sign;
             encoded_tx[tx_detail_idx::AY2] = acc.ay;
         }
@@ -217,7 +214,7 @@ impl ManagerWrapper {
         state.set_token_balance(tx.account_id, tx.token_id, balance);
         if deposit_to_new {
             let l2key = tx.l2key.clone().unwrap();
-            state.set_account_l2_addr(tx.account_id, l2key.sign, l2key.ay, l2key.eth_addr);
+            state.set_account_l2_addr(tx.account_id, l2key.sign, l2key.ay);
         }
 
         let new_root = state.root();
@@ -268,7 +265,6 @@ impl ManagerWrapper {
         encoded_tx[tx_detail_idx::NONCE1] = from_account.nonce;
         encoded_tx[tx_detail_idx::AY1] = from_account.ay;
         encoded_tx[tx_detail_idx::SIGN1] = from_account.sign;
-        encoded_tx[tx_detail_idx::ETH_ADDR1] = from_account.eth_addr;
 
         encoded_tx[tx_detail_idx::BALANCE2] = to_new_balance;
         encoded_tx[tx_detail_idx::NONCE2] = to_account.nonce;
@@ -276,11 +272,9 @@ impl ManagerWrapper {
             let l2key = tx.l2key.clone().unwrap();
             encoded_tx[tx_detail_idx::AY2] = l2key.ay;
             encoded_tx[tx_detail_idx::SIGN2] = l2key.sign;
-            encoded_tx[tx_detail_idx::ETH_ADDR2] = l2key.eth_addr;
         } else {
             encoded_tx[tx_detail_idx::AY2] = to_account.ay;
             encoded_tx[tx_detail_idx::SIGN2] = to_account.sign;
-            encoded_tx[tx_detail_idx::ETH_ADDR2] = to_account.eth_addr;
         }
 
         encoded_tx[tx_detail_idx::SIG_L2_HASH1] = tx.sig.hash;
@@ -315,7 +309,7 @@ impl ManagerWrapper {
         if transfer_to_new {
             // transfer_to_new is rarely used
             let l2key = tx.l2key.unwrap();
-            state.set_account_l2_addr(tx.to, l2key.sign, l2key.ay, l2key.eth_addr);
+            state.set_account_l2_addr(tx.to, l2key.sign, l2key.ay);
         }
 
         let raw_tx = RawTx {
@@ -361,7 +355,6 @@ impl ManagerWrapper {
         encoded_tx[tx_detail_idx::ACCOUNT_ID1] = Fr::from_u32(account_id);
         encoded_tx[tx_detail_idx::BALANCE1] = old_balance;
         encoded_tx[tx_detail_idx::NONCE1] = nonce;
-        encoded_tx[tx_detail_idx::ETH_ADDR1] = acc.eth_addr;
         encoded_tx[tx_detail_idx::SIGN1] = acc.sign;
         encoded_tx[tx_detail_idx::AY1] = acc.ay;
 
@@ -369,7 +362,6 @@ impl ManagerWrapper {
         encoded_tx[tx_detail_idx::ACCOUNT_ID2] = Fr::from_u32(account_id);
         encoded_tx[tx_detail_idx::BALANCE2] = new_balance;
         encoded_tx[tx_detail_idx::NONCE2] = nonce.add(&Fr::one());
-        encoded_tx[tx_detail_idx::ETH_ADDR2] = acc.eth_addr;
         encoded_tx[tx_detail_idx::SIGN2] = acc.sign;
         encoded_tx[tx_detail_idx::AY2] = acc.ay;
 
@@ -472,8 +464,6 @@ impl ManagerWrapper {
         let mut encoded_tx = [Fr::zero(); TX_LENGTH];
         encoded_tx[tx_detail_idx::ACCOUNT_ID1] = Fr::from_u32(acc_id1);
         encoded_tx[tx_detail_idx::ACCOUNT_ID2] = Fr::from_u32(acc_id2);
-        encoded_tx[tx_detail_idx::ETH_ADDR1] = account1.eth_addr;
-        encoded_tx[tx_detail_idx::ETH_ADDR2] = account2.eth_addr;
         encoded_tx[tx_detail_idx::SIGN1] = account1.sign;
         encoded_tx[tx_detail_idx::SIGN2] = account2.sign;
         encoded_tx[tx_detail_idx::AY1] = account1.ay;

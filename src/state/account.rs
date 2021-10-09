@@ -21,8 +21,6 @@ pub struct AccountState {
     #[serde(with = "FrSerde")]
     pub ay: Fr,
     #[serde(with = "FrSerde")]
-    pub eth_addr: Fr,
-    #[serde(with = "FrSerde")]
     pub order_root: Fr,
 }
 
@@ -33,7 +31,6 @@ impl AccountState {
             sign: Fr::zero(),
             balance_root,
             ay: Fr::zero(),
-            eth_addr: Fr::zero(),
             order_root,
         }
     }
@@ -45,7 +42,6 @@ impl AccountState {
             sign: Fr::zero(),
             balance_root: Fr::zero(),
             ay: Fr::zero(),
-            eth_addr: Fr::zero(),
             order_root: Fr::zero(),
         }
     }
@@ -55,14 +51,12 @@ impl AccountState {
 
         data.add_assign(&self.nonce);
         data.add_assign(&self.sign.shl(40));
-        let inputs = &[data, self.balance_root, self.ay, self.eth_addr, self.order_root];
+        let inputs = &[data, self.balance_root, self.ay, self.order_root];
         Fr::hash(inputs)
     }
-    // TODO: remove eth_addr
-    pub fn update_l2_addr(&mut self, sign: Fr, ay: Fr, eth_addr: Fr) {
+    pub fn update_l2_addr(&mut self, sign: Fr, ay: Fr) {
         self.sign = sign;
         self.ay = ay;
-        self.eth_addr = eth_addr;
     }
     pub fn update_nonce(&mut self, nonce: Fr) {
         self.nonce = nonce;
