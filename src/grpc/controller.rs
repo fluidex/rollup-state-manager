@@ -2,7 +2,7 @@ use crate::config::Settings;
 use crate::state::global::GlobalState;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::L2BlockSerde;
-use core::cmp::{max, min};
+use core::cmp::min;
 use fluidex_common::db::models::{l2_block, tablenames};
 use fluidex_common::db::DbType;
 use fluidex_common::types::FrExt;
@@ -101,13 +101,14 @@ async fn get_l2_blocks(
 
     let count_query = format!("select block_id from {} order by block_id desc limit 1", tablenames::L2_BLOCK);
     // "total"'s type needs to be consistent with block_id
-    let total: i64 = match sqlx::query_scalar(&count_query).fetch_one(&mut tx).await {
-        Ok(max_block_id) => max_block_id,
+    let total: i64 = match sqlx::query_scalar::<_, i64>(&count_query).fetch_one(&mut tx).await {
+        Ok(max_block_id) => max_block_id + 1,
         Err(sqlx::Error::RowNotFound) => return Ok((0, vec![])),
         Err(error) => return Err(error.into()),
     };
 
-    let limit = max(1, request.limit);
+    let limit = if request.limit.is_positive() { request.limit } else { 10 };
+
     let limit = min(100, limit);
     let blocks_query = format!(
         "select block_id, new_root, status, detail, created_time
