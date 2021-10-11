@@ -2,7 +2,7 @@ use crate::config::Settings;
 use crate::state::global::GlobalState;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::L2BlockSerde;
-use core::cmp::{max, min};
+use core::cmp::min;
 use fluidex_common::db::models::{l2_block, tablenames};
 use fluidex_common::db::DbType;
 use fluidex_common::types::FrExt;
@@ -107,11 +107,7 @@ async fn get_l2_blocks(
         Err(error) => return Err(error.into()),
     };
 
-    let limit = if request.limit.is_positive() {
-        request.limit
-    } else {
-        10
-    };
+    let limit = if request.limit.is_positive() { request.limit } else { 10 };
 
     let limit = min(100, limit);
     let blocks_query = format!(
