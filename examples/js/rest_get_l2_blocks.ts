@@ -24,7 +24,8 @@ async function getL2BlocksTest() {
     block["merkle_root"],
     "0x1f237e688aef284ee8df484f0787334a06ce4ed490bfd868bc2c581a7eaa9c8c"
   );
-  let block = res["blocks"][1];
+
+  block = res["blocks"][1];
   assert.equal(block["block_height"], "0");
   assert.equal(
     block["merkle_root"],
