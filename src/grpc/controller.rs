@@ -101,7 +101,7 @@ async fn get_l2_blocks(
 
     let count_query = format!("select block_id from {} order by block_id desc limit 1", tablenames::L2_BLOCK);
     // "total"'s type needs to be consistent with block_id
-    let total: i64 = match sqlx::query_scalar::<i64>(&count_query).fetch_one(&mut tx).await {
+    let total: i64 = match sqlx::query_scalar::<_, i64>(&count_query).fetch_one(&mut tx).await {
         Ok(max_block_id) => max_block_id + 1,
         Err(sqlx::Error::RowNotFound) => return Ok((0, vec![])),
         Err(error) => return Err(error.into()),
