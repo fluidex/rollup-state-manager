@@ -11,7 +11,9 @@ class Client {
   }
 
   async l2BlocksQuery() {
-    let resp = await this.client.get(`/l2_blocks`);
+    const offset = 0;
+    const limit = 10;
+    let resp = await this.client.get(`/l2_blocks?offset=${offset}&limit=${limit}`);
     if (resp.status === 200) {
       return resp.data;
     } else {
