@@ -16,7 +16,7 @@ async function mainTest() {
 
 async function getL2BlocksTest() {
   const res = await restClient.l2BlocksQuery();
-  assert.equal(res["total"], "1");
+  assert.equal(res["total"], "2");
 
   let block = res["blocks"][0];
   assert.equal(block["block_height"], "1");
