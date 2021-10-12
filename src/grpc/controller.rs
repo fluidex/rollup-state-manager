@@ -130,7 +130,7 @@ async fn get_l2_blocks(
 
 async fn get_l2_block_by_id(db_pool: &sqlx::Pool<DbType>, block_id: i64) -> Result<l2_block::L2Block, Status> {
     let stmt = format!(
-        "select block_id, new_root, status, detail, created_time
+        "select *
         from {}
         where block_id = $1
         order by created_time desc limit 1",
