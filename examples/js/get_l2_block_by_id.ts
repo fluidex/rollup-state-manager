@@ -66,7 +66,6 @@ async function depositBalance() {
 async function getL2BlockByIdTest() {
   const res = await grpcClient.l2BlockQuery(blockId);
   assert(res["created_time"]);
-  assert.equal(res["txs"].length, 2);
   assert.equal(res["tx_num"], "2");
   assert.equal(res["real_tx_num"], "2");
   assert.equal(res["status"], "UNCOMMITED");
@@ -74,6 +73,8 @@ async function getL2BlockByIdTest() {
     res["new_root"],
     "0x29b6ba8438d7a56e30c8946cf2b7c8ed2b8db52cc64f1f4840b215209c3c593c"
   );
+  assert.equal(res["txs"].length, 2);
+  assert.deepEqual(res["txs_type"], ["DEPOSIT", "DEPOSIT"]);
 
   console.log("getL2BlockByIdTest passed");
 }
