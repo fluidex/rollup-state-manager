@@ -62,6 +62,7 @@ impl Controller {
                 detail: tx.iter().map(|fr_str| fr_str.0.to_decimal_string()).collect(),
             })
             .collect();
+        let txs_type = detail.txs_type.into_iter().map(|t| t as i32).collect();
 
         Ok(L2BlockQueryResponse {
             new_root: l2_block.new_root,
@@ -70,6 +71,7 @@ impl Controller {
             real_tx_num: tx_num, // TODO: Needs to decode and filter out NOP txs.
             status: status as i32,
             txs,
+            txs_type,
         })
     }
 
