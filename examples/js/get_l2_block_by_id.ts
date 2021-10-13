@@ -74,8 +74,7 @@ async function getL2BlockByIdTest() {
     "0x29b6ba8438d7a56e30c8946cf2b7c8ed2b8db52cc64f1f4840b215209c3c593c"
   );
   assert.equal(res["txs"].length, 2);
-  assert.deepEqual(res["txs_type"], ["DEPOSIT","DEPOSIT"]);
-
+  assert.deepEqual(res["txs_type"], ["DEPOSIT", "DEPOSIT"]);
 
   console.log("getL2BlockByIdTest passed");
 }
