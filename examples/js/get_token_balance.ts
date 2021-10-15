@@ -4,7 +4,7 @@ import { sleep } from "./util";
 import { strict as assert } from "assert";
 
 const tokenId = 0;
-const userId = 1;
+const userId = 3;
 
 const kafkaUserValue = {
   user_id: userId,

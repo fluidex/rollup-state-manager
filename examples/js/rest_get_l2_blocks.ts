@@ -16,20 +16,20 @@ async function mainTest() {
 
 async function getL2BlocksTest() {
   const res = await restClient.l2BlocksQuery();
-  assert.equal(res["total"], "2");
+  assert.equal(res["total"], "3");
 
   let block = res["blocks"][0];
-  assert.equal(block["block_height"], "1");
+  assert.equal(block["block_height"], "2");
   assert.equal(
     block["merkle_root"],
-    "0x1f237e688aef284ee8df484f0787334a06ce4ed490bfd868bc2c581a7eaa9c8c"
+    "0x157b359e2fed778742b7f42f6e438d6552215f86473ac5b668a7ce3799062a61"
   );
 
   block = res["blocks"][1];
-  assert.equal(block["block_height"], "0");
+  assert.equal(block["block_height"], "1");
   assert.equal(
     block["merkle_root"],
-    "0x29b6ba8438d7a56e30c8946cf2b7c8ed2b8db52cc64f1f4840b215209c3c593c"
+    "0x0cf9708094c494c668f6943ab4cfba04882d2b25303244e6ae6f14931a0c008c"
   );
 
   console.log("getL2BlocksTest passed");
