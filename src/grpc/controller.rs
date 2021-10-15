@@ -156,11 +156,12 @@ impl Controller {
         }
 
         Ok(L2BlockQueryResponse {
-            new_root: l2_block.new_root,
-            created_time: FTimestamp::from(&l2_block.created_time).0,
             tx_num,
             real_tx_num: tx_num, // TODO: Needs to decode and filter out NOP txs.
+            created_time: FTimestamp::from(&l2_block.created_time).0,
             status: status as i32,
+            new_root: l2_block.new_root,
+            l1_tx_hash: l2_block.l1_tx_hash.unwrap_or_else(|| "".to_owned()),
             txs,
             decoded_txs,
             txs_type,
