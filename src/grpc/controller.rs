@@ -72,6 +72,7 @@ impl Controller {
             status: status as i32,
             txs,
             txs_type,
+            l1_tx_hash: l2_block.l1_tx_hash,
         })
     }
 
