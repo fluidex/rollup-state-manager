@@ -4,7 +4,7 @@ class Client {
   client: AxiosInstance;
 
   constructor(
-    server = process.env.REST_ADDR || "http://0.0.0.0:8765/rollupapi"
+    server = process.env.REST_ADDR || "http://0.0.0.0:8765/explorer/api"
   ) {
     console.log("using REST", server);
     this.client = axios.create({ baseURL: server, timeout: 1000 });
