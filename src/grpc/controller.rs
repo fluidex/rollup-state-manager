@@ -1,7 +1,7 @@
 use crate::config::Settings;
 use crate::state::global::GlobalState;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
-use crate::types::l2::L2BlockSerde;
+use crate::types::l2::{tx_detail_idx, AmountType, L2BlockSerde, TxType};
 use core::cmp::min;
 use fluidex_common::db::models::{l2_block, tablenames};
 use fluidex_common::db::DbType;
@@ -55,22 +55,115 @@ impl Controller {
 
         let detail: L2BlockSerde = serde_json::from_value(l2_block.detail).unwrap();
         let tx_num = detail.encoded_txs.len() as u64;
-        let txs = detail
-            .encoded_txs
-            .iter()
-            .map(|tx| l2_block_query_response::Tx {
+
+        let mut txs = vec![];
+        let mut decoded_txs = vec![];
+        let mut txs_type = vec![];
+        for (tx, tx_type) in detail.encoded_txs.iter().zip(detail.txs_type.into_iter()) {
+            txs.push(l2_block_query_response::EncodedTx {
                 detail: tx.iter().map(|fr_str| fr_str.0.to_decimal_string()).collect(),
-            })
-            .collect();
-        let txs_type = detail.txs_type.into_iter().map(|t| t as i32).collect();
+            });
+
+            let mut decoded_tx = l2_block_query_response::DecodedTx::default();
+            match tx_type {
+                TxType::Deposit => {
+                    let account_id = tx[tx_detail_idx::ACCOUNT_ID1].0.to_u32();
+                    debug_assert!(account_id == tx[tx_detail_idx::ACCOUNT_ID2].0.to_u32());
+
+                    let token_id = tx[tx_detail_idx::TOKEN_ID1].0.to_u32();
+                    debug_assert!(token_id == tx[tx_detail_idx::TOKEN_ID2].0.to_u32());
+
+                    let amount = AmountType::from_encoded_bigint(tx[tx_detail_idx::AMOUNT].0.to_bigint())
+                        .unwrap()
+                        .to_decimal(prec_token_id(token_id))
+                        .to_string();
+
+                    decoded_tx.deposit_tx = Some(DepositTx {
+                        account_id,
+                        token_id,
+                        amount,
+                    })
+                }
+                TxType::Withdraw => {
+                    let account_id = tx[tx_detail_idx::ACCOUNT_ID1].0.to_u32();
+
+                    let token_id = tx[tx_detail_idx::TOKEN_ID1].0.to_u32();
+                    debug_assert!(token_id == tx[tx_detail_idx::TOKEN_ID2].0.to_u32());
+
+                    let amount = AmountType::from_encoded_bigint(tx[tx_detail_idx::AMOUNT].0.to_bigint())
+                        .unwrap()
+                        .to_decimal(prec_token_id(token_id))
+                        .to_string();
+
+                    let old_balance = tx[tx_detail_idx::BALANCE1].0.to_bigint().to_string();
+
+                    decoded_tx.withdraw_tx = Some(WithdrawTx {
+                        account_id,
+                        token_id,
+                        amount,
+                        old_balance,
+                    })
+                }
+                TxType::Transfer => {
+                    let from = tx[tx_detail_idx::ACCOUNT_ID1].0.to_u32();
+                    let to = tx[tx_detail_idx::ACCOUNT_ID2].0.to_u32();
+
+                    let token_id = tx[tx_detail_idx::TOKEN_ID1].0.to_u32();
+                    debug_assert!(token_id == tx[tx_detail_idx::TOKEN_ID2].0.to_u32());
+
+                    let amount = AmountType::from_encoded_bigint(tx[tx_detail_idx::AMOUNT].0.to_bigint())
+                        .unwrap()
+                        .to_decimal(prec_token_id(token_id))
+                        .to_string();
+
+                    decoded_tx.transfer_tx = Some(TransferTx {
+                        from,
+                        to,
+                        token_id,
+                        amount,
+                    })
+                }
+                TxType::SpotTrade => {
+                    let order1_account_id = tx[tx_detail_idx::ACCOUNT_ID1].0.to_u32();
+                    let order2_account_id = tx[tx_detail_idx::ACCOUNT_ID2].0.to_u32();
+
+                    let token_id_1to2 = tx[tx_detail_idx::TOKEN_ID1].0.to_u32();
+                    let token_id_2to1 = tx[tx_detail_idx::TOKEN_ID2].0.to_u32();
+
+                    let amount_1to2 = AmountType::from_encoded_bigint(tx[tx_detail_idx::AMOUNT].0.to_bigint())
+                        .unwrap()
+                        .to_decimal(prec_token_id(token_id_1to2))
+                        .to_string();
+                    let amount_2to1 = AmountType::from_encoded_bigint(tx[tx_detail_idx::AMOUNT2].0.to_bigint())
+                        .unwrap()
+                        .to_decimal(prec_token_id(token_id_2to1))
+                        .to_string();
+
+                    decoded_tx.spot_trade_tx = Some(SpotTradeTx {
+                        order1_account_id,
+                        order2_account_id,
+                        token_id_1to2,
+                        token_id_2to1,
+                        amount_1to2,
+                        amount_2to1,
+                    })
+                }
+                _ => (),
+            };
+            decoded_txs.push(decoded_tx);
+
+            txs_type.push(tx_type as i32);
+        }
 
         Ok(L2BlockQueryResponse {
-            new_root: l2_block.new_root,
-            created_time: FTimestamp::from(&l2_block.created_time).0,
             tx_num,
             real_tx_num: tx_num, // TODO: Needs to decode and filter out NOP txs.
+            created_time: FTimestamp::from(&l2_block.created_time).0,
             status: status as i32,
+            new_root: l2_block.new_root,
+            l1_tx_hash: l2_block.l1_tx_hash.unwrap_or_else(|| "".to_owned()),
             txs,
+            decoded_txs,
             txs_type,
         })
     }

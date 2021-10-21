@@ -4,7 +4,7 @@ import { sleep } from "./util";
 import { strict as assert } from "assert";
 
 const tokenId = 0;
-const userId = 1;
+const userId = 3;
 
 const kafkaUserValue = {
   user_id: userId,
@@ -43,6 +43,7 @@ async function mainTest() {
   await kafkaProducer.Stop();
 
   await getTokenBalanceTest();
+  await getL2BlockTest();
 }
 
 async function registerUser() {
@@ -70,6 +71,35 @@ async function getTokenBalanceTest() {
   assert.equal(res["precision"], 4);
 
   console.log("getTokenBalanceTest passed");
+}
+
+async function getL2BlockTest() {
+  console.log("getL2BlockTest Begin");
+
+  const res = await grpcClient.l2BlockQuery(2);
+  assert.equal(res["tx_num"], "2");
+  assert.equal(res["real_tx_num"], "2");
+  assert(res["created_time"]);
+  assert.equal(res["status"], "UNCOMMITED");
+  assert.equal(
+    res["new_root"],
+    "0x157b359e2fed778742b7f42f6e438d6552215f86473ac5b668a7ce3799062a61"
+  );
+  assert.equal(res["txs"].length, 2);
+  assert.equal(res["decoded_txs"].length, 2);
+  assert.deepEqual(res["txs_type"], ["DEPOSIT", "DEPOSIT"]);
+
+  const tx1 = res["decoded_txs"][0]["deposit_tx"];
+  assert.equal(tx1["account_id"], userId);
+  assert.equal(tx1["token_id"], 0);
+  assert.equal(tx1["amount"], "0.0000");
+
+  const tx2 = res["decoded_txs"][1]["deposit_tx"];
+  assert.equal(tx2["account_id"], userId);
+  assert.equal(tx2["token_id"], 0);
+  assert.equal(tx2["amount"], "3");
+
+  console.log("getL2BlockTest End");
 }
 
 main();
