@@ -55,12 +55,7 @@ impl Controller {
 
         let detail: L2BlockSerde = serde_json::from_value(l2_block.detail).unwrap();
         let tx_num = detail.encoded_txs.len() as u64;
-        let real_tx_num = detail
-            .txs_type
-            .clone()
-            .into_iter()
-            .filter(|t| *t != TxType::Nop)
-            .count();
+        let real_tx_num = detail.txs_type.clone().into_iter().filter(|t| *t != TxType::Nop).count();
 
         let mut txs = vec![];
         let mut decoded_txs = vec![];
