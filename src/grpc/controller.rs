@@ -57,10 +57,10 @@ impl Controller {
         let tx_num = detail.encoded_txs.len() as u64;
         let real_tx_num = detail
             .txs_type
+            .clone()
             .into_iter()
             .filter(|t| *t != TxType::Nop)
-            .collect::<Vec<TxType>>()
-            .len();
+            .count();
 
         let mut txs = vec![];
         let mut decoded_txs = vec![];
