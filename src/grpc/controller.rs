@@ -55,6 +55,12 @@ impl Controller {
 
         let detail: L2BlockSerde = serde_json::from_value(l2_block.detail).unwrap();
         let tx_num = detail.encoded_txs.len() as u64;
+        let real_tx_num = detail
+            .txs_type
+            .into_iter()
+            .filter(|t| *t != TxType::Nop)
+            .collect::<Vec<TxType>>()
+            .len();
 
         let mut txs = vec![];
         let mut decoded_txs = vec![];
@@ -157,7 +163,7 @@ impl Controller {
 
         Ok(L2BlockQueryResponse {
             tx_num,
-            real_tx_num: tx_num, // TODO: Needs to decode and filter out NOP txs.
+            real_tx_num: real_tx_num as u64,
             created_time: FTimestamp::from(&l2_block.created_time).0,
             status: status as i32,
             new_root: l2_block.new_root,

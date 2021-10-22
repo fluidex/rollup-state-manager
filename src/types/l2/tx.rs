@@ -12,7 +12,7 @@ use fluidex_common::Fr;
 use num::{One, PrimInt, ToPrimitive, Zero};
 use sha2::Digest;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 #[repr(u8)]
 pub enum TxType {
     Nop,
