@@ -128,8 +128,8 @@ impl Controller {
                     let order1_account_id = tx[tx_detail_idx::ACCOUNT_ID1].0.to_u32();
                     let order2_account_id = tx[tx_detail_idx::ACCOUNT_ID2].0.to_u32();
 
-                    let token_id_1to2 = tx[tx_detail_idx::TOKEN_ID1].0.to_u32();
-                    let token_id_2to1 = tx[tx_detail_idx::TOKEN_ID2].0.to_u32();
+                    let token_id_1to2 = tx[tx_detail_idx::NEW_ORDER1_TOKEN_SELL].0.to_u32();
+                    let token_id_2to1 = tx[tx_detail_idx::NEW_ORDER2_TOKEN_SELL].0.to_u32();
 
                     let amount_1to2 = AmountType::from_encoded_bigint(tx[tx_detail_idx::AMOUNT].0.to_bigint())
                         .unwrap()
