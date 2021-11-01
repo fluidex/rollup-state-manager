@@ -120,7 +120,7 @@ impl Processor {
         let mut withdraw_tx = l2::WithdrawTx::new(account_id, token_id, amount, balance_before.to_fr(precision));
         withdraw_tx.sig = Signature::from_raw(withdraw_tx.hash(), &raw_sig);
         if self.enable_check_sig {
-            check_withdraw_sig(&manager, &withdraw_tx, &raw_sig);
+            check_withdraw_sig(manager, &withdraw_tx, &raw_sig);
         }
         manager.withdraw(withdraw_tx, offset);
         self.transfer_tx_total_time += timing.elapsed().as_secs_f32();
@@ -160,9 +160,9 @@ impl Processor {
         let mut taker_order: Option<l2::Order> = None;
         let mut maker_order: Option<l2::Order> = None;
         if let Some(ask_order_origin) = &trade.ask_order {
-            let ask_order_input = exchange_order_to_rollup_order(&ask_order_origin);
+            let ask_order_input = exchange_order_to_rollup_order(ask_order_origin);
             if self.enable_check_sig {
-                self.check_order_sig(&manager, &ask_order_input);
+                self.check_order_sig(manager, &ask_order_input);
             }
             assert!(!manager.has_order(ask_order_input.account_id, ask_order_input.order_id));
             let ask_order = l2::Order::from(ask_order_input);
@@ -176,9 +176,9 @@ impl Processor {
             };
         }
         if let Some(bid_order_origin) = &trade.bid_order {
-            let bid_order_input = exchange_order_to_rollup_order(&bid_order_origin);
+            let bid_order_input = exchange_order_to_rollup_order(bid_order_origin);
             if self.enable_check_sig {
-                self.check_order_sig(&manager, &bid_order_input);
+                self.check_order_sig(manager, &bid_order_input);
             }
             assert!(!manager.has_order(bid_order_input.account_id, bid_order_input.order_id));
             let bid_order = l2::Order::from(bid_order_input);
@@ -220,7 +220,7 @@ impl Processor {
         let mut transfer_tx = l2::TransferTx::new(from, to, token_id, amount);
         transfer_tx.sig = Signature::from_raw(transfer_tx.hash(), &raw_sig);
         if self.enable_check_sig {
-            check_transfer_sig(&manager, &transfer_tx, &raw_sig);
+            check_transfer_sig(manager, &transfer_tx, &raw_sig);
         }
         manager.transfer(transfer_tx, offset);
         self.transfer_tx_total_time += timing.elapsed().as_secs_f32();
@@ -301,13 +301,13 @@ impl Processor {
 fn check_transfer_sig(manager: &ManagerWrapper, transfer: &l2::TransferTx, sig: &SignatureBJJ) {
     let msg = transfer.hash();
     manager
-        .check_sig(transfer.from, &msg, &sig)
+        .check_sig(transfer.from, &msg, sig)
         .unwrap_or_else(|_| panic!("invalid sig for transfer {:?}", transfer));
 }
 
 fn check_withdraw_sig(manager: &ManagerWrapper, withdraw: &l2::WithdrawTx, sig: &SignatureBJJ) {
     let msg = withdraw.hash();
     manager
-        .check_sig(withdraw.account_id, &msg, &sig)
+        .check_sig(withdraw.account_id, &msg, sig)
         .unwrap_or_else(|_| panic!("invalid sig for withdraw {:?}", withdraw));
 }
