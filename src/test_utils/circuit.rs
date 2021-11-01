@@ -63,6 +63,6 @@ fn write_circuit(circuit_repo: &Path, test_dir: &Path, source: &CircuitSource) -
         source.main
     );
     let mut f = File::create(circuit_file)?;
-    f.write_all(&file_content.as_bytes())?;
+    f.write_all(file_content.as_bytes())?;
     Ok(circuit_dir)
 }

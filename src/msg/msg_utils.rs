@@ -1,10 +1,10 @@
 #![allow(clippy::let_and_return)]
-use crate::account::SignatureBJJ;
 use crate::state::ManagerWrapper;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, OrderSide};
 use crate::types::matchengine::{self, messages};
 use fluidex_common::babyjubjub_rs;
+use fluidex_common::l2::account::SignatureBJJ;
 use fluidex_common::rust_decimal::Decimal;
 use fluidex_common::types::{DecimalExt, FrExt};
 use fluidex_common::Fr;

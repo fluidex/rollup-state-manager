@@ -95,7 +95,7 @@ pub fn run(src: &str) -> Result<()> {
     let (msg_sender, msg_receiver) = crossbeam_channel::unbounded();
     let (blk_sender, blk_receiver) = crossbeam_channel::unbounded();
 
-    let loader_thread = msg_loader::load_msgs_from_file(&filepath.to_str().unwrap(), msg_sender);
+    let loader_thread = msg_loader::load_msgs_from_file(filepath.to_str().unwrap(), msg_sender);
 
     let replay_thread = replay_msgs(msg_receiver, blk_sender);
 
