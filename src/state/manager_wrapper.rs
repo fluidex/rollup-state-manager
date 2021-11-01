@@ -2,7 +2,6 @@
 #![allow(clippy::vec_init_then_push)]
 
 use super::global::{AccountUpdates, GlobalState};
-use crate::account::{L2Account, SignatureBJJ};
 use crate::config::Settings;
 #[cfg(feature = "persist_sled")]
 use crate::r#const::sled_db::*;
@@ -14,6 +13,7 @@ use crate::types::merkle_tree::Tree;
 use anyhow::{anyhow, bail};
 use fluidex_common::babyjubjub_rs::{self, Point};
 use fluidex_common::ff::Field;
+use fluidex_common::l2::account::{L2Account, SignatureBJJ};
 use fluidex_common::{types::FrExt, Fr};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Instant;

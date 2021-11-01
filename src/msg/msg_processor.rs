@@ -1,12 +1,11 @@
-use crate::account::SignatureBJJ;
 use crate::msg::msg_utils::bytes_to_sig;
 use crate::state::ManagerWrapper;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{self, AmountType, OrderInput, OrderSide};
 use crate::types::matchengine::messages;
-
 use fluidex_common::babyjubjub_rs::{self, Point};
 use fluidex_common::ff::Field;
+use fluidex_common::l2::account::{Signature, SignatureBJJ};
 use fluidex_common::rust_decimal::Decimal;
 use fluidex_common::types::{DecimalExt, FrExt};
 use fluidex_common::Fr;
@@ -119,7 +118,7 @@ impl Processor {
         let timing = Instant::now();
         let raw_sig = bytes_to_sig(withdraw.signature);
         let mut withdraw_tx = l2::WithdrawTx::new(account_id, token_id, amount, balance_before.to_fr(precision));
-        withdraw_tx.sig = crate::account::Signature::from_raw(withdraw_tx.hash(), &raw_sig);
+        withdraw_tx.sig = Signature::from_raw(withdraw_tx.hash(), &raw_sig);
         if self.enable_check_sig {
             check_withdraw_sig(&manager, &withdraw_tx, &raw_sig);
         }
@@ -219,7 +218,7 @@ impl Processor {
         let timing = Instant::now();
         let raw_sig = bytes_to_sig(transfer.signature);
         let mut transfer_tx = l2::TransferTx::new(from, to, token_id, amount);
-        transfer_tx.sig = crate::account::Signature::from_raw(transfer_tx.hash(), &raw_sig);
+        transfer_tx.sig = Signature::from_raw(transfer_tx.hash(), &raw_sig);
         if self.enable_check_sig {
             check_transfer_sig(&manager, &transfer_tx, &raw_sig);
         }

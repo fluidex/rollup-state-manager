@@ -1,11 +1,10 @@
 use super::order;
 use super::tx_detail_idx;
-use crate::account::Signature;
 use crate::types::merkle_tree::MerklePath;
-use anyhow::anyhow;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use ethers::core::types::U256;
 use fluidex_common::ff::Field;
+use fluidex_common::l2::account::Signature;
 use fluidex_common::num_bigint::BigInt;
 use fluidex_common::types::{Float40, FrExt};
 use fluidex_common::Fr;

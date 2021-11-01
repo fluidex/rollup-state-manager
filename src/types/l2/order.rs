@@ -1,6 +1,7 @@
 #![allow(clippy::let_and_return)]
-use crate::account::{Account, Signature, SignatureBJJ};
+use crate::account::Account;
 use fluidex_common::ff::Field;
+use fluidex_common::l2::account::{Signature, SignatureBJJ};
 #[cfg(not(feature = "fr_string_repr"))]
 use fluidex_common::serde::FrBytes as FrSerde;
 #[cfg(feature = "fr_string_repr")]
