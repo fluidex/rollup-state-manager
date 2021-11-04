@@ -36,7 +36,7 @@ impl Controller {
                 .map(|b| l2_blocks_query_response::BlockSummary {
                     block_height: b.block_id,
                     merkle_root: b.new_root.clone(),
-                    block_time: FTimestamp::from(&b.created_time).0,
+                    block_time: FTimestamp::from(&b.created_time).as_milliseconds(),
                 })
                 .collect(),
         })
@@ -180,7 +180,7 @@ impl Controller {
         Ok(L2BlockQueryResponse {
             tx_num,
             real_tx_num: real_tx_num as u64,
-            created_time: FTimestamp::from(&l2_block.created_time).0,
+            created_time: FTimestamp::from(&l2_block.created_time).as_milliseconds(),
             status: status as i32,
             new_root: l2_block.new_root,
             l1_tx_hash: l2_block.l1_tx_hash.unwrap_or_else(|| "".to_owned()),

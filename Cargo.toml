@@ -14,14 +14,14 @@ config_rs = { package = "config", version = "0.10.1" }
 crossbeam-channel = "0.5.1"
 dotenv = "0.15.0"
 ethers = { git = "https://github.com/gakonst/ethers-rs" }
-fluidex-common = { git = "https://github.com/fluidex/common-rs", branch = "master", features = [ "kafka", "l2-account", "non-blocking-tracing", "rollup-state-db" ] }
+fluidex-common = { git = "https://github.com/fluidex/common-rs", branch = "support-convert-timestamp-to-seconds-and-milliseconds", features = [ "kafka", "l2-account", "non-blocking-tracing", "rollup-state-db" ] }
 futures = "0.3.13"
 hex = "0.4.3"
 lazy_static = "1.4.0"
 log = "0.4"
 num = "0.4.0"
 once_cell = "1.8.0"
-orchestra = { git = "https://github.com/fluidex/orchestra.git", branch = "master", features = [ "rollup" ] }
+orchestra = { git = "https://github.com/fluidex/orchestra.git", branch = "update-time-fields-to-unit-millisecond", features = [ "rollup" ] }
 rand = "0.8.3"
 rayon = "1.5.0"
 regex = "1"
