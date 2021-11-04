@@ -65,7 +65,8 @@ async function depositBalance() {
 }
 
 async function getTokenBalanceTest() {
-  const res = await grpcClient.tokenBalanceQuery(userId, tokenId, "", "");
+  // const res = await grpcClient.tokenBalanceQuery(userId, tokenId, "", "");
+  const res = await grpcClient.tokenBalanceQuery(userId, 999, "", "ETH");  // test ignoring token_id by providing token_name
   assert.equal(res["balance"], "3.0000");
   assert.equal(res["balance_raw"], "30000");
   assert.equal(res["precision"], 4);
