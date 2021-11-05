@@ -1,7 +1,10 @@
+import * as dayjs from "dayjs";
 import { grpcClient } from "./grpc_client";
 import { kafkaProducer } from "./kafka_producer";
 import { sleep } from "./util";
 import { strict as assert } from "assert";
+
+const one_hour_milliseconds = 3_600_000;
 
 const blockId = 0;
 const userId1 = 1;
@@ -100,7 +103,9 @@ async function testBlock0() {
   const res = await grpcClient.l2BlockQuery(0);
   assert.equal(res["tx_num"], "2");
   assert.equal(res["real_tx_num"], "2");
-  assert(res["created_time"]);
+  const time_now_milliseconds = dayjs().valueOf();
+  assert(res["created_time"] <= time_now_milliseconds);
+  assert(res["created_time"] + one_hour_milliseconds > time_now_milliseconds);
   assert.equal(res["status"], "UNCOMMITED");
   assert.equal(
     res["new_root"],
@@ -133,7 +138,9 @@ async function testBlock1() {
   const res = await grpcClient.l2BlockQuery(1);
   assert.equal(res["tx_num"], "2");
   assert.equal(res["real_tx_num"], "2");
-  assert(res["created_time"]);
+  const time_now_milliseconds = dayjs().valueOf();
+  assert(res["created_time"] <= time_now_milliseconds);
+  assert(res["created_time"] + one_hour_milliseconds > time_now_milliseconds);
   assert.equal(res["status"], "UNCOMMITED");
   assert.equal(
     res["new_root"],

@@ -6,6 +6,7 @@
     "@eeston/grpc-caller": "^0.20.2",
     "@grpc/grpc-js": "^1.2.5",
     "axios": "^0.21.1",
+    "dayjs": "^1.10.7",
     "dotenv": "^8.2.0",
     "kafkajs": "^1.11.0"
   },
