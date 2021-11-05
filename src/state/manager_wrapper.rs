@@ -6,7 +6,7 @@ use crate::config::Settings;
 #[cfg(feature = "persist_sled")]
 use crate::r#const::sled_db::*;
 use crate::types::l2::{
-    tx_detail_idx, AmountType, DepositTx, FullSpotTradeTx, L2Block, L2BlockDetail, Order, RawTx, TransferTx, TxDataEncoder, TxType,
+    tx_encode::{self, EncodeForScheme}, tx_detail_idx, AmountType, DepositTx, UpdateKeyTx, FullSpotTradeTx, L2Block, L2BlockDetail, Order, RawTx, TransferTx, TxDataEncoder, TxType,
     WithdrawTx, TX_LENGTH,
 };
 use crate::types::merkle_tree::Tree;
@@ -15,6 +15,7 @@ use fluidex_common::babyjubjub_rs::{self, Point};
 use fluidex_common::ff::Field;
 use fluidex_common::l2::account::{L2Account, SignatureBJJ};
 use fluidex_common::{types::FrExt, Fr};
+use fluidex_common::{num_bigint::BigInt, num_traits::ToPrimitive};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Instant;
 
@@ -31,9 +32,117 @@ pub struct ManagerWrapper {
     verify_sig: bool,
 }
 
-fn encode_amount_to_fr(amount: &AmountType) -> anyhow::Result<Fr> {
+fn encode_amount_to_compressed_fr(amount: &AmountType) -> anyhow::Result<Fr> {
     Ok(Fr::from_bigint((*amount).to_encoded_int()?))
 }
+
+//extend the amount type so the fr has no compression
+fn amount_to_fr(amount: &AmountType) -> Fr {
+    Fr::from_bigint((*amount).to_bigint())
+}
+
+fn compress_fr(fr: &Fr) -> anyhow::Result<Fr> {
+    let mut encode_int = fr.to_bigint();
+    let mut exponent = 0u8;
+    //TODO: this is a temporary resolution with many hacking, we should add this code into fluidex-common later
+    let mut test_sig : BigInt = encode_int.clone() / 10;
+    while encode_int == test_sig.clone() * 10 {
+        encode_int = test_sig;
+        //Fr has at most 76 zeros so u8 as exp should be enough
+        exponent += 1;
+        test_sig = encode_int.clone() / 10;
+    }
+
+    let encoder = AmountType {
+        significand: encode_int.to_i64().ok_or(anyhow!("significand part too big: {}", encode_int))?,
+        exponent,
+    };
+    //TODO: floats still not check the range of significand yet so we have to check it here
+    if encoder.significand >= 34359738368i64 {
+        Err(anyhow!("too big for 35bit significand: {}", encode_int))
+    }else {
+        Ok(Fr::from_bigint(encoder.to_encoded_int()?))
+    }
+    
+
+}
+
+fn decompress_fr(fr: &Fr) -> anyhow::Result<Fr> {
+    let decoder = AmountType::from_encoded_bigint(fr.to_bigint())?;
+
+    Ok(Fr::from_bigint(decoder.to_bigint()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_compress_fr() {
+        let ret = compress_fr(&Fr::from_u32(1000)).unwrap();
+        assert_eq!(ret, Fr::from_str("103079215105"));
+
+        let ret = compress_fr(&Fr::from_u32(3000)).unwrap();
+        assert_eq!(ret, Fr::from_str("103079215107"));
+
+        let ret = compress_fr(&Fr::from_u32(1430)).unwrap();
+        assert_eq!(ret, Fr::from_str("34359738511"));
+
+        let ret = compress_fr(&Fr::from_u32(99999)).unwrap();
+        assert_eq!(ret, Fr::from_str("99999"));
+
+        compress_fr(&Fr::from_u64(38359738368)).expect_err("should not contain");
+    }
+}
+
+fn encode_rawtx_to_pubdata(tx: &RawTx, encoder: &mut TxDataEncoder) -> anyhow::Result<()> {
+    let payload = &tx.payload;
+    let ret = match tx.tx_type {
+        TxType::Deposit => {
+            if payload[tx_detail_idx::DST_IS_NEW] != Fr::zero() {
+                assert_eq!(payload[tx_detail_idx::AMOUNT], Fr::zero());
+                encoder.encode_heading(1)?; //100
+                tx_encode::ForL2KeyTx(tx).encode(encoder)
+            }else {
+                encoder.encode_heading(0)?;
+                tx_encode::ForCommonTx(tx).encode(encoder)
+            }
+        },
+        TxType::Transfer => {
+            encoder.encode_heading(0)?;
+            tx_encode::ForCommonTx(tx).encode(encoder)            
+        },
+
+        TxType::Withdraw => {
+            encoder.encode_heading(4)?; //001
+            tx_encode::ForCommonTx(tx).encode(encoder)
+        },
+
+        TxType::SpotTrade => {
+            let mut h = 0;
+            let order1_filled = payload[tx_detail_idx::NEW_ORDER1_FILLED_BUY] == decompress_fr(&payload[tx_detail_idx::NEW_ORDER1_AMOUNT_BUY])?
+            || payload[tx_detail_idx::NEW_ORDER1_FILLED_SELL] == decompress_fr(&payload[tx_detail_idx::NEW_ORDER1_AMOUNT_SELL])?;
+            let order2_filled = payload[tx_detail_idx::NEW_ORDER2_FILLED_BUY] == decompress_fr(&payload[tx_detail_idx::NEW_ORDER2_AMOUNT_BUY])?
+            || payload[tx_detail_idx::NEW_ORDER2_FILLED_SELL] == decompress_fr(&payload[tx_detail_idx::NEW_ORDER2_AMOUNT_SELL])?;
+
+            h += if order1_filled {2} else {0};
+            h += if order2_filled {4} else {0};
+            encoder.encode_heading(h)?; //001, 010 or 011
+            tx_encode::ForSpotTradeTx(tx).encode(encoder)
+        },
+
+        TxType::Nop => {
+            encoder.encode_heading(0)?;
+            Ok(())
+        },
+
+        _ => Ok(()),
+    };
+    ret?;
+
+    encoder.encode_padding();
+    Ok(())
+}
+
 
 impl ManagerWrapper {
     pub fn print_config() {
@@ -42,7 +151,7 @@ impl ManagerWrapper {
     pub fn new(state: Arc<RwLock<GlobalState>>, n_tx: usize, block_offset: Option<usize>, verbose: bool) -> Self {
         let tx_data_encoder = {
             let st = state.read().unwrap();
-            TxDataEncoder::new(st.balance_bits() as u32, st.account_bits() as u32)
+            TxDataEncoder::new(st.balance_bits() as u32, st.order_bits() as u32, st.account_bits() as u32)
         };
 
         Self {
@@ -124,7 +233,7 @@ impl ManagerWrapper {
         let old_account_roots: Vec<Fr> = buffered_txs.iter().map(|tx| tx.root_before).collect();
         let new_account_roots: Vec<Fr> = buffered_txs.iter().map(|tx| tx.root_after).collect();
         //calc tx-pubdata's hash
-        buffered_txs.iter().for_each(|tx| tx.encode_pubdata(encoder).unwrap());
+        buffered_txs.iter().for_each(|tx| encode_rawtx_to_pubdata(tx, encoder).unwrap());
         let detail = L2BlockDetail {
             old_root: *old_account_roots.first().unwrap(),
             new_root: *new_account_roots.last().unwrap(),
@@ -149,8 +258,65 @@ impl ManagerWrapper {
     pub fn get_block_generate_num(&self) -> usize {
         self.block_generate_num
     }
+    pub fn key_update(&mut self, tx: UpdateKeyTx, offset: Option<i64>) -> anyhow::Result<()> {
+        let mut state = self.mut_state();
+        if state.has_account(tx.account_id) {
+            bail!("current update key can only set key for un-inited account");
+        }
+        let fake_token_id = 0;
+        let proof = state.balance_full_proof(tx.account_id, fake_token_id);
+        let acc = state.get_account(tx.account_id);
+        let old_balance = state.get_token_balance(tx.account_id, fake_token_id);
+        let nonce = acc.nonce;
+
+        let mut encoded_tx = [Fr::zero(); TX_LENGTH];
+        encoded_tx[tx_detail_idx::TOKEN_ID1] = Fr::from_u32(fake_token_id);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID1] = Fr::from_u32(tx.account_id);
+        encoded_tx[tx_detail_idx::BALANCE1] = old_balance;
+        encoded_tx[tx_detail_idx::NONCE1] = nonce;
+        encoded_tx[tx_detail_idx::SIGN1] = acc.sign;
+        encoded_tx[tx_detail_idx::AY1] = acc.ay;
+
+        encoded_tx[tx_detail_idx::TOKEN_ID2] = Fr::from_u32(fake_token_id);
+        encoded_tx[tx_detail_idx::ACCOUNT_ID2] = Fr::from_u32(tx.account_id);
+        encoded_tx[tx_detail_idx::BALANCE2] = old_balance;
+        encoded_tx[tx_detail_idx::NONCE2] = nonce;
+        encoded_tx[tx_detail_idx::SIGN2] = tx.l2key.sign;
+        encoded_tx[tx_detail_idx::AY2] = tx.l2key.ay;
+
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = Fr::one();
+        encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = Fr::one();
+        encoded_tx[tx_detail_idx::DST_IS_NEW] =  Fr::one();
+
+        let mut raw_tx = RawTx {
+            tx_type: TxType::Deposit,
+            payload: encoded_tx.to_vec(),
+            balance_path0: proof.balance_path.clone(),
+            balance_path1: proof.balance_path.clone(),
+            balance_path2: proof.balance_path.clone(),
+            balance_path3: proof.balance_path,
+            order_path0: state.trivial_order_path_elements(),
+            order_path1: state.trivial_order_path_elements(),
+            order_root0: acc.order_root,
+            order_root1: acc.order_root,
+            account_path0: proof.account_path.clone(),
+            account_path1: proof.account_path,
+            root_before: proof.root,
+            root_after: Fr::zero(),
+            offset,
+        };
+
+        state.set_account_l2_addr(tx.account_id, tx.l2key.sign, tx.l2key.ay);
+        let new_root = state.root();
+        drop(state);
+        log::debug!("finish update key tx {:?} new root {}", tx, new_root);
+        raw_tx.root_after = new_root;
+        self.add_raw_tx(raw_tx);
+        Ok(())
+    }
     pub fn deposit(&mut self, tx: DepositTx, offset: Option<i64>) -> anyhow::Result<()> {
         let mut state = self.mut_state();
+        //TODO: deposit to new has been deprecated after key_update is induced
         let deposit_to_new = tx.l2key.is_some();
         if deposit_to_new && state.has_account(tx.account_id) {
             bail!("deposit to new, but account already existed");
@@ -165,7 +331,7 @@ impl ManagerWrapper {
         let nonce = acc.nonce;
 
         let mut encoded_tx = [Fr::zero(); TX_LENGTH];
-        encoded_tx[tx_detail_idx::AMOUNT] = encode_amount_to_fr(&tx.amount)?;
+        encoded_tx[tx_detail_idx::AMOUNT] = encode_amount_to_compressed_fr(&tx.amount)?;
 
         encoded_tx[tx_detail_idx::TOKEN_ID1] = Fr::from_u32(tx.token_id);
         encoded_tx[tx_detail_idx::ACCOUNT_ID1] = Fr::from_u32(tx.account_id);
@@ -259,7 +425,7 @@ impl ManagerWrapper {
         encoded_tx[tx_detail_idx::ACCOUNT_ID2] = Fr::from_u32(tx.to);
         encoded_tx[tx_detail_idx::TOKEN_ID1] = Fr::from_u32(tx.token_id);
         encoded_tx[tx_detail_idx::TOKEN_ID2] = Fr::from_u32(tx.token_id);
-        encoded_tx[tx_detail_idx::AMOUNT] = encode_amount_to_fr(&tx.amount).unwrap();
+        encoded_tx[tx_detail_idx::AMOUNT] = encode_amount_to_compressed_fr(&tx.amount).unwrap();
 
         encoded_tx[tx_detail_idx::BALANCE1] = from_old_balance;
         encoded_tx[tx_detail_idx::NONCE1] = from_account.nonce;
@@ -349,7 +515,7 @@ impl ManagerWrapper {
         // first, generate the tx
         let mut encoded_tx = [Fr::zero(); TX_LENGTH];
 
-        encoded_tx[tx_detail_idx::AMOUNT] = encode_amount_to_fr(&tx.amount).unwrap();
+        encoded_tx[tx_detail_idx::AMOUNT] = encode_amount_to_compressed_fr(&tx.amount).unwrap();
 
         encoded_tx[tx_detail_idx::TOKEN_ID1] = Fr::from_u32(token_id);
         encoded_tx[tx_detail_idx::ACCOUNT_ID1] = Fr::from_u32(account_id);
@@ -496,8 +662,8 @@ impl ManagerWrapper {
         encoded_tx[tx_detail_idx::OLD_ORDER2_FILLED_BUY] = old_order2_in_tree.filled_buy;
         encoded_tx[tx_detail_idx::OLD_ORDER2_AMOUNT_BUY] = old_order2_in_tree.total_buy;
 
-        encoded_tx[tx_detail_idx::AMOUNT] = encode_amount_to_fr(&trade.amount_1to2).unwrap();
-        encoded_tx[tx_detail_idx::AMOUNT2] = encode_amount_to_fr(&trade.amount_2to1).unwrap();
+        encoded_tx[tx_detail_idx::AMOUNT1] = amount_to_fr(&trade.amount_1to2);
+        encoded_tx[tx_detail_idx::AMOUNT2] = amount_to_fr(&trade.amount_2to1);
         encoded_tx[tx_detail_idx::ORDER1_POS] = Fr::from_u32(order1_pos);
         encoded_tx[tx_detail_idx::ORDER2_POS] = Fr::from_u32(order2_pos);
 
@@ -574,19 +740,19 @@ impl ManagerWrapper {
         encoded_tx[tx_detail_idx::NEW_ORDER1_ID] = Fr::from_u32(order1.order_id);
         encoded_tx[tx_detail_idx::NEW_ORDER1_TOKEN_SELL] = order1.token_sell;
         encoded_tx[tx_detail_idx::NEW_ORDER1_FILLED_SELL] = order1.filled_sell;
-        encoded_tx[tx_detail_idx::NEW_ORDER1_AMOUNT_SELL] = order1.total_sell;
+        encoded_tx[tx_detail_idx::NEW_ORDER1_AMOUNT_SELL] = compress_fr(&order1.total_sell).unwrap();
         encoded_tx[tx_detail_idx::NEW_ORDER1_TOKEN_BUY] = order1.token_buy;
         encoded_tx[tx_detail_idx::NEW_ORDER1_FILLED_BUY] = order1.filled_buy;
-        encoded_tx[tx_detail_idx::NEW_ORDER1_AMOUNT_BUY] = order1.total_buy;
+        encoded_tx[tx_detail_idx::NEW_ORDER1_AMOUNT_BUY] = compress_fr(&order1.total_buy).unwrap();
 
         encoded_tx[tx_detail_idx::NEW_ORDER2_ID] = Fr::from_u32(order2.order_id);
 
         encoded_tx[tx_detail_idx::NEW_ORDER2_TOKEN_SELL] = order2.token_sell;
         encoded_tx[tx_detail_idx::NEW_ORDER2_FILLED_SELL] = order2.filled_sell;
-        encoded_tx[tx_detail_idx::NEW_ORDER2_AMOUNT_SELL] = order2.total_sell;
+        encoded_tx[tx_detail_idx::NEW_ORDER2_AMOUNT_SELL] = compress_fr(&order2.total_sell).unwrap();
         encoded_tx[tx_detail_idx::NEW_ORDER2_TOKEN_BUY] = order2.token_buy;
         encoded_tx[tx_detail_idx::NEW_ORDER2_FILLED_BUY] = order2.filled_buy;
-        encoded_tx[tx_detail_idx::NEW_ORDER2_AMOUNT_BUY] = order2.total_buy;
+        encoded_tx[tx_detail_idx::NEW_ORDER2_AMOUNT_BUY] = compress_fr(&order2.total_buy).unwrap();
 
         encoded_tx[tx_detail_idx::TOKEN_ID1] = order1.token_sell;
         encoded_tx[tx_detail_idx::TOKEN_ID2] = order2.token_buy;

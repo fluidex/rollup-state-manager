@@ -43,22 +43,18 @@ impl Processor {
         let l2_pubkey: Vec<u8> = hex::decode(l2_pubkey.trim_start_matches("0x")).unwrap();
         let bjj_compressed: [u8; 32] = l2_pubkey.try_into().unwrap();
         let l2_pubkey_point: Point = babyjubjub_rs::decompress_point(bjj_compressed).unwrap();
-        let fake_token_id = 0;
-        let fake_amount = AmountType::from_decimal(&Decimal::zero(), prec_token_id(fake_token_id)).unwrap();
         let eth_addr = Fr::from_str(&user_info.l1_address);
         let sign = if bjj_compressed[31] & 0x80 != 0x00 { Fr::one() } else { Fr::zero() };
         // TODO: remove '0x' from eth addr?
         manager
-            .deposit(
-                l2::DepositTx {
-                    token_id: fake_token_id,
+            .key_update(
+                l2::UpdateKeyTx {
                     account_id,
-                    amount: fake_amount,
-                    l2key: Some(l2::L2Key {
+                    l2key: l2::L2Key {
                         eth_addr,
                         sign,
                         ay: l2_pubkey_point.y,
-                    }),
+                    },
                 },
                 offset,
             )
