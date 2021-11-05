@@ -951,7 +951,7 @@ dependencies = [
 [[package]]
 name = "ethers"
 version = "0.5.3"
-source = "git+https://github.com/gakonst/ethers-rs#bd3a7042005c3b4aad92f500e983e26114382ba6"
+source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
 dependencies = [
  "ethers-contract",
  "ethers-core",
@@ -964,7 +964,7 @@ dependencies = [
 [[package]]
 name = "ethers-contract"
 version = "0.5.3"
-source = "git+https://github.com/gakonst/ethers-rs#bd3a7042005c3b4aad92f500e983e26114382ba6"
+source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
 dependencies = [
  "ethers-contract-abigen",
  "ethers-contract-derive",
@@ -982,7 +982,7 @@ dependencies = [
 [[package]]
 name = "ethers-contract-abigen"
 version = "0.5.3"
-source = "git+https://github.com/gakonst/ethers-rs#bd3a7042005c3b4aad92f500e983e26114382ba6"
+source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
 dependencies = [
  "Inflector",
  "anyhow",
@@ -1004,7 +1004,7 @@ dependencies = [
 [[package]]
 name = "ethers-contract-derive"
 version = "0.5.3"
-source = "git+https://github.com/gakonst/ethers-rs#bd3a7042005c3b4aad92f500e983e26114382ba6"
+source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
 dependencies = [
  "ethers-contract-abigen",
  "ethers-core",
@@ -1018,7 +1018,7 @@ dependencies = [
 [[package]]
 name = "ethers-core"
 version = "0.5.4"
-source = "git+https://github.com/gakonst/ethers-rs#bd3a7042005c3b4aad92f500e983e26114382ba6"
+source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
 dependencies = [
  "arrayvec 0.7.2",
  "bytes",
@@ -1045,7 +1045,7 @@ dependencies = [
 [[package]]
 name = "ethers-middleware"
 version = "0.5.3"
-source = "git+https://github.com/gakonst/ethers-rs#bd3a7042005c3b4aad92f500e983e26114382ba6"
+source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
 dependencies = [
  "async-trait",
  "ethers-contract",
@@ -1068,7 +1068,7 @@ dependencies = [
 [[package]]
 name = "ethers-providers"
 version = "0.5.4"
-source = "git+https://github.com/gakonst/ethers-rs#bd3a7042005c3b4aad92f500e983e26114382ba6"
+source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
 dependencies = [
  "async-trait",
  "auto_impl",
@@ -1097,7 +1097,7 @@ dependencies = [
 [[package]]
 name = "ethers-signers"
 version = "0.5.3"
-source = "git+https://github.com/gakonst/ethers-rs#bd3a7042005c3b4aad92f500e983e26114382ba6"
+source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
 dependencies = [
  "async-trait",
  "coins-bip32",
@@ -1117,7 +1117,7 @@ dependencies = [
 [[package]]
 name = "ethers-solc"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/ethers-rs#bd3a7042005c3b4aad92f500e983e26114382ba6"
+source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
 dependencies = [
  "colored",
  "ethers-core",
@@ -1194,7 +1194,7 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 [[package]]
 name = "fluidex-common"
 version = "0.1.0"
-source = "git+https://github.com/fluidex/common-rs?branch=support-convert-timestamp-to-seconds-and-milliseconds#7f5150f30be7ffd5e82b8fedbb874299b8c2034d"
+source = "git+https://github.com/fluidex/common-rs?branch=master#656ef50fc63c025efe2c40298467b595be7f895a"
 dependencies = [
  "anyhow",
  "babyjubjub-rs",
@@ -2213,7 +2213,7 @@ dependencies = [
 [[package]]
 name = "orchestra"
 version = "0.1.0"
-source = "git+https://github.com/fluidex/orchestra.git?branch=update-time-fields-to-unit-millisecond#04192bf3815df95fef6642d8715ebce7ef9a729c"
+source = "git+https://github.com/fluidex/orchestra.git?branch=master#17f2a3f92f1569b61e623d4743305f4af49fdcf6"
 dependencies = [
  "prost 0.8.0",
  "serde 1.0.130",
