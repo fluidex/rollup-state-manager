@@ -82,8 +82,8 @@ pub struct SpotTradeTx {
     pub order2_account_id: u32,
     pub token_id_1to2: u32,
     pub token_id_2to1: u32,
-    pub amount_1to2: AmountType,
-    pub amount_2to1: AmountType,
+    pub amount_1to2: Fr,
+    pub amount_2to1: Fr,
     pub order1_id: u32,
     pub order2_id: u32,
 }
@@ -664,14 +664,8 @@ fn test_tx_pubdata() {
             order2_account_id: 2,
             token_id_1to2: 0,
             token_id_2to1: 1,
-            amount_1to2: AmountType{
-                exponent: 1u8,
-                significand: 12,
-            }, //120
-            amount_2to1: AmountType{
-                exponent: 2u8,
-                significand: 12,
-            }, //1200
+            amount_1to2: Fr::from_u32(120),
+            amount_2to1: Fr::from_u32(1200),
             order1_id: 1,
             order2_id: 1,            
         },

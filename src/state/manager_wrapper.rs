@@ -36,11 +36,6 @@ fn encode_amount_to_compressed_fr(amount: &AmountType) -> anyhow::Result<Fr> {
     Ok(Fr::from_bigint((*amount).to_encoded_int()?))
 }
 
-//extend the amount type so the fr has no compression
-fn amount_to_fr(amount: &AmountType) -> Fr {
-    Fr::from_bigint((*amount).to_bigint())
-}
-
 fn compress_fr(fr: &Fr) -> anyhow::Result<Fr> {
     let mut encode_int = fr.to_bigint();
     let mut exponent = 0u8;
@@ -662,22 +657,22 @@ impl ManagerWrapper {
         encoded_tx[tx_detail_idx::OLD_ORDER2_FILLED_BUY] = old_order2_in_tree.filled_buy;
         encoded_tx[tx_detail_idx::OLD_ORDER2_AMOUNT_BUY] = old_order2_in_tree.total_buy;
 
-        encoded_tx[tx_detail_idx::AMOUNT1] = amount_to_fr(&trade.amount_1to2);
-        encoded_tx[tx_detail_idx::AMOUNT2] = amount_to_fr(&trade.amount_2to1);
+        encoded_tx[tx_detail_idx::AMOUNT1] = trade.amount_1to2;
+        encoded_tx[tx_detail_idx::AMOUNT2] = trade.amount_2to1;
         encoded_tx[tx_detail_idx::ORDER1_POS] = Fr::from_u32(order1_pos);
         encoded_tx[tx_detail_idx::ORDER2_POS] = Fr::from_u32(order2_pos);
 
         let acc1_balance_sell = state.get_token_balance(acc_id1, trade.token_id_1to2);
-        assert!(acc1_balance_sell > trade.amount_1to2.to_fr(), "balance_1to2");
-        let acc1_balance_sell_new = acc1_balance_sell.sub(&trade.amount_1to2.to_fr());
+        assert!(acc1_balance_sell > trade.amount_1to2, "balance_1to2");
+        let acc1_balance_sell_new = acc1_balance_sell.sub(&trade.amount_1to2);
         let acc1_balance_buy = state.get_token_balance(acc_id1, trade.token_id_2to1);
-        let acc1_balance_buy_new = acc1_balance_buy.add(&trade.amount_2to1.to_fr());
+        let acc1_balance_buy_new = acc1_balance_buy.add(&trade.amount_2to1);
 
         let acc2_balance_sell = state.get_token_balance(acc_id2, trade.token_id_2to1);
-        assert!(acc2_balance_sell > trade.amount_2to1.to_fr(), "balance_2to1");
-        let acc2_balance_sell_new = acc2_balance_sell.sub(&trade.amount_2to1.to_fr());
+        assert!(acc2_balance_sell > trade.amount_2to1, "balance_2to1");
+        let acc2_balance_sell_new = acc2_balance_sell.sub(&trade.amount_2to1);
         let acc2_balance_buy = state.get_token_balance(acc_id2, trade.token_id_1to2);
-        let acc2_balance_buy_new = acc2_balance_buy.add(&trade.amount_1to2.to_fr());
+        let acc2_balance_buy_new = acc2_balance_buy.add(&trade.amount_1to2);
 
         encoded_tx[tx_detail_idx::BALANCE1] = acc1_balance_sell;
         encoded_tx[tx_detail_idx::BALANCE2] = acc2_balance_buy_new;
@@ -707,9 +702,9 @@ impl ManagerWrapper {
             offset,
         };
 
-        order1.trade_with(&trade.amount_1to2.to_fr(), &trade.amount_2to1.to_fr());
+        order1.trade_with(&trade.amount_1to2, &trade.amount_2to1);
         state.update_order_state(acc_id1, order1_pos, order1);
-        order2.trade_with(&trade.amount_2to1.to_fr(), &trade.amount_1to2.to_fr());
+        order2.trade_with(&trade.amount_2to1, &trade.amount_1to2);
         state.update_order_state(acc_id2, order2_pos, order2);
 
         let acc1_updates = AccountUpdates {

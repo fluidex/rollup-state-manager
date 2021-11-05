@@ -201,8 +201,8 @@ impl Block {
             order2_account_id: account_id2,
             token_id_1to2: token_id0,
             token_id_2to1: token_id1,
-            amount_1to2: AmountType::from_decimal(&Decimal::new(amount_1to2, 0), prec_token_id(token_id0)).unwrap(),
-            amount_2to1: AmountType::from_decimal(&Decimal::new(amount_2to1, 0), prec_token_id(token_id1)).unwrap(),
+            amount_1to2: Decimal::new(amount_1to2, 0).to_fr(prec_token_id(token_id0)),
+            amount_2to1: Decimal::new(amount_2to1, 0).to_fr(prec_token_id(token_id1)),
             order1_id: order_id1,
             order2_id: order_id2,
         };
