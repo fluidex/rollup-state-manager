@@ -84,7 +84,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: circuits/node_modules
-          key: node_modules-${{ hashFiles('circuits/package-lock.json') }}
+          key: circuits_node_modules-${{ hashFiles('circuits/package-lock.json') }}
 
       - name: circuits npm ci
         if: steps.circuits_npm_cache.outputs.cache-hit != 'true'
