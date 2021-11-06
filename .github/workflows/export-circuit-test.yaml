@@ -33,6 +33,9 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v2
 
+      - name: Pull git submodule
+        run: git submodule update --init --recursive
+
       - name: Install 1.56.0 toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -75,6 +78,19 @@ jobs:
           chmod +x ~/.cargo/bin/sccache
           printf "[build]\nrustc-wrapper = \"/home/runner/.cargo/bin/sccache\"" >> ~/.cargo/config
           ~/.cargo/bin/sccache -s
+
+      - name: Cache circuits node_modules
+        id: circuits_npm_cache
+        uses: actions/cache@v2
+        with:
+          path: circuits/node_modules
+          key: node_modules-${{ hashFiles('circuits/package-lock.json') }}
+
+      - name: circuits npm ci
+        if: steps.circuits_npm_cache.outputs.cache-hit != 'true'
+        run: |
+          cd circuits
+          npm ci
 
       - name: Test export_circuit
         run: bash tests/circuit_tests/test.sh
