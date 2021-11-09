@@ -10,7 +10,7 @@ use fluidex_common::Fr;
 use num::{One, PrimInt, ToPrimitive, Zero};
 use sha2::Digest;
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u8)]
 pub enum TxType {
     Nop,
@@ -163,8 +163,9 @@ impl WithdrawTx {
             account_id,
             token_id,
             amount,
-            nonce: Fr::zero(),
-            old_balance: Fr::zero(), // TODO: Use real `old_balance` for hash.
+            nonce: Fr::zero(), //TODO: nonce is also not involved yet ...
+                               //later we should also update the scripts in circuits
+            old_balance: Fr::zero(), // TODO: Maybe we should not involve old_balance into hash
             sig: Signature::default(),
         }
     }
@@ -286,7 +287,7 @@ impl BitEncodeContext {
 
         let mut padding = align_at - total_bits % align_at;
         while padding > 0 {
-            if self.applying_bit == 0 {
+            if padding >= 8 && self.applying_bit == 0 {
                 //fast forward by pushing chars instead of bits
                 let pad_bytes = padding / 8;
                 padding -= pad_bytes * 8;
@@ -331,7 +332,7 @@ impl TxDataEncoder {
     }
 
     pub fn pubdata_len_bits(&self) -> u32 {
-        self.account_bits + self.token_bits + AMOUNT_LEN * 8
+        self.tx_encode_bits as u32
     }
 
     pub fn encode_account(&mut self, account_id: u32) -> Result<()> {

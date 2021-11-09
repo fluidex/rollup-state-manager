@@ -5,7 +5,7 @@ use rollup_state_manager::account::Account;
 use rollup_state_manager::state::{GlobalState, ManagerWrapper};
 use rollup_state_manager::test_utils::circuit::{CircuitSource, CircuitTestCase, CircuitTestData};
 use rollup_state_manager::test_utils::types::prec_token_id;
-use rollup_state_manager::types::l2::{self, AmountType, DepositTx, L2BlockSerde, L2Key, OrderInput, SpotTradeTx, TransferTx, WithdrawTx};
+use rollup_state_manager::types::l2::{self, AmountType, DepositTx, UpdateKeyTx, L2BlockSerde, L2Key, OrderInput, SpotTradeTx, TransferTx, WithdrawTx};
 use serde_json::json;
 
 use rollup_state_manager::params;
@@ -95,17 +95,26 @@ impl Block {
             )
             .unwrap();
 
+        manager
+            .key_update(
+                UpdateKeyTx {
+                    account_id: account_id1,
+                    l2key: L2Key {
+                        eth_addr: account1.eth_addr(),
+                        sign: account1.sign(),
+                        ay: account1.ay(),
+                    },
+                },
+                None,
+            )
+            .unwrap();  
+            
         let mut transfer_tx0 = TransferTx::new(
             account_id0,
             account_id1,
             token_id0,
             AmountType::from_decimal(&Decimal::new(100, 0), prec_token_id(token_id0)).unwrap(),
         );
-        transfer_tx0.l2key = Some(L2Key {
-            eth_addr: account1.eth_addr(),
-            sign: account1.sign(),
-            ay: account1.ay(),
-        });
         transfer_tx0.from_nonce = manager.get_account_nonce(account_id0);
         let hash = transfer_tx0.hash();
         transfer_tx0.sig = account0.sign_hash(hash).unwrap();
@@ -149,16 +158,25 @@ impl Block {
             )
             .unwrap();
         manager
+            .key_update(
+                UpdateKeyTx {
+                    account_id: account_id2,
+                    l2key: L2Key {
+                        eth_addr: account2.eth_addr(),
+                        sign: account2.sign(),
+                        ay: account2.ay(),
+                    },
+                },
+                None,
+            )
+            .unwrap();            
+        manager
             .deposit(
                 DepositTx {
                     account_id: account_id2,
                     token_id: token_id1,
                     amount: AmountType::from_decimal(&Decimal::new(1990, 0), prec_token_id(token_id1)).unwrap(),
-                    l2key: Some(L2Key {
-                        eth_addr: account2.eth_addr(),
-                        sign: account2.sign(),
-                        ay: account2.ay(),
-                    }),
+                    l2key: None,
                 },
                 None,
             )
@@ -188,8 +206,8 @@ impl Block {
             order_id: order_id2,
             token_buy: Fr::from_u32(token_id0),
             token_sell: Fr::from_u32(token_id1),
-            total_buy: Decimal::new(1000, 0).to_fr(prec_token_id(token_id0)),
-            total_sell: Decimal::new(10000, 0).to_fr(prec_token_id(token_id1)),
+            total_buy: Decimal::new(amount_1to2, 0).to_fr(prec_token_id(token_id0)),
+            total_sell: Decimal::new(amount_2to1 + 10, 0).to_fr(prec_token_id(token_id1)),
             sig: Default::default(),
             account_id: 2,
             side: l2::order::OrderSide::Buy,

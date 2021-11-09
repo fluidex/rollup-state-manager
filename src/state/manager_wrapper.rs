@@ -38,6 +38,10 @@ fn encode_amount_to_compressed_fr(amount: &AmountType) -> anyhow::Result<Fr> {
 
 fn compress_fr(fr: &Fr) -> anyhow::Result<Fr> {
     let mut encode_int = fr.to_bigint();
+    if encode_int == BigInt::from(0) {
+        return Ok(Fr::zero());
+    }
+
     let mut exponent = 0u8;
     //TODO: this is a temporary resolution with many hacking, we should add this code into fluidex-common later
     let mut test_sig : BigInt = encode_int.clone() / 10;
@@ -73,6 +77,9 @@ mod tests {
     use super::*;
     #[test]
     fn test_compress_fr() {
+        let ret = compress_fr(&Fr::from_u32(0)).unwrap();
+        assert_eq!(ret, Fr::zero());
+
         let ret = compress_fr(&Fr::from_u32(1000)).unwrap();
         assert_eq!(ret, Fr::from_str("103079215105"));
 
@@ -103,6 +110,8 @@ fn encode_rawtx_to_pubdata(tx: &RawTx, encoder: &mut TxDataEncoder) -> anyhow::R
             }
         },
         TxType::Transfer => {
+            //prohibit "transfer to new" tx
+            assert_eq!(payload[tx_detail_idx::DST_IS_NEW], Fr::zero());
             encoder.encode_heading(0)?;
             tx_encode::ForCommonTx(tx).encode(encoder)            
         },
@@ -121,6 +130,7 @@ fn encode_rawtx_to_pubdata(tx: &RawTx, encoder: &mut TxDataEncoder) -> anyhow::R
 
             h += if order1_filled {2} else {0};
             h += if order2_filled {4} else {0};
+            assert!(h > 0);
             encoder.encode_heading(h)?; //001, 010 or 011
             tx_encode::ForSpotTradeTx(tx).encode(encoder)
         },
@@ -301,6 +311,7 @@ impl ManagerWrapper {
             offset,
         };
 
+        state.set_token_balance(tx.account_id, fake_token_id, old_balance);
         state.set_account_l2_addr(tx.account_id, tx.l2key.sign, tx.l2key.ay);
         let new_root = state.root();
         drop(state);
@@ -405,7 +416,7 @@ impl ManagerWrapper {
 
         let from_old_balance = state.get_token_balance(tx.from, tx.token_id);
         let to_old_balance = state.get_token_balance(tx.to, tx.token_id);
-        //println!("transfer from {} to {} amount {} from_old_balance {}", tx.from, tx.to, tx.amount.to_fr(), from_old_balance);
+        println!("transfer from {} to {} amount {} from_old_balance {}", tx.from, tx.to, tx.amount.to_fr(), from_old_balance);
         assert!(
             from_old_balance >= tx.amount.to_fr(),
             "Transfer balance not enough {} < {}",
@@ -713,7 +724,7 @@ impl ManagerWrapper {
                 (trade.token_id_1to2, acc1_balance_sell_new),
                 (trade.token_id_2to1, acc1_balance_buy_new),
             ],
-            order_updates: vec![(order1_pos, order1.hash())],
+            order_updates: vec![(order1_pos, order1.hash(state.order_bits()))],
             ..Default::default()
         };
         let acc2_updates = AccountUpdates {
@@ -722,7 +733,7 @@ impl ManagerWrapper {
                 (trade.token_id_1to2, acc2_balance_buy_new),
                 (trade.token_id_2to1, acc2_balance_sell_new),
             ],
-            order_updates: vec![(order2_pos, order2.hash())],
+            order_updates: vec![(order2_pos, order2.hash(state.order_bits()))],
             ..Default::default()
         };
         state.batch_update(vec![acc1_updates, acc2_updates], true);
@@ -885,14 +896,6 @@ mod test {
     use crate::config::Settings;
     use crate::types::l2::L2Key;
 
-    fn dummy_l2key() -> L2Key {
-        L2Key {
-            eth_addr: Fr::zero(),
-            sign: Fr::zero(),
-            ay: Fr::zero(),
-        }
-    }
-
     #[test]
     fn test_state_pubdata() {
         let mut s = Settings::new();
@@ -903,16 +906,26 @@ mod test {
         let gs = GlobalState::new(2, 3, 2, false);
         let mut wrapper = ManagerWrapper::new(Arc::new(RwLock::new(gs)), 2, None, false);
 
+        let key1 = L2Key {
+            eth_addr: Fr::zero(),
+            sign: Fr::zero(),
+            ay: Fr::from_str("12651997034108828793201924845334010433472202362737359078204512710424413547138"),            
+        };
+
+        let key2 = L2Key {
+            eth_addr: Fr::zero(),
+            sign: Fr::zero(),
+            ay: Fr::from_str("14696714050843746842272235061621223134990844289270786347035843272317411381964"),            
+        };
+
         //notice offset is of no use if we do not persist tx locally ...
         //testing example picked from circuit/test/testdata/msg_float.jsonl
         //block 1
         wrapper
-            .deposit(
-                DepositTx {
+            .key_update(
+                UpdateKeyTx {
                     account_id: 0,
-                    token_id: 1,
-                    amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
-                    l2key: Some(dummy_l2key()),
+                    l2key: key1,
                 },
                 None,
             )
@@ -921,9 +934,9 @@ mod test {
             .deposit(
                 DepositTx {
                     account_id: 0,
-                    token_id: 0,
+                    token_id: 1,
                     amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
-                    l2key: Some(dummy_l2key()),
+                    l2key: None,
                 },
                 None,
             )
@@ -933,28 +946,53 @@ mod test {
         wrapper
             .deposit(
                 DepositTx {
-                    account_id: 1,
-                    token_id: 1,
+                    account_id: 0,
+                    token_id: 0,
                     amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
-                    l2key: Some(dummy_l2key()),
+                    l2key: None,
                 },
                 None,
             )
             .unwrap();
+        wrapper
+            .key_update(
+                UpdateKeyTx {
+                    account_id: 1,
+                    l2key: key2,
+                },
+                None,
+            )
+            .unwrap();
+
+        //block 3
+        wrapper
+            .deposit(
+                DepositTx {
+                    account_id: 1,
+                    token_id: 1,
+                    amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
+                    l2key: None,
+                },
+                None,
+            )
+            .unwrap();
+
         wrapper
             .deposit(
                 DepositTx {
                     account_id: 1,
                     token_id: 0,
                     amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
-                    l2key: Some(dummy_l2key()),
+                    l2key: None,
                 },
                 None,
             )
             .unwrap();
 
         let blks = wrapper.pop_all_blocks();
-        assert_eq!(blks[0].detail.txdata_hash.low_u128(), 298571517759234780085007816947765249360u128);
-        assert_eq!(blks[1].detail.txdata_hash.low_u128(), 296940437820416654432875895781101051776u128);
+        assert_eq!(blks[0].detail.txdata_hash.low_u128(), 210768282952759810590552623169132871868u128);
+        assert_eq!(blks[1].detail.txdata_hash.low_u128(), 159409240260550832134647856072165320498u128);
+        assert_eq!(blks[2].detail.txdata_hash.low_u128(), 4036618609204034397054436922352855460u128);
+        
     }
 }
