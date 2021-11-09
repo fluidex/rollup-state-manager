@@ -29,7 +29,7 @@ async function getL2BlocksTest() {
   assert(block["block_time"] + one_hour_milliseconds > time_now_milliseconds);
   assert.equal(
     block["merkle_root"],
-    "0x0eb470af91c202fc21b920dde57857a60483e298be687df030ba1096bad52f36"
+    "0x1ab8107bab6aa9ca2ccab519821547379375d3266184c7490c4fd07699d0dcb7"
   );
 
   block = res["blocks"][1];
@@ -38,7 +38,7 @@ async function getL2BlocksTest() {
   assert(block["block_time"] + one_hour_milliseconds > time_now_milliseconds);
   assert.equal(
     block["merkle_root"],
-    "0x1ab8107bab6aa9ca2ccab519821547379375d3266184c7490c4fd07699d0dcb7"
+    "0x0cf9708094c494c668f6943ab4cfba04882d2b25303244e6ae6f14931a0c008c"
   );
 
   console.log("getL2BlocksTest passed");

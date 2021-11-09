@@ -84,7 +84,7 @@ async function getL2BlockTest() {
   assert.equal(res["status"], "UNCOMMITED");
   assert.equal(
     res["new_root"],
-    "0x157b359e2fed778742b7f42f6e438d6552215f86473ac5b668a7ce3799062a61"
+    "0x1060bd15e928cbde6a958d2bfb8fbe029f8321478287ebe45cdeb54bcb8a68e1"
   );
   assert.equal(res["txs"].length, 2);
   assert.equal(res["decoded_txs"].length, 2);
