@@ -125,10 +125,12 @@ impl ManagerWrapper {
         let new_account_roots: Vec<Fr> = buffered_txs.iter().map(|tx| tx.root_after).collect();
         //calc tx-pubdata's hash
         buffered_txs.iter().for_each(|tx| tx.encode_pubdata(encoder).unwrap());
+        let (txdata_hash, txdata) = encoder.finish();
         let detail = L2BlockDetail {
             old_root: *old_account_roots.first().unwrap(),
             new_root: *new_account_roots.last().unwrap(),
-            txdata_hash: encoder.finish(),
+            txdata_hash,
+            txdata,
             txs_type,
             encoded_txs,
             balance_path_elements,
@@ -728,7 +730,7 @@ mod test {
         L2Key {
             eth_addr: Fr::zero(),
             sign: Fr::zero(),
-            ay: Fr::zero(),
+            ay: Fr::one(), //so state could consider account has existed
         }
     }
 
@@ -737,7 +739,7 @@ mod test {
         let mut s = Settings::new();
         //don't persist
         s.persist_every_n_block = 1000;
-        Settings::set(s);
+        Settings::set_safe(s);
 
         let gs = GlobalState::new(2, 3, 2, false);
         let mut wrapper = ManagerWrapper::new(Arc::new(RwLock::new(gs)), 2, None, false);
@@ -762,7 +764,7 @@ mod test {
                     account_id: 0,
                     token_id: 0,
                     amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
-                    l2key: Some(dummy_l2key()),
+                    l2key: None,
                 },
                 None,
             )
@@ -786,7 +788,7 @@ mod test {
                     account_id: 1,
                     token_id: 0,
                     amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
-                    l2key: Some(dummy_l2key()),
+                    l2key: None,
                 },
                 None,
             )

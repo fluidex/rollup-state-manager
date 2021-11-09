@@ -56,6 +56,7 @@ pub enum L2Tx {
     Transfer(TransferTx),
     FullSpotTrade(FullSpotTradeTx),
     Withdraw(WithdrawTx),
+    Nop,
 }
 
 #[derive(Debug)]
@@ -249,6 +250,17 @@ impl BitEncodeContext {
     }
 }
 
+impl std::io::Write for BitEncodeContext {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.encode_bytes(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 pub const AMOUNT_LEN: u32 = 5;
 
 pub struct TxDataEncoder {
@@ -296,10 +308,11 @@ impl TxDataEncoder {
     }
 
     //finish encoding, output the result hash, and prepare for next encoding
-    pub fn finish(&mut self) -> U256 {
+    pub fn finish(&mut self) -> (U256, Vec<u8>) {
         let encoded_bytes = self.ctx.replace(BitEncodeContext::new()).unwrap().seal();
         //        println!("{:x?}", &encoded_bytes);
-        U256::from_big_endian(&sha2::Sha256::digest(&encoded_bytes))
+        let hash = U256::from_big_endian(&sha2::Sha256::digest(&encoded_bytes));
+        (hash, encoded_bytes)
     }
 }
 
@@ -437,7 +450,7 @@ fn test_tx_pubdata() {
     tx_nop.encode_pubdata(&mut tx_encoder).unwrap();
     tx_nop.encode_pubdata(&mut tx_encoder).unwrap();
 
-    let hash = tx_encoder.finish();
+    let (hash, _) = tx_encoder.finish();
     //preimage should be: 4af0b5a4000025477400000013a1dd00000000000000000000000000000000
     assert_eq!(hash.low_u128(), 273971448787759175191113939742247265668u128);
 }

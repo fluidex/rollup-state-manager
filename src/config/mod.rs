@@ -60,6 +60,10 @@ impl Settings {
         Self::get()
     }
 
+    pub fn set_safe(settings: Self) -> &'static Self {
+        SETTINGS.set(settings).map_or_else(|_| Self::get(), |_| Self::get())
+    }
+
     /// Gets the reference to the singleton `Settings`.
     ///
     /// # Panics
