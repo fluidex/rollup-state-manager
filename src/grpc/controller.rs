@@ -74,13 +74,14 @@ impl Controller {
                     let token_id = tx[tx_detail_idx::TOKEN_ID1].0.to_u32();
                     debug_assert!(token_id == tx[tx_detail_idx::TOKEN_ID2].0.to_u32());
 
+                    let precision = prec_token_id(token_id);
                     let amount = AmountType::from_encoded_bigint(tx[tx_detail_idx::AMOUNT].0.to_bigint())
                         .unwrap()
-                        .to_decimal(prec_token_id(token_id))
+                        .to_decimal(precision)
                         .to_string();
 
-                    let old_balance = tx[tx_detail_idx::BALANCE1].0.to_bigint().to_string();
-                    let new_balance = tx[tx_detail_idx::BALANCE2].0.to_bigint().to_string();
+                    let old_balance = tx[tx_detail_idx::BALANCE1].0.to_decimal(precision).to_string();
+                    let new_balance = tx[tx_detail_idx::BALANCE2].0.to_decimal(precision).to_string();
 
                     decoded_tx.deposit_tx = Some(DepositTx {
                         account_id,
@@ -96,13 +97,14 @@ impl Controller {
                     let token_id = tx[tx_detail_idx::TOKEN_ID1].0.to_u32();
                     debug_assert!(token_id == tx[tx_detail_idx::TOKEN_ID2].0.to_u32());
 
+                    let precision = prec_token_id(token_id);
                     let amount = AmountType::from_encoded_bigint(tx[tx_detail_idx::AMOUNT].0.to_bigint())
                         .unwrap()
                         .to_decimal(prec_token_id(token_id))
                         .to_string();
 
-                    let old_balance = tx[tx_detail_idx::BALANCE1].0.to_bigint().to_string();
-                    let new_balance = tx[tx_detail_idx::BALANCE2].0.to_bigint().to_string();
+                    let old_balance = tx[tx_detail_idx::BALANCE1].0.to_decimal(precision).to_string();
+                    let new_balance = tx[tx_detail_idx::BALANCE2].0.to_decimal(precision).to_string();
 
                     decoded_tx.withdraw_tx = Some(WithdrawTx {
                         account_id,
@@ -119,15 +121,16 @@ impl Controller {
                     let token_id = tx[tx_detail_idx::TOKEN_ID1].0.to_u32();
                     debug_assert!(token_id == tx[tx_detail_idx::TOKEN_ID2].0.to_u32());
 
+                    let precision = prec_token_id(token_id);
                     let amount = tx[tx_detail_idx::AMOUNT].0;
 
                     let from_old_balance = tx[tx_detail_idx::BALANCE1].0;
-                    let from_new_balance = from_old_balance.sub(&amount).to_bigint().to_string();
-                    let from_old_balance = from_old_balance.to_bigint().to_string();
+                    let from_new_balance = from_old_balance.sub(&amount).to_decimal(precision).to_string();
+                    let from_old_balance = from_old_balance.to_decimal(precision).to_string();
 
                     let to_new_balance = tx[tx_detail_idx::BALANCE1].0;
-                    let to_old_balance = to_new_balance.sub(&amount).to_bigint().to_string();
-                    let to_new_balance = to_new_balance.to_bigint().to_string();
+                    let to_old_balance = to_new_balance.sub(&amount).to_decimal(precision).to_string();
+                    let to_new_balance = to_new_balance.to_decimal(precision).to_string();
 
                     let amount = AmountType::from_encoded_bigint(amount.to_bigint())
                         .unwrap()

@@ -119,15 +119,15 @@ async function testBlock0() {
   assert.equal(tx1["account_id"], userId1);
   assert.equal(tx1["token_id"], 0);
   assert.equal(tx1["amount"], "0.0000");
-  assert.equal(tx1["old_balance"], "0");
-  assert.equal(tx1["new_balance"], "0");
+  assert.equal(tx1["old_balance"], "0.0000");
+  assert.equal(tx1["new_balance"], "0.0000");
 
   const tx2 = res["decoded_txs"][1]["deposit_tx"];
   assert.equal(tx2["account_id"], userId2);
   assert.equal(tx2["token_id"], 0);
   assert.equal(tx2["amount"], "0.0000");
-  assert.equal(tx2["old_balance"], "0");
-  assert.equal(tx2["new_balance"], "0");
+  assert.equal(tx2["old_balance"], "0.0000");
+  assert.equal(tx2["new_balance"], "0.0000");
 
   console.log("testBlock0 End");
 }
@@ -154,15 +154,15 @@ async function testBlock1() {
   assert.equal(tx1["account_id"], userId1);
   assert.equal(tx1["token_id"], 1);
   assert.equal(tx1["amount"], "500000");
-  assert.equal(tx1["old_balance"], "0");
-  assert.equal(tx1["new_balance"], "500000000000");
+  assert.equal(tx1["old_balance"], "0.000000");
+  assert.equal(tx1["new_balance"], "500000.000000");
 
   const tx2 = res["decoded_txs"][1]["withdraw_tx"];
   assert.equal(tx2["account_id"], userId1);
   assert.equal(tx2["token_id"], 1);
   assert.equal(tx2["amount"], "100");
-  assert.equal(tx2["old_balance"], "500000000000");
-  assert.equal(tx2["new_balance"], "499900000000");
+  assert.equal(tx2["old_balance"], "500000.000000");
+  assert.equal(tx2["new_balance"], "499900.000000");
 
   console.log("testBlock1 End");
 }

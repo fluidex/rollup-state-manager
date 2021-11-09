@@ -94,15 +94,15 @@ async function getL2BlockTest() {
   assert.equal(tx1["account_id"], userId);
   assert.equal(tx1["token_id"], 0);
   assert.equal(tx1["amount"], "0.0000");
-  assert.equal(tx1["old_balance"], "0");
-  assert.equal(tx1["new_balance"], "0");
+  assert.equal(tx1["old_balance"], "0.0000");
+  assert.equal(tx1["new_balance"], "0.0000");
 
   const tx2 = res["decoded_txs"][1]["deposit_tx"];
   assert.equal(tx2["account_id"], userId);
   assert.equal(tx2["token_id"], 0);
   assert.equal(tx2["amount"], "3");
-  assert.equal(tx2["old_balance"], "0");
-  assert.equal(tx2["new_balance"], "30000");
+  assert.equal(tx2["old_balance"], "0.0000");
+  assert.equal(tx2["new_balance"], "3.0000");
 
   console.log("getL2BlockTest End");
 }
