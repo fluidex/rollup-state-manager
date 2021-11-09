@@ -23,13 +23,14 @@ async function getL2BlocksTest() {
 
   const time_now_milliseconds = dayjs().valueOf();
 
+  //notice the arry of blocks start from the latest block
   let block = res["blocks"][0];
   assert.equal(block["block_height"], "2");
   assert(block["block_time"] <= time_now_milliseconds);
   assert(block["block_time"] + one_hour_milliseconds > time_now_milliseconds);
   assert.equal(
     block["merkle_root"],
-    "0x1ab8107bab6aa9ca2ccab519821547379375d3266184c7490c4fd07699d0dcb7"
+    "0x157b359e2fed778742b7f42f6e438d6552215f86473ac5b668a7ce3799062a61"
   );
 
   block = res["blocks"][1];
