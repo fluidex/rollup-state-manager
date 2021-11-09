@@ -1,7 +1,7 @@
 use crate::config::Settings;
 use crate::state::global::GlobalState;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
-use crate::types::l2::{tx_detail_idx, L2BlockSerde, TxType};
+use crate::types::l2::{tx_detail_idx, AmountType, L2BlockSerde, TxType};
 use core::cmp::min;
 use fluidex_common::db::models::{l2_block, tablenames};
 use fluidex_common::db::DbType;
@@ -102,6 +102,7 @@ impl Controller {
                     let precision = prec_token_id(token_id);
                     let amount = AmountType::from_encoded_bigint(tx[tx_detail_idx::AMOUNT].0.to_bigint())
                         .unwrap()
+                        .to_decimal(precision)
                         .to_string();
 
                     let old_balance = tx[tx_detail_idx::BALANCE1].0.to_decimal(precision).to_string();
@@ -133,8 +134,9 @@ impl Controller {
                     let to_old_balance = to_new_balance.sub(&amount).to_decimal(precision).to_string();
                     let to_new_balance = to_new_balance.to_decimal(precision).to_string();
 
-                    let amount = Decimal::try_from_i128_with_scale(amount.to_bigint().to_i128().unwrap(), prec_token_id(token_id))
+                    let amount = AmountType::from_encoded_bigint(tx[tx_detail_idx::AMOUNT].0.to_bigint())
                         .unwrap()
+                        .to_decimal(precision)
                         .to_string();
 
                     decoded_tx.transfer_tx = Some(TransferTx {
