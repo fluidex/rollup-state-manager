@@ -5,7 +5,9 @@ use rollup_state_manager::account::Account;
 use rollup_state_manager::state::{GlobalState, ManagerWrapper};
 use rollup_state_manager::test_utils::circuit::{CircuitSource, CircuitTestCase, CircuitTestData};
 use rollup_state_manager::test_utils::types::prec_token_id;
-use rollup_state_manager::types::l2::{self, AmountType, DepositTx, UpdateKeyTx, L2BlockSerde, L2Key, OrderInput, SpotTradeTx, TransferTx, WithdrawTx};
+use rollup_state_manager::types::l2::{
+    self, AmountType, DepositTx, L2BlockSerde, L2Key, OrderInput, SpotTradeTx, TransferTx, UpdateKeyTx, WithdrawTx,
+};
 use serde_json::json;
 
 use rollup_state_manager::params;
@@ -107,8 +109,8 @@ impl Block {
                 },
                 None,
             )
-            .unwrap();  
-            
+            .unwrap();
+
         let mut transfer_tx0 = TransferTx::new(
             account_id0,
             account_id1,
@@ -169,7 +171,7 @@ impl Block {
                 },
                 None,
             )
-            .unwrap();            
+            .unwrap();
         manager
             .deposit(
                 DepositTx {

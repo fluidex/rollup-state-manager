@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use ethers::core::types::U256;
 use fluidex_common::ff::Field;
 use fluidex_common::l2::account::Signature;
-use fluidex_common::num_bigint::{BigUint, BigInt};
+use fluidex_common::num_bigint::{BigInt, BigUint};
 use fluidex_common::types::{Float40, FrExt};
 use fluidex_common::Fr;
 use num::{One, PrimInt, ToPrimitive, Zero};
@@ -164,7 +164,7 @@ impl WithdrawTx {
             token_id,
             amount,
             nonce: Fr::zero(), //TODO: nonce is also not involved yet ...
-                               //later we should also update the scripts in circuits
+            //later we should also update the scripts in circuits
             old_balance: Fr::zero(), // TODO: Maybe we should not involve old_balance into hash
             sig: Signature::default(),
         }
@@ -247,7 +247,9 @@ impl BitEncodeContext {
     }
 
     fn encode_big(&mut self, n: BigInt, bits: u32) -> Result<()> {
-        let mut un = n.to_biguint().ok_or(anyhow!("have {}, can only encode positive integer", n))?;
+        let mut un = n
+            .to_biguint()
+            .ok_or_else(|| anyhow!("have {}, can only encode positive integer", n))?;
         let mut i = bits;
 
         while i > 0 {
@@ -260,7 +262,7 @@ impl BitEncodeContext {
             Err(anyhow!("can not encode number within specified bits"))
         } else {
             Ok(())
-        }        
+        }
     }
 
     fn encode_bytes(&mut self, bts: &[u8]) {
@@ -273,13 +275,12 @@ impl BitEncodeContext {
         let total_bits = self.encoding_buf.len() * 8 + self.applying_bit;
         if total_bits % at == 0 {
             Ok(())
-        }else {
+        } else {
             Err(at - total_bits % at)
-        } 
-
+        }
     }
 
-    fn padding(&mut self, align_at: usize){
+    fn padding(&mut self, align_at: usize) {
         let total_bits = self.encoding_buf.len() * 8 + self.applying_bit;
         if total_bits % align_at == 0 {
             return;
@@ -291,8 +292,8 @@ impl BitEncodeContext {
                 //fast forward by pushing chars instead of bits
                 let pad_bytes = padding / 8;
                 padding -= pad_bytes * 8;
-                self.encoding_buf.resize(self.encoding_buf.len()+ pad_bytes, 0u8);
-            }else {
+                self.encoding_buf.resize(self.encoding_buf.len() + pad_bytes, 0u8);
+            } else {
                 self.apply_bit(true);
                 padding -= 1;
             }
@@ -359,14 +360,17 @@ impl TxDataEncoder {
     pub fn encode_fr(&mut self, fr: &Fr, bits: u32) -> Result<()> {
         if bits < 64 {
             self.ctx.as_mut().unwrap().encode_primint(fr.to_i64(), bits)
-        }else {
+        } else {
             self.ctx.as_mut().unwrap().encode_big(fr.to_bigint(), bits)
         }
-        
     }
 
     pub fn encode_heading(&mut self, head: u32) -> Result<()> {
-        self.ctx.as_ref().unwrap().check_align(self.tx_encode_bits).map_err(|n|anyhow!("not align: miss {} bits", n))?;
+        self.ctx
+            .as_ref()
+            .unwrap()
+            .check_align(self.tx_encode_bits)
+            .map_err(|n| anyhow!("not align: miss {} bits", n))?;
         self.ctx.as_mut().unwrap().encode_primint(head, 3)
     }
 
@@ -405,10 +409,9 @@ impl EncodeForPubData for UpdateKeyTx {
         encoder.encode_fr(&self.l2key.sign, 1)?;
         encoder.encode_fr(&self.l2key.ay, 254)?;
         encoder.encode_padding();
-        Ok(())        
+        Ok(())
     }
 }
-
 
 impl EncodeForPubData for DepositTx {
     fn encode_pubdata(&self, encoder: &mut TxDataEncoder) -> Result<()> {
@@ -420,7 +423,7 @@ impl EncodeForPubData for DepositTx {
         encoder.encode_token(self.token_id)?;
         encoder.encode_amount(&self.amount)?;
         encoder.encode_padding();
-        Ok(())        
+        Ok(())
     }
 }
 
@@ -433,7 +436,7 @@ impl EncodeForPubData for TransferTx {
         encoder.encode_token(self.token_id)?;
         encoder.encode_amount(&self.amount)?;
         encoder.encode_padding();
-        Ok(())        
+        Ok(())
     }
 }
 
@@ -444,8 +447,8 @@ impl EncodeForPubData for FullSpotTradeTx {
         let trade = &self.trade;
         let mut h = 0;
         //order 1
-        h += if order1.is_filled() {2} else {0};
-        h += if order2.is_filled() {4} else {0};
+        h += if order1.is_filled() { 2 } else { 0 };
+        h += if order2.is_filled() { 4 } else { 0 };
         encoder.encode_heading(h)?;
         encoder.encode_account(trade.order1_account_id)?;
         encoder.encode_account(trade.order2_account_id)?;
@@ -471,7 +474,7 @@ impl EncodeForPubData for WithdrawTx {
         encoder.encode_token(self.token_id)?;
         encoder.encode_amount(&self.amount)?;
         encoder.encode_padding();
-        Ok(())        
+        Ok(())
     }
 }
 
@@ -541,7 +544,7 @@ fn test_tx_pubdata() {
     let tx = DepositTx {
         account_id: 0,
         token_id: 0,
-        amount: AmountType{
+        amount: AmountType {
             exponent: 2u8,
             significand: 2,
         }, //200
@@ -556,7 +559,7 @@ fn test_tx_pubdata() {
     let tx = DepositTx {
         account_id: 1,
         token_id: 0,
-        amount: AmountType{
+        amount: AmountType {
             exponent: 2u8,
             significand: 1,
         }, //100,
@@ -569,7 +572,7 @@ fn test_tx_pubdata() {
         from: 1,
         to: 0,
         token_id: 0,
-        amount: AmountType{
+        amount: AmountType {
             exponent: 1u8,
             significand: 5,
         }, //50
@@ -587,7 +590,7 @@ fn test_tx_pubdata() {
     let tx = WithdrawTx {
         account_id: 0,
         token_id: 0,
-        amount: AmountType{
+        amount: AmountType {
             exponent: 1u8,
             significand: 15,
         }, //150
@@ -601,7 +604,7 @@ fn test_tx_pubdata() {
     let tx = DepositTx {
         account_id: 1,
         token_id: 0,
-        amount: AmountType{
+        amount: AmountType {
             exponent: 0u8,
             significand: 199,
         },
@@ -617,7 +620,7 @@ fn test_tx_pubdata() {
     let tx = DepositTx {
         account_id: 2,
         token_id: 1,
-        amount: AmountType{
+        amount: AmountType {
             exponent: 1u8,
             significand: 199,
         }, //1990
@@ -633,12 +636,12 @@ fn test_tx_pubdata() {
     mk_order.token_buy = Fr::from_u32(1);
     mk_order.filled_buy = Fr::from_u32(1200);
     mk_order.filled_sell = Fr::from_u32(120);
-    let amt = AmountType{
+    let amt = AmountType {
         exponent: 4u8,
         significand: 1,
     }; // 10000
     mk_order.total_buy = Fr::from_bigint(amt.to_encoded_int().unwrap());
-    let amt = AmountType{
+    let amt = AmountType {
         exponent: 3u8,
         significand: 1,
     }; // 1000
@@ -648,15 +651,15 @@ fn test_tx_pubdata() {
     tk_order.token_sell = Fr::from_u32(1);
     tk_order.filled_sell = Fr::from_u32(1210);
     tk_order.filled_buy = Fr::from_u32(121);
-    let amt = AmountType{
+    let amt = AmountType {
         exponent: 0u8,
         significand: 121,
-    };//121
+    }; //121
     tk_order.total_buy = Fr::from_bigint(amt.to_encoded_int().unwrap());
-    let amt = AmountType{
+    let amt = AmountType {
         exponent: 1u8,
         significand: 121,
-    };//1210
+    }; //1210
     tk_order.total_sell = Fr::from_bigint(amt.to_encoded_int().unwrap());
 
     let tx = FullSpotTradeTx {
@@ -668,7 +671,7 @@ fn test_tx_pubdata() {
             amount_1to2: Fr::from_u32(120),
             amount_2to1: Fr::from_u32(1200),
             order1_id: 1,
-            order2_id: 1,            
+            order2_id: 1,
         },
         maker_order: Some(mk_order),
         taker_order: Some(tk_order),
@@ -678,7 +681,6 @@ fn test_tx_pubdata() {
 
     let hash = tx_encoder.finish();
     assert_eq!(hash.low_u128(), 146266009004152019134474450994520485822u128);
-
 }
 /*
 #[cfg(test)]

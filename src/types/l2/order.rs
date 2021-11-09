@@ -147,7 +147,7 @@ impl Order {
 fn bench_order_sign() {
     use std::time::Instant;
     let mut order = Order::default();
-    let default_order_levels : usize = 5;
+    let default_order_levels: usize = 5;
     let t1 = Instant::now();
     for _ in 0..99 {
         order.hash(default_order_levels);

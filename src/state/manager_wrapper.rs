@@ -6,7 +6,9 @@ use crate::config::Settings;
 #[cfg(feature = "persist_sled")]
 use crate::r#const::sled_db::*;
 use crate::types::l2::{
-    tx_encode::{self, EncodeForScheme}, tx_detail_idx, AmountType, DepositTx, UpdateKeyTx, FullSpotTradeTx, L2Block, L2BlockDetail, Order, RawTx, TransferTx, TxDataEncoder, TxType,
+    tx_detail_idx,
+    tx_encode::{self, EncodeForScheme},
+    AmountType, DepositTx, FullSpotTradeTx, L2Block, L2BlockDetail, Order, RawTx, TransferTx, TxDataEncoder, TxType, UpdateKeyTx,
     WithdrawTx, TX_LENGTH,
 };
 use crate::types::merkle_tree::Tree;
@@ -14,8 +16,8 @@ use anyhow::{anyhow, bail};
 use fluidex_common::babyjubjub_rs::{self, Point};
 use fluidex_common::ff::Field;
 use fluidex_common::l2::account::{L2Account, SignatureBJJ};
-use fluidex_common::{types::FrExt, Fr};
 use fluidex_common::{num_bigint::BigInt, num_traits::ToPrimitive};
+use fluidex_common::{types::FrExt, Fr};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Instant;
 
@@ -44,7 +46,7 @@ fn compress_fr(fr: &Fr) -> anyhow::Result<Fr> {
 
     let mut exponent = 0u8;
     //TODO: this is a temporary resolution with many hacking, we should add this code into fluidex-common later
-    let mut test_sig : BigInt = encode_int.clone() / 10;
+    let mut test_sig: BigInt = encode_int.clone() / 10;
     while encode_int == test_sig.clone() * 10 {
         encode_int = test_sig;
         //Fr has at most 76 zeros so u8 as exp should be enough
@@ -53,17 +55,17 @@ fn compress_fr(fr: &Fr) -> anyhow::Result<Fr> {
     }
 
     let encoder = AmountType {
-        significand: encode_int.to_i64().ok_or(anyhow!("significand part too big: {}", encode_int))?,
+        significand: encode_int
+            .to_i64()
+            .ok_or_else(|| anyhow!("significand part too big: {}", encode_int))?,
         exponent,
     };
     //TODO: floats still not check the range of significand yet so we have to check it here
     if encoder.significand >= 34359738368i64 {
         Err(anyhow!("too big for 35bit significand: {}", encode_int))
-    }else {
+    } else {
         Ok(Fr::from_bigint(encoder.to_encoded_int()?))
     }
-    
-
 }
 
 fn decompress_fr(fr: &Fr) -> anyhow::Result<Fr> {
@@ -104,41 +106,43 @@ fn encode_rawtx_to_pubdata(tx: &RawTx, encoder: &mut TxDataEncoder) -> anyhow::R
                 assert_eq!(payload[tx_detail_idx::AMOUNT], Fr::zero());
                 encoder.encode_heading(1)?; //100
                 tx_encode::ForL2KeyTx(tx).encode(encoder)
-            }else {
+            } else {
                 encoder.encode_heading(0)?;
                 tx_encode::ForCommonTx(tx).encode(encoder)
             }
-        },
+        }
         TxType::Transfer => {
             //prohibit "transfer to new" tx
             assert_eq!(payload[tx_detail_idx::DST_IS_NEW], Fr::zero());
             encoder.encode_heading(0)?;
-            tx_encode::ForCommonTx(tx).encode(encoder)            
-        },
+            tx_encode::ForCommonTx(tx).encode(encoder)
+        }
 
         TxType::Withdraw => {
             encoder.encode_heading(4)?; //001
             tx_encode::ForCommonTx(tx).encode(encoder)
-        },
+        }
 
         TxType::SpotTrade => {
             let mut h = 0;
-            let order1_filled = payload[tx_detail_idx::NEW_ORDER1_FILLED_BUY] == decompress_fr(&payload[tx_detail_idx::NEW_ORDER1_AMOUNT_BUY])?
-            || payload[tx_detail_idx::NEW_ORDER1_FILLED_SELL] == decompress_fr(&payload[tx_detail_idx::NEW_ORDER1_AMOUNT_SELL])?;
-            let order2_filled = payload[tx_detail_idx::NEW_ORDER2_FILLED_BUY] == decompress_fr(&payload[tx_detail_idx::NEW_ORDER2_AMOUNT_BUY])?
-            || payload[tx_detail_idx::NEW_ORDER2_FILLED_SELL] == decompress_fr(&payload[tx_detail_idx::NEW_ORDER2_AMOUNT_SELL])?;
+            let order1_filled = payload[tx_detail_idx::NEW_ORDER1_FILLED_BUY]
+                == decompress_fr(&payload[tx_detail_idx::NEW_ORDER1_AMOUNT_BUY])?
+                || payload[tx_detail_idx::NEW_ORDER1_FILLED_SELL] == decompress_fr(&payload[tx_detail_idx::NEW_ORDER1_AMOUNT_SELL])?;
+            let order2_filled = payload[tx_detail_idx::NEW_ORDER2_FILLED_BUY]
+                == decompress_fr(&payload[tx_detail_idx::NEW_ORDER2_AMOUNT_BUY])?
+                || payload[tx_detail_idx::NEW_ORDER2_FILLED_SELL] == decompress_fr(&payload[tx_detail_idx::NEW_ORDER2_AMOUNT_SELL])?;
 
-            h += if order1_filled {2} else {0};
-            h += if order2_filled {4} else {0};
+            h += if order1_filled { 2 } else { 0 };
+            h += if order2_filled { 4 } else { 0 };
             assert!(h > 0);
             encoder.encode_heading(h)?; //001, 010 or 011
             tx_encode::ForSpotTradeTx(tx).encode(encoder)
-        },
+        }
 
         TxType::Nop => {
             encoder.encode_heading(0)?;
             Ok(())
-        },
+        }
 
         _ => Ok(()),
     };
@@ -147,7 +151,6 @@ fn encode_rawtx_to_pubdata(tx: &RawTx, encoder: &mut TxDataEncoder) -> anyhow::R
     encoder.encode_padding();
     Ok(())
 }
-
 
 impl ManagerWrapper {
     pub fn print_config() {
@@ -291,7 +294,7 @@ impl ManagerWrapper {
 
         encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK1] = Fr::one();
         encoded_tx[tx_detail_idx::ENABLE_BALANCE_CHECK2] = Fr::one();
-        encoded_tx[tx_detail_idx::DST_IS_NEW] =  Fr::one();
+        encoded_tx[tx_detail_idx::DST_IS_NEW] = Fr::one();
 
         let mut raw_tx = RawTx {
             tx_type: TxType::Deposit,
@@ -416,7 +419,13 @@ impl ManagerWrapper {
 
         let from_old_balance = state.get_token_balance(tx.from, tx.token_id);
         let to_old_balance = state.get_token_balance(tx.to, tx.token_id);
-        println!("transfer from {} to {} amount {} from_old_balance {}", tx.from, tx.to, tx.amount.to_fr(), from_old_balance);
+        println!(
+            "transfer from {} to {} amount {} from_old_balance {}",
+            tx.from,
+            tx.to,
+            tx.amount.to_fr(),
+            from_old_balance
+        );
         assert!(
             from_old_balance >= tx.amount.to_fr(),
             "Transfer balance not enough {} < {}",
@@ -909,13 +918,13 @@ mod test {
         let key1 = L2Key {
             eth_addr: Fr::zero(),
             sign: Fr::zero(),
-            ay: Fr::from_str("12651997034108828793201924845334010433472202362737359078204512710424413547138"),            
+            ay: Fr::from_str("12651997034108828793201924845334010433472202362737359078204512710424413547138"),
         };
 
         let key2 = L2Key {
             eth_addr: Fr::zero(),
             sign: Fr::zero(),
-            ay: Fr::from_str("14696714050843746842272235061621223134990844289270786347035843272317411381964"),            
+            ay: Fr::from_str("14696714050843746842272235061621223134990844289270786347035843272317411381964"),
         };
 
         //notice offset is of no use if we do not persist tx locally ...
@@ -993,6 +1002,5 @@ mod test {
         assert_eq!(blks[0].detail.txdata_hash.low_u128(), 210768282952759810590552623169132871868u128);
         assert_eq!(blks[1].detail.txdata_hash.low_u128(), 159409240260550832134647856072165320498u128);
         assert_eq!(blks[2].detail.txdata_hash.low_u128(), 4036618609204034397054436922352855460u128);
-        
     }
 }

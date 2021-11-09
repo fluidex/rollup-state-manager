@@ -5,9 +5,9 @@ use crate::types::l2::{tx_detail_idx, L2BlockSerde, TxType};
 use core::cmp::min;
 use fluidex_common::db::models::{l2_block, tablenames};
 use fluidex_common::db::DbType;
-use fluidex_common::types::FrExt;
-use fluidex_common::rust_decimal::Decimal;
 use fluidex_common::num_traits::ToPrimitive;
+use fluidex_common::rust_decimal::Decimal;
+use fluidex_common::types::FrExt;
 use fluidex_common::utils::timeutil::FTimestamp;
 use orchestra::rpc::rollup::*;
 use std::sync::{Arc, RwLock};
@@ -133,9 +133,7 @@ impl Controller {
                     let to_old_balance = to_new_balance.sub(&amount).to_decimal(precision).to_string();
                     let to_new_balance = to_new_balance.to_decimal(precision).to_string();
 
-                    let amount = Decimal::try_from_i128_with_scale(
-                            amount.to_bigint().to_i128().unwrap(),
-                            prec_token_id(token_id))
+                    let amount = Decimal::try_from_i128_with_scale(amount.to_bigint().to_i128().unwrap(), prec_token_id(token_id))
                         .unwrap()
                         .to_string();
 
@@ -158,15 +156,17 @@ impl Controller {
                     let token_id_2to1 = tx[tx_detail_idx::NEW_ORDER2_TOKEN_SELL].0.to_u32();
 
                     let amount_1to2 = Decimal::try_from_i128_with_scale(
-                            tx[tx_detail_idx::AMOUNT1].0.to_bigint().to_i128().unwrap(),
-                            prec_token_id(token_id_1to2))
-                        .unwrap()
-                        .to_string();
+                        tx[tx_detail_idx::AMOUNT1].0.to_bigint().to_i128().unwrap(),
+                        prec_token_id(token_id_1to2),
+                    )
+                    .unwrap()
+                    .to_string();
                     let amount_2to1 = Decimal::try_from_i128_with_scale(
-                            tx[tx_detail_idx::AMOUNT2].0.to_bigint().to_i128().unwrap(),
-                            prec_token_id(token_id_2to1))
-                        .unwrap()
-                        .to_string();
+                        tx[tx_detail_idx::AMOUNT2].0.to_bigint().to_i128().unwrap(),
+                        prec_token_id(token_id_2to1),
+                    )
+                    .unwrap()
+                    .to_string();
 
                     decoded_tx.spot_trade_tx = Some(SpotTradeTx {
                         order1_account_id,
