@@ -159,7 +159,7 @@ impl GlobalState {
         let empty_balance_tree = Tree::new(balance_levels, Fr::zero());
         let default_balance_root = empty_balance_tree.get_root();
 
-        let default_order_leaf = Order::default().hash(order_levels);
+        let default_order_leaf = Order::default().hash();
         let empty_order_tree = Tree::new(order_levels, default_order_leaf);
         let default_order_root = empty_order_tree.get_root();
         let trivial_order_path_elements = empty_order_tree.get_proof(0).path_elements;
@@ -327,13 +327,12 @@ impl GlobalState {
         if order_pos >= 2u32.pow(self.order_levels as u32) {
             panic!("order_pos {} invalid for order_levels {}", order_pos, self.order_levels);
         }
-        let order_bits = self.order_bits();
         self.order_trees
             .get_mut(&account_id)
             .unwrap()
             .lock()
             .unwrap()
-            .set_value(order_pos, order.hash(order_bits));
+            .set_value(order_pos, order.hash());
         self.order_states.get_mut(&account_id).unwrap().insert(order_pos, order);
         let order_id: u32 = order.order_id;
         self.order_id_to_pos.insert((account_id, order_id), order_pos);

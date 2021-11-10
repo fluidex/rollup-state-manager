@@ -8,7 +8,7 @@ impl EncodingParam for TxDataEncoder {
         let mut ret = 0;
         let scheme_len = self.account_bits * 2 + self.token_bits * 2 + 40 * 1;
         ret = if ret < scheme_len { scheme_len } else { ret };
-        let scheme_len = self.account_bits * 2 + self.token_bits * 2 + 40 * 4 + self.order_bits * 2;
+        let scheme_len = 32 * 2 + self.account_bits * 2 + self.token_bits * 2 + 40 * 4 + self.order_bits * 2;
         ret = if ret < scheme_len { scheme_len } else { ret };
         let scheme_len = 1 * 1 + 254 * 1 + self.account_bits * 1;
         ret = if ret < scheme_len { scheme_len } else { ret };
@@ -52,10 +52,12 @@ impl EncodeForScheme for ForSpotTradeTx<'_> {
         encoder.encode_fr(&payload[tx_detail_idx::NEW_ORDER2_TOKEN_SELL], encoder.token_bits)?;
         encoder.encode_fr(&payload[tx_detail_idx::NEW_ORDER1_AMOUNT_SELL], 40)?;
         encoder.encode_fr(&payload[tx_detail_idx::NEW_ORDER1_AMOUNT_BUY], 40)?;
-        encoder.encode_fr(&payload[tx_detail_idx::NEW_ORDER1_ID], encoder.order_bits).ok();
+        encoder.encode_fr(&payload[tx_detail_idx::ORDER1_POS], encoder.order_bits)?;
+        encoder.encode_fr(&payload[tx_detail_idx::NEW_ORDER1_ID], 32).ok();
         encoder.encode_fr(&payload[tx_detail_idx::NEW_ORDER2_AMOUNT_SELL], 40)?;
         encoder.encode_fr(&payload[tx_detail_idx::NEW_ORDER2_AMOUNT_BUY], 40)?;
-        encoder.encode_fr(&payload[tx_detail_idx::NEW_ORDER2_ID], encoder.order_bits).ok();
+        encoder.encode_fr(&payload[tx_detail_idx::ORDER2_POS], encoder.order_bits)?;
+        encoder.encode_fr(&payload[tx_detail_idx::NEW_ORDER2_ID], 32).ok();
 
         Ok(())
     }

@@ -419,13 +419,6 @@ impl ManagerWrapper {
 
         let from_old_balance = state.get_token_balance(tx.from, tx.token_id);
         let to_old_balance = state.get_token_balance(tx.to, tx.token_id);
-        println!(
-            "transfer from {} to {} amount {} from_old_balance {}",
-            tx.from,
-            tx.to,
-            tx.amount.to_fr(),
-            from_old_balance
-        );
         assert!(
             from_old_balance >= tx.amount.to_fr(),
             "Transfer balance not enough {} < {}",
@@ -733,7 +726,7 @@ impl ManagerWrapper {
                 (trade.token_id_1to2, acc1_balance_sell_new),
                 (trade.token_id_2to1, acc1_balance_buy_new),
             ],
-            order_updates: vec![(order1_pos, order1.hash(state.order_bits()))],
+            order_updates: vec![(order1_pos, order1.hash())],
             ..Default::default()
         };
         let acc2_updates = AccountUpdates {
@@ -742,7 +735,7 @@ impl ManagerWrapper {
                 (trade.token_id_1to2, acc2_balance_buy_new),
                 (trade.token_id_2to1, acc2_balance_sell_new),
             ],
-            order_updates: vec![(order2_pos, order2.hash(state.order_bits()))],
+            order_updates: vec![(order2_pos, order2.hash())],
             ..Default::default()
         };
         state.batch_update(vec![acc1_updates, acc2_updates], true);

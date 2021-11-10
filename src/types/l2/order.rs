@@ -113,12 +113,10 @@ impl From<OrderInput> for Order {
 }
 
 impl Order {
-    pub fn hash(&self, orderlevel: usize) -> Fr {
+    pub fn hash(&self) -> Fr {
         let mut data = Fr::zero();
-        //TODO: data involved in hash should not exceed the range of pubdata has encoded
-        //so we have to truncate the order id here
-        //we should assess the security of this action
-        data.add_assign(&Fr::from_u32(self.order_id % (1 << orderlevel) as u32));
+        //notice we have to truncate the order id to 32bit
+        data.add_assign(&Fr::from_u32(self.order_id));
         data.add_assign(&self.token_buy.shl(32));
         data.add_assign(&self.token_sell.shl(64));
         Fr::hash(&[data, self.filled_sell, self.filled_buy, self.total_sell, self.total_buy])
@@ -147,10 +145,9 @@ impl Order {
 fn bench_order_sign() {
     use std::time::Instant;
     let mut order = Order::default();
-    let default_order_levels: usize = 5;
     let t1 = Instant::now();
     for _ in 0..99 {
-        order.hash(default_order_levels);
+        order.hash();
     }
     // safe version:
     //   order hash takes 7.18ms, debug mode
@@ -161,7 +158,7 @@ fn bench_order_sign() {
     println!("order hash takes {}ms", t1.elapsed().as_millis() as f64 / 100.0);
     let acc = Account::new(0);
     let t2 = Instant::now();
-    let hash = order.hash(default_order_levels);
+    let hash = order.hash();
     for _ in 0..99 {
         //order.sign_with(&acc).unwrap();
         order.sig = acc.sign_hash(hash).unwrap();
