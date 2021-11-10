@@ -2213,7 +2213,7 @@ dependencies = [
 [[package]]
 name = "orchestra"
 version = "0.1.0"
-source = "git+https://github.com/fluidex/orchestra.git?branch=master#17f2a3f92f1569b61e623d4743305f4af49fdcf6"
+source = "git+https://github.com/fluidex/orchestra.git?branch=refactor-token-balance-query#f28954beb5fe9a1abcd7b80d63d93de5e1ddb6d7"
 dependencies = [
  "prost 0.8.0",
  "serde 1.0.130",

@@ -126,4 +126,5 @@ jobs:
           cd ./examples/js/
           npx ts-node get_l2_block_by_id.ts
           npx ts-node get_token_balance.ts
+          npx ts-node rest_get_token_balance.ts
           npx ts-node rest_get_l2_blocks.ts
