@@ -42,7 +42,9 @@ async function mainTest() {
   await sleep(1000);
   await kafkaProducer.Stop();
 
-  await getTokenBalanceTest();
+  await testGetTokenBalanceByTokenId();
+  await testGetTokenBalanceByTokenName();
+
   await getL2BlockTest();
 }
 
@@ -64,14 +66,26 @@ async function depositBalance() {
   ]);
 }
 
-async function getTokenBalanceTest() {
-  // const res = await grpcClient.tokenBalanceQuery(userId, tokenId, "", "");
-  const res = await grpcClient.tokenBalanceQuery(userId, 999, "", "ETH"); // test ignoring token_id by providing token_name
+async function testGetTokenBalanceByTokenId() {
+  console.log("testGetTokenBalanceByTokenId Begin");
+
+  const res = await grpcClient.tokenBalanceQuery(userId, tokenId, null, null);
   assert.equal(res["balance"], "3.0000");
   assert.equal(res["balance_raw"], "30000");
   assert.equal(res["precision"], 4);
 
-  console.log("getTokenBalanceTest passed");
+  console.log("testGetTokenBalanceByTokenId End");
+}
+
+async function testGetTokenBalanceByTokenName() {
+  console.log("testGetTokenBalanceByTokenName Begin");
+
+  const res = await grpcClient.tokenBalanceQuery(userId, null, null, "ETH");
+  assert.equal(res["balance"], "3.0000");
+  assert.equal(res["balance_raw"], "30000");
+  assert.equal(res["precision"], 4);
+
+  console.log("testGetTokenBalanceByTokenName End");
 }
 
 async function getL2BlockTest() {

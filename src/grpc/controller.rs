@@ -200,12 +200,17 @@ impl Controller {
     }
 
     pub fn token_balance_query(&self, request: TokenBalanceQueryRequest) -> Result<TokenBalanceQueryResponse, Status> {
-        let token_id = if !request.token_address.is_empty() {
+        let token_id = if let Some(token_id) = request.token_id {
+            token_id
+        } else if let Some(_token_address) = request.token_address {
             unimplemented!()
-        } else if !request.token_name.is_empty() {
-            get_token_id_by_name(&request.token_name)
+        } else if let Some(token_name) = request.token_name {
+            get_token_id_by_name(&token_name)
         } else {
-            request.token_id
+            return Err(Status::new(
+                Code::InvalidArgument,
+                "Must specify one of token_id, token_address or token_name",
+            ));
         };
 
         let balance = self.state.read().unwrap().get_token_balance(request.account_id, token_id);
