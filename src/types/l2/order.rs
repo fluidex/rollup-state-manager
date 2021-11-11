@@ -115,6 +115,7 @@ impl From<OrderInput> for Order {
 impl Order {
     pub fn hash(&self) -> Fr {
         let mut data = Fr::zero();
+        //notice we have to truncate the order id to 32bit
         data.add_assign(&Fr::from_u32(self.order_id));
         data.add_assign(&self.token_buy.shl(32));
         data.add_assign(&self.token_sell.shl(64));

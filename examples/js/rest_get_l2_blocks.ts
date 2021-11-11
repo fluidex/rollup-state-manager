@@ -23,6 +23,7 @@ async function getL2BlocksTest() {
 
   const time_now_milliseconds = dayjs().valueOf();
 
+  //notice the arry of blocks start from the latest block
   let block = res["blocks"][0];
   assert.equal(block["block_height"], "2");
   assert(block["block_time"] <= time_now_milliseconds);
