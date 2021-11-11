@@ -157,18 +157,34 @@ impl Controller {
                     let token_id_1to2 = tx[tx_detail_idx::NEW_ORDER1_TOKEN_SELL].0.to_u32();
                     let token_id_2to1 = tx[tx_detail_idx::NEW_ORDER2_TOKEN_SELL].0.to_u32();
 
-                    let amount_1to2 = Decimal::try_from_i128_with_scale(
-                        tx[tx_detail_idx::AMOUNT1].0.to_bigint().to_i128().unwrap(),
-                        prec_token_id(token_id_1to2),
-                    )
-                    .unwrap()
-                    .to_string();
-                    let amount_2to1 = Decimal::try_from_i128_with_scale(
-                        tx[tx_detail_idx::AMOUNT2].0.to_bigint().to_i128().unwrap(),
-                        prec_token_id(token_id_2to1),
-                    )
-                    .unwrap()
-                    .to_string();
+                    let amount1 = tx[tx_detail_idx::AMOUNT1].0;
+                    let amount2 = tx[tx_detail_idx::AMOUNT2].0;
+
+                    let balance1 = tx[tx_detail_idx::BALANCE1].0;
+                    let balance2 = tx[tx_detail_idx::BALANCE2].0;
+                    let balance3 = tx[tx_detail_idx::BALANCE3].0;
+                    let balance4 = tx[tx_detail_idx::BALANCE4].0;
+
+                    let precision_1to2 = prec_token_id(token_id_1to2);
+                    let precision_2to1 = prec_token_id(token_id_2to1);
+
+                    let amount_1to2 =
+                        Decimal::try_from_i128_with_scale(amount1.to_bigint().to_i128().unwrap(), prec_token_id(token_id_1to2))
+                            .unwrap()
+                            .to_string();
+                    let amount_2to1 =
+                        Decimal::try_from_i128_with_scale(amount2.to_bigint().to_i128().unwrap(), prec_token_id(token_id_2to1))
+                            .unwrap()
+                            .to_string();
+
+                    let account1_token_sell_old_balance = balance1.to_decimal(precision_1to2).to_string();
+                    let account1_token_sell_new_balance = balance1.sub(&amount1).to_decimal(precision_1to2).to_string();
+                    let account1_token_buy_old_balance = balance4.sub(&amount2).to_decimal(precision_2to1).to_string();
+                    let account1_token_buy_new_balance = balance4.to_decimal(precision_2to1).to_string();
+                    let account2_token_sell_old_balance = balance3.to_decimal(precision_2to1).to_string();
+                    let account2_token_sell_new_balance = balance3.sub(&amount2).to_decimal(precision_2to1).to_string();
+                    let account2_token_buy_old_balance = balance2.sub(&amount2).to_decimal(precision_1to2).to_string();
+                    let account2_token_buy_new_balance = balance2.to_decimal(precision_1to2).to_string();
 
                     decoded_tx.spot_trade_tx = Some(SpotTradeTx {
                         order1_account_id,
@@ -177,6 +193,14 @@ impl Controller {
                         token_id_2to1,
                         amount_1to2,
                         amount_2to1,
+                        account1_token_buy_new_balance,
+                        account1_token_buy_old_balance,
+                        account1_token_sell_new_balance,
+                        account1_token_sell_old_balance,
+                        account2_token_buy_new_balance,
+                        account2_token_buy_old_balance,
+                        account2_token_sell_new_balance,
+                        account2_token_sell_old_balance,
                     })
                 }
                 _ => (),
