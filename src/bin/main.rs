@@ -226,12 +226,13 @@ async fn save_block_to_db(pool: &PgPool, block: &L2Block) -> anyhow::Result<()> 
     let new_root = block.detail.new_root.to_hex_string();
     let detail = L2BlockSerde::from(block.detail.clone());
     sqlx::query(&format!(
-        "insert into {} (block_id, new_root, detail) values ($1, $2, $3)",
+        "insert into {} (block_id, new_root, detail, raw_public_data) values ($1, $2, $3, $4)",
         tablenames::L2_BLOCK
     ))
     .bind(block.block_id as u32)
     .bind(new_root)
     .bind(sqlx::types::Json(detail))
+    .bind(&block.public_data)
     .execute(pool)
     .await?;
 

@@ -177,9 +177,9 @@ dependencies = [
 
 [[package]]
 name = "auto_impl"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42cbf586c80ada5e5ccdecae80d3ef0854f224e2dd74435f8d87e6831b8d0a38"
+checksum = "7862e21c893d65a1650125d157eaeec691439379a1cee17ee49031b79236ada4"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -445,9 +445,9 @@ dependencies = [
 
 [[package]]
 name = "cargo_metadata"
-version = "0.14.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c297bd3135f558552f99a0daa180876984ea2c4ffa7470314540dff8c654109a"
+checksum = "ba2ae6de944143141f6155a473a6b02f66c7c3f9f47316f802f80204ebfe6e12"
 dependencies = [
  "camino",
  "cargo-platform",
@@ -951,7 +951,7 @@ dependencies = [
 [[package]]
 name = "ethers"
 version = "0.5.3"
-source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
+source = "git+https://github.com/gakonst/ethers-rs#203b2e8ea303f36111968f8a143a03e50ecb98b2"
 dependencies = [
  "ethers-contract",
  "ethers-core",
@@ -964,7 +964,7 @@ dependencies = [
 [[package]]
 name = "ethers-contract"
 version = "0.5.3"
-source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
+source = "git+https://github.com/gakonst/ethers-rs#203b2e8ea303f36111968f8a143a03e50ecb98b2"
 dependencies = [
  "ethers-contract-abigen",
  "ethers-contract-derive",
@@ -982,11 +982,10 @@ dependencies = [
 [[package]]
 name = "ethers-contract-abigen"
 version = "0.5.3"
-source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
+source = "git+https://github.com/gakonst/ethers-rs#203b2e8ea303f36111968f8a143a03e50ecb98b2"
 dependencies = [
  "Inflector",
  "anyhow",
- "cargo_metadata",
  "cfg-if",
  "ethers-core",
  "getrandom",
@@ -1004,7 +1003,7 @@ dependencies = [
 [[package]]
 name = "ethers-contract-derive"
 version = "0.5.3"
-source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
+source = "git+https://github.com/gakonst/ethers-rs#203b2e8ea303f36111968f8a143a03e50ecb98b2"
 dependencies = [
  "ethers-contract-abigen",
  "ethers-core",
@@ -1018,10 +1017,11 @@ dependencies = [
 [[package]]
 name = "ethers-core"
 version = "0.5.4"
-source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
+source = "git+https://github.com/gakonst/ethers-rs#203b2e8ea303f36111968f8a143a03e50ecb98b2"
 dependencies = [
  "arrayvec 0.7.2",
  "bytes",
+ "cargo_metadata",
  "convert_case",
  "ecdsa",
  "elliptic-curve",
@@ -1045,7 +1045,7 @@ dependencies = [
 [[package]]
 name = "ethers-middleware"
 version = "0.5.3"
-source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
+source = "git+https://github.com/gakonst/ethers-rs#203b2e8ea303f36111968f8a143a03e50ecb98b2"
 dependencies = [
  "async-trait",
  "ethers-contract",
@@ -1068,7 +1068,7 @@ dependencies = [
 [[package]]
 name = "ethers-providers"
 version = "0.5.4"
-source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
+source = "git+https://github.com/gakonst/ethers-rs#203b2e8ea303f36111968f8a143a03e50ecb98b2"
 dependencies = [
  "async-trait",
  "auto_impl",
@@ -1097,7 +1097,7 @@ dependencies = [
 [[package]]
 name = "ethers-signers"
 version = "0.5.3"
-source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
+source = "git+https://github.com/gakonst/ethers-rs#203b2e8ea303f36111968f8a143a03e50ecb98b2"
 dependencies = [
  "async-trait",
  "coins-bip32",
@@ -1117,7 +1117,7 @@ dependencies = [
 [[package]]
 name = "ethers-solc"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/ethers-rs#6bf45a0b5d320809366d2aedfcda68b957e9fc2e"
+source = "git+https://github.com/gakonst/ethers-rs#203b2e8ea303f36111968f8a143a03e50ecb98b2"
 dependencies = [
  "colored",
  "ethers-core",
@@ -1194,7 +1194,7 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 [[package]]
 name = "fluidex-common"
 version = "0.1.0"
-source = "git+https://github.com/fluidex/common-rs?branch=master#656ef50fc63c025efe2c40298467b595be7f895a"
+source = "git+https://github.com/fluidex/common-rs?branch=master#769e979cf6efef9b157b3b00873e2d5ed4c94d5b"
 dependencies = [
  "anyhow",
  "babyjubjub-rs",
