@@ -242,10 +242,11 @@ impl ManagerWrapper {
         let new_account_roots: Vec<Fr> = buffered_txs.iter().map(|tx| tx.root_after).collect();
         //calc tx-pubdata's hash
         buffered_txs.iter().for_each(|tx| encode_rawtx_to_pubdata(tx, encoder).unwrap());
+        let (txdata_hash, public_data) = encoder.finish_with_raw();
         let detail = L2BlockDetail {
             old_root: *old_account_roots.first().unwrap(),
             new_root: *new_account_roots.last().unwrap(),
-            txdata_hash: encoder.finish(),
+            txdata_hash,
             txs_type,
             encoded_txs,
             balance_path_elements,
@@ -255,7 +256,11 @@ impl ManagerWrapper {
             old_account_roots,
             new_account_roots,
         };
-        L2Block { block_id, detail }
+        L2Block {
+            block_id,
+            detail,
+            public_data,
+        }
     }
     pub fn has_raw_tx(&self) -> bool {
         !self.buffered_txs.is_empty()

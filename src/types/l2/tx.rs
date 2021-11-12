@@ -380,9 +380,15 @@ impl TxDataEncoder {
 
     //finish encoding, output the result hash, and prepare for next encoding
     pub fn finish(&mut self) -> U256 {
-        let encoded_bytes = self.ctx.replace(BitEncodeContext::new()).unwrap().seal();
+        let (hash, _) = self.finish_with_raw();
         //        println!("{:02x?}", &encoded_bytes);
-        U256::from_big_endian(&sha2::Sha256::digest(&encoded_bytes))
+        hash
+    }
+
+    pub fn finish_with_raw(&mut self) -> (U256, Vec<u8>) {
+        let encoded_bytes = self.ctx.replace(BitEncodeContext::new()).unwrap().seal();
+        let hash = U256::from_big_endian(&sha2::Sha256::digest(&encoded_bytes));
+        (hash, encoded_bytes)
     }
 }
 

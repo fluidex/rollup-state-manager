@@ -23,4 +23,5 @@ pub struct L2BlockDetail {
 pub struct L2Block {
     pub block_id: usize,
     pub detail: L2BlockDetail,
+    pub public_data: Vec<u8>,
 }
