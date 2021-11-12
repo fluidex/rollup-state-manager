@@ -183,7 +183,7 @@ impl Controller {
                     let account1_token_buy_new_balance = balance4.to_decimal(precision_2to1).to_string();
                     let account2_token_sell_old_balance = balance3.to_decimal(precision_2to1).to_string();
                     let account2_token_sell_new_balance = balance3.sub(&amount2).to_decimal(precision_2to1).to_string();
-                    let account2_token_buy_old_balance = balance2.sub(&amount2).to_decimal(precision_1to2).to_string();
+                    let account2_token_buy_old_balance = balance2.sub(&amount1).to_decimal(precision_1to2).to_string();
                     let account2_token_buy_new_balance = balance2.to_decimal(precision_1to2).to_string();
 
                     decoded_tx.spot_trade_tx = Some(SpotTradeTx {
