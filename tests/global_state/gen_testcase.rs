@@ -20,6 +20,8 @@ use rollup_state_manager::config::Settings;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
 use std::option::Option::None;
 
+const N_TXS: usize = 2;
+
 fn replay_msgs(
     msg_receiver: crossbeam_channel::Receiver<WrappedMessage>,
     block_sender: crossbeam_channel::Sender<L2Block>,
@@ -31,7 +33,7 @@ fn replay_msgs(
             *params::ACCOUNTLEVELS,
             *params::VERBOSE,
         )));
-        let mut manager = ManagerWrapper::new(state, *params::NTXS, None, *params::VERBOSE);
+        let mut manager = ManagerWrapper::new(state, vec![N_TXS], None, *params::VERBOSE);
 
         println!("genesis root {}", manager.root());
 
@@ -65,9 +67,10 @@ fn replay_msgs(
                 }
             }
         }
-        manager.flush_with_nop();
 
-        for block in manager.pop_all_blocks() {
+        let mut tx_num = 0;
+        for block in manager.pop_all_blocks(true) {
+            tx_num += block.detail.encoded_txs.len();
             block_sender.try_send(block).unwrap();
         }
 
@@ -83,7 +86,7 @@ fn replay_msgs(
         println!(
             "genesis {} blocks (TPS: {})",
             block_num,
-            (*params::NTXS * block_num) as f32 / timing.elapsed().as_secs_f32()
+            tx_num as f32 / timing.elapsed().as_secs_f32()
         );
         Ok(())
     }))
@@ -114,7 +117,7 @@ pub fn export_circuit_and_testdata(circuit_repo: &Path, blocks: Vec<L2Block>) ->
             src: String::from("src/block.circom"),
             main: format!(
                 "Block({}, {}, {}, {})",
-                *params::NTXS,
+                N_TXS,
                 *params::BALANCELEVELS,
                 *params::ORDERLEVELS,
                 *params::ACCOUNTLEVELS

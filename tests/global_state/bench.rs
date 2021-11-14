@@ -21,6 +21,8 @@ use std::time::Instant;
 #[cfg(not(feature = "windows_build"))]
 use {pprof::protos::Message, std::io::Write};
 
+const N_TXS: usize = 2;
+
 fn bench_with_dummy_transfers() -> Result<()> {
     GlobalState::print_config();
     let state = Arc::new(RwLock::new(GlobalState::new(
@@ -35,7 +37,7 @@ fn bench_with_dummy_transfers() -> Result<()> {
         ..Default::default()
     };
 
-    let mut manager = ManagerWrapper::new(state, *params::NTXS, None, *params::VERBOSE);
+    let mut manager = ManagerWrapper::new(state, vec![N_TXS], None, *params::VERBOSE);
 
     // step1: create users
     let user1 = Account::from_mnemonic(1, &get_mnemonic_by_account_id(1)).unwrap();
@@ -124,7 +126,7 @@ fn bench_with_real_trades(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
     // by clone accounts with same trades
     let loop_num = 50;
 
-    let mut manager = ManagerWrapper::new(state, *params::NTXS, None, *params::VERBOSE);
+    let mut manager = ManagerWrapper::new(state, vec![N_TXS], None, *params::VERBOSE);
     let timing = Instant::now();
     let mut inner_timing = Instant::now();
 
@@ -193,11 +195,12 @@ fn bench_with_real_trades(_circuit_repo: &Path) -> Result<Vec<l2::L2Block>> {
         //println!("\nepoch {} done", i);
     }
 
-    let blocks: Vec<_> = manager.pop_all_blocks();
+    let blocks: Vec<_> = manager.pop_all_blocks(true);
+    let tx_num = blocks.iter().fold(0, |acc, b| acc + b.detail.encoded_txs.len());
     println!(
         "bench for {} blocks (TPS: {})",
         blocks.len(),
-        (*params::NTXS * blocks.len()) as f32 / timing.elapsed().as_secs_f32()
+        tx_num as f32 / timing.elapsed().as_secs_f32()
     );
     Ok(blocks)
 }

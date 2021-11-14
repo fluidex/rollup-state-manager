@@ -24,11 +24,9 @@ use std::time::Instant;
 // TODO: too many unwrap here
 pub struct ManagerWrapper {
     state: Arc<RwLock<GlobalState>>,
-    n_tx: usize,
-    // 0 <= len(buffered_txs) < n_tx
+    tx_slot_nums: Vec<usize>,
     buffered_txs: Vec<RawTx>,
     block_generate_num: usize,
-    //buffered_blocks: Vec<L2Block>,
     tx_data_encoder: TxDataEncoder,
     verbose: bool,
     verify_sig: bool,
@@ -156,7 +154,7 @@ impl ManagerWrapper {
     pub fn print_config() {
         Tree::print_config();
     }
-    pub fn new(state: Arc<RwLock<GlobalState>>, n_tx: usize, block_offset: Option<usize>, verbose: bool) -> Self {
+    pub fn new(state: Arc<RwLock<GlobalState>>, tx_slot_nums: Vec<usize>, block_offset: Option<usize>, verbose: bool) -> Self {
         let tx_data_encoder = {
             let st = state.read().unwrap();
             TxDataEncoder::new(st.balance_bits() as u32, st.order_bits() as u32, st.account_bits() as u32)
@@ -164,10 +162,9 @@ impl ManagerWrapper {
 
         Self {
             state,
-            n_tx,
+            tx_slot_nums,
             buffered_txs: Vec::new(),
             block_generate_num: block_offset.unwrap_or(0),
-            //buffered_blocks: Vec::new(),
             tx_data_encoder,
             verbose,
             verify_sig: true,
@@ -802,15 +799,6 @@ impl ManagerWrapper {
         self.add_raw_tx(raw_tx);
     }
 
-    pub fn flush_with_nop(&mut self) {
-        let mut cnt = 0;
-        while self.buffered_txs.len() % self.n_tx != 0 {
-            self.nop();
-            cnt += 1;
-        }
-        log::debug!("flush with {} nop", cnt);
-    }
-
     pub fn check_sig(&self, account_id: u32, msg: &Fr, sig: &SignatureBJJ) -> anyhow::Result<()> {
         let state = self.state();
         if !state.has_account(account_id) {
@@ -826,14 +814,46 @@ impl ManagerWrapper {
         Ok(())
     }
 
-    pub fn pop_all_blocks(&mut self) -> Vec<L2Block> {
+    pub fn pop_all_blocks(&mut self, need_to_flush: bool) -> Vec<L2Block> {
         let mut blocks = vec![];
+        self.generate_blocks(&mut blocks);
+        if need_to_flush {
+            self.flush_with_nop();
+            self.generate_blocks(&mut blocks);
+        }
+        blocks
+    }
+
+    fn flush_with_nop(&mut self) {
         let mut i = 0;
-        let len = self.buffered_txs.len();
-        while i + self.n_tx <= len {
+        let tx_count = self.buffered_txs.len();
+        loop {
+            let tx_slot_num = self.calculate_tx_slot_num(tx_count - i);
+            if i + tx_slot_num > tx_count {
+                break;
+            }
+
+            i += tx_slot_num;
+        }
+
+        for _ in 0..tx_count - i {
+            self.nop();
+        }
+
+        log::debug!("flush with {} nop", i);
+    }
+
+    fn generate_blocks(&mut self, blocks: &mut Vec<L2Block>) {
+        let mut i = 0;
+        let tx_count = self.buffered_txs.len();
+        loop {
+            let tx_slot_num = self.calculate_tx_slot_num(tx_count - i);
+            if i + tx_slot_num > tx_count {
+                break;
+            }
             let block = Self::forge_with_txs(
                 self.block_generate_num,
-                &self.buffered_txs[i..i + self.n_tx],
+                &self.buffered_txs[i..i + tx_slot_num],
                 &mut self.tx_data_encoder,
             );
             blocks.push(block);
@@ -841,24 +861,31 @@ impl ManagerWrapper {
             self.block_generate_num += 1;
 
             #[cfg(feature = "persist_sled")]
-            // TODO: fix unwrap
             if self.block_generate_num % Settings::persist_every_n_block() == 0 {
-                self.persist(i)
+                self.persist(i, tx_slot_num);
             }
 
-            i += self.n_tx;
+            i += tx_slot_num;
         }
         self.buffered_txs.drain(0..i);
-        blocks
+    }
+
+    fn calculate_tx_slot_num(&self, tx_count: usize) -> usize {
+        *self
+            .tx_slot_nums
+            .iter()
+            .rev()
+            .find(|&slot_num| tx_count > slot_num * 10)
+            .unwrap_or(&self.tx_slot_nums[0])
     }
 
     #[cfg(feature = "persist_sled")]
-    fn persist(&mut self, i: usize) {
+    fn persist(&mut self, i: usize, tx_slot_num: usize) {
         log::info!("start to dump #{}", self.block_generate_num);
         let start = Instant::now();
-        let last_offset = self.buffered_txs[i..i + self.n_tx].iter().rev().filter_map(|tx| tx.offset).next();
+        let last_offset = self.buffered_txs[i..i + tx_slot_num].iter().rev().filter_map(|tx| tx.offset).next();
         if log::log_enabled!(log::Level::Debug) {
-            let offsets: Vec<Option<i64>> = self.buffered_txs[i..i + self.n_tx].iter().map(|tx| tx.offset).collect();
+            let offsets: Vec<Option<i64>> = self.buffered_txs[i..i + tx_slot_num].iter().map(|tx| tx.offset).collect();
             log::debug!("block #{}, offsets: {:?}", self.block_generate_num, offsets);
         }
         if last_offset.is_none() {
@@ -911,7 +938,7 @@ mod test {
         Settings::set(s);
 
         let gs = GlobalState::new(2, 3, 2, false);
-        let mut wrapper = ManagerWrapper::new(Arc::new(RwLock::new(gs)), 2, None, false);
+        let mut wrapper = ManagerWrapper::new(Arc::new(RwLock::new(gs)), vec![2], None, false);
 
         let key1 = L2Key {
             eth_addr: Fr::zero(),
@@ -996,7 +1023,7 @@ mod test {
             )
             .unwrap();
 
-        let blks = wrapper.pop_all_blocks();
+        let blks = wrapper.pop_all_blocks(true);
         assert_eq!(blks[0].detail.txdata_hash.low_u128(), 210768282952759810590552623169132871868u128);
         assert_eq!(blks[1].detail.txdata_hash.low_u128(), 159409240260550832134647856072165320498u128);
         assert_eq!(blks[2].detail.txdata_hash.low_u128(), 4036618609204034397054436922352855460u128);

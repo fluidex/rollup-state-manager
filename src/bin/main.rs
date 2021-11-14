@@ -72,7 +72,7 @@ fn process_msgs(
             None
         };
 
-        let manager = ManagerWrapper::new(state, *params::NTXS, block_offset, *params::VERBOSE);
+        let manager = ManagerWrapper::new(state, (*params::TX_SLOT_NUMS).clone(), block_offset, *params::VERBOSE);
         // TODO: change to to_hex_string, remove 'Fr(' and ')'
         log::info!("genesis root {}", manager.root().to_string());
 
@@ -125,11 +125,12 @@ fn run_msg_processor(
         let db_pool = PgPool::connect(Settings::db()).await.unwrap();
         let mut old_block_check = true;
         let mut old_block_num = 0;
+        let mut tx_num = 0;
         loop {
             // In the worst case we wait for about 119 seconds timeout until we try to
             // generate a block, if there's any tx.
             // TODO: dynamic timeout
-            match msg_receiver.recv_timeout(Duration::from_secs(120)) {
+            let need_to_flush = match msg_receiver.recv_timeout(Duration::from_secs(120)) {
                 Ok(msg) => {
                     log::debug!("recv new msg {:?}", msg);
                     match msg {
@@ -152,18 +153,15 @@ fn run_msg_processor(
                             processor.handle_withdraw_msg(&mut manager, withdraw);
                         }
                     }
+                    false
                 }
                 Err(err) => match err {
-                    RecvTimeoutError::Timeout => {
-                        if manager.has_raw_tx() {
-                            manager.flush_with_nop();
-                        }
-                    }
+                    RecvTimeoutError::Timeout => true,
                     RecvTimeoutError::Disconnected => break,
                 },
             };
 
-            for block in manager.pop_all_blocks() {
+            for block in manager.pop_all_blocks(need_to_flush) {
                 if old_block_check && is_present_block(&db_pool, &block).await.unwrap() {
                     // Skips this old block.
                     old_block_num += 1;
@@ -173,17 +171,18 @@ fn run_msg_processor(
                 // Once the block is a new one, no need to check if old.
                 old_block_check = false;
 
+                tx_num += block.detail.encoded_txs.len();
                 block_sender.try_send(block).unwrap();
             }
 
             let block_num = manager.get_block_generate_num() - old_block_num;
             let secs = timing.elapsed().as_secs_f32();
             log::info!(
-                "generate {} blocks with block_size {} in {}s: average TPS: {}",
+                "generate {} blocks with dynamic block_size {:?} in {}s: average TPS: {}",
                 block_num,
-                *params::NTXS,
+                *params::TX_SLOT_NUMS,
                 secs,
-                (*params::NTXS * block_num) as f32 / secs
+                tx_num as f32 / secs
             );
         }
 
