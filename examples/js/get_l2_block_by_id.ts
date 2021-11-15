@@ -153,14 +153,14 @@ async function testBlock1() {
   const tx1 = res["decoded_txs"][0]["deposit_tx"];
   assert.equal(tx1["account_id"], userId1);
   assert.equal(tx1["token_id"], 1);
-  assert.equal(tx1["amount"], "500000");
+  assert.equal(tx1["amount"], "500000.000000");
   assert.equal(tx1["old_balance"], "0.000000");
   assert.equal(tx1["new_balance"], "500000.000000");
 
   const tx2 = res["decoded_txs"][1]["withdraw_tx"];
   assert.equal(tx2["account_id"], userId1);
   assert.equal(tx2["token_id"], 1);
-  assert.equal(tx2["amount"], "100");
+  assert.equal(tx2["amount"], "100.000000");
   assert.equal(tx2["old_balance"], "500000.000000");
   assert.equal(tx2["new_balance"], "499900.000000");
 
