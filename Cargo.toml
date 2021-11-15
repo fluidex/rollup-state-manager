@@ -14,7 +14,7 @@ config_rs = { package = "config", version = "0.10.1" }
 crossbeam-channel = "0.5.1"
 dotenv = "0.15.0"
 ethers = { git = "https://github.com/gakonst/ethers-rs" }
-fluidex-common = { git = "https://github.com/fluidex/common-rs", branch = "call-rescale-for-amount-type-format", features = [ "kafka", "l2-account", "non-blocking-tracing", "rollup-state-db" ] }
+fluidex-common = { git = "https://github.com/fluidex/common-rs", branch = "master", features = [ "kafka", "l2-account", "non-blocking-tracing", "rollup-state-db" ] }
 futures = "0.3.13"
 hex = "0.4.3"
 lazy_static = "1.4.0"

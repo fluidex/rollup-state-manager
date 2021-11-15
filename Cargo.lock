@@ -1194,7 +1194,7 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 [[package]]
 name = "fluidex-common"
 version = "0.1.0"
-source = "git+https://github.com/fluidex/common-rs?branch=call-rescale-for-amount-type-format#6028b1b1eeaa362b38d92921abd4f1ada572bd2f"
+source = "git+https://github.com/fluidex/common-rs?branch=master#f277677d893feb5eecd30d399a8ccb96efaf1a23"
 dependencies = [
  "anyhow",
  "babyjubjub-rs",
