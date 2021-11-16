@@ -2,17 +2,11 @@
 #![allow(dead_code)]
 
 use crossbeam_channel::RecvTimeoutError;
+use fluidex_common::db::models::tablenames;
+use fluidex_common::db::models::task::TaskStatus;
+use fluidex_common::db::MIGRATOR;
 use fluidex_common::non_blocking_tracing;
-use fluidex_common::{
-    db::{
-        models::{
-            tablenames,
-            task::{CircuitType, TaskStatus},
-        },
-        MIGRATOR,
-    },
-    types::FrExt,
-};
+use fluidex_common::types::FrExt;
 use rollup_state_manager::config::Settings;
 use rollup_state_manager::grpc::run_grpc_server;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
@@ -240,6 +234,7 @@ async fn save_block_to_db(pool: &PgPool, block: &L2Block) -> anyhow::Result<()> 
 }
 
 async fn save_task_to_db(pool: &PgPool, block: L2Block) -> anyhow::Result<()> {
+    let tx_num = block.detail.encoded_txs.len();
     let input = L2BlockSerde::from(block.detail);
     let task_id = unique_task_id();
 
@@ -248,7 +243,7 @@ async fn save_task_to_db(pool: &PgPool, block: L2Block) -> anyhow::Result<()> {
         tablenames::TASK
     ))
     .bind(task_id)
-    .bind(CircuitType::BLOCK)
+    .bind(format!("block_{}", tx_num))
     .bind(block.block_id as i64) // TODO: will it overflow?
     .bind(sqlx::types::Json(input))
     .bind(TaskStatus::Inited)
