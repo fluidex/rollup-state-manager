@@ -15,3 +15,6 @@ startall:
 
 taillogs:
 	tail -n 15 logs/*
+
+shfmt:
+	shfmt -i 2 -sr -w scripts/*.sh
