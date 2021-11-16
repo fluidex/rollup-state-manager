@@ -2,9 +2,9 @@
 #![allow(dead_code)]
 
 use crossbeam_channel::RecvTimeoutError;
-use fluidex_common::db::MIGRATOR;
 use fluidex_common::db::models::tablenames;
 use fluidex_common::db::models::task::TaskStatus;
+use fluidex_common::db::MIGRATOR;
 use fluidex_common::non_blocking_tracing;
 use fluidex_common::types::FrExt;
 use rollup_state_manager::config::Settings;
@@ -15,8 +15,8 @@ use rollup_state_manager::r#const::sled_db::*;
 use rollup_state_manager::state::{GlobalState, ManagerWrapper};
 use rollup_state_manager::test_utils::messages::WrappedMessage;
 use rollup_state_manager::types::l2::{L2Block, L2BlockSerde};
-use sqlx::Row;
 use sqlx::postgres::PgPool;
+use sqlx::Row;
 use std::option::Option::None;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
