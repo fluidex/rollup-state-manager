@@ -14,6 +14,8 @@ use rollup_state_manager::params;
 use std::option::Option::None;
 use std::sync::{Arc, RwLock};
 
+const N_TXS: usize = 2;
+
 pub struct Block {
     n_txs: usize,
     account_levels: usize,
@@ -62,7 +64,7 @@ impl Block {
             self.verbose,
         )));
         let (sender, receiver) = crossbeam_channel::bounded(100);
-        let mut manager = ManagerWrapper::new(state, self.n_txs, None, self.verbose);
+        let mut manager = ManagerWrapper::new(state, vec![self.n_txs], None, self.verbose);
 
         let token_id0 = 0;
         let token_id1 = 1;
@@ -235,9 +237,7 @@ impl Block {
         };
         manager.full_spot_trade(full_trade, None);
 
-        manager.flush_with_nop();
-
-        for block in manager.pop_all_blocks() {
+        for block in manager.pop_all_blocks(true) {
             sender.try_send(block).unwrap();
         }
 
@@ -260,13 +260,12 @@ impl Block {
             self.verbose,
         )));
         let (sender, receiver) = crossbeam_channel::bounded(100);
-        let mut manager = ManagerWrapper::new(state, self.n_txs, None, self.verbose);
+        let mut manager = ManagerWrapper::new(state, vec![self.n_txs], None, self.verbose);
         // we need to have at least 1 account
         manager.create_new_account(1).unwrap();
         manager.nop();
-        manager.flush_with_nop();
 
-        for block in manager.pop_all_blocks() {
+        for block in manager.pop_all_blocks(true) {
             sender.try_send(block).unwrap();
         }
 
@@ -282,13 +281,13 @@ impl Block {
 pub fn get_l2_block_test_case() -> CircuitTestCase {
     let main = format!(
         "Block({}, {}, {}, {})",
-        *params::NTXS,
+        N_TXS,
         *params::BALANCELEVELS,
         *params::ORDERLEVELS,
         *params::ACCOUNTLEVELS
     );
     let test_data = Block::new(
-        *params::NTXS,
+        N_TXS,
         *params::BALANCELEVELS,
         *params::ORDERLEVELS,
         *params::ACCOUNTLEVELS,

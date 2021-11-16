@@ -2888,6 +2888,7 @@ dependencies = [
  "fluidex-common",
  "futures",
  "hex",
+ "itertools 0.10.1",
  "lazy_static",
  "log",
  "num",

@@ -17,6 +17,7 @@ ethers = { git = "https://github.com/gakonst/ethers-rs" }
 fluidex-common = { git = "https://github.com/fluidex/common-rs", branch = "master", features = [ "kafka", "l2-account", "non-blocking-tracing", "rollup-state-db" ] }
 futures = "0.3.13"
 hex = "0.4.3"
+itertools = "0.10.0"
 lazy_static = "1.4.0"
 log = "0.4"
 num = "0.4.0"
