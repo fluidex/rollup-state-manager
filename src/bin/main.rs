@@ -11,6 +11,7 @@ use rollup_state_manager::config::Settings;
 use rollup_state_manager::grpc::run_grpc_server;
 use rollup_state_manager::msg::{msg_loader, msg_processor};
 use rollup_state_manager::params;
+#[cfg(feature = "persist_sled")]
 use rollup_state_manager::r#const::sled_db::*;
 use rollup_state_manager::state::{GlobalState, ManagerWrapper};
 use rollup_state_manager::test_utils::messages::WrappedMessage;
@@ -23,7 +24,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::{fs, io};
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() {
     dotenv::dotenv().ok();
     let _guard = non_blocking_tracing::setup();
     log::info!("state_keeper started");
@@ -31,18 +32,7 @@ async fn main() -> anyhow::Result<()> {
     Settings::init_default();
     log::debug!("{:?}", Settings::get());
 
-    let last_dump = get_latest_dump()?;
-    if let Some(id) = last_dump {
-        log::info!("found dump #{}", id);
-        let db = sled::open(Settings::persist_dir().join(format!("{}.db", id)))?;
-        let last_offset = db.get(KAFKA_OFFSET_KEY)?.unwrap();
-        let last_offset: i64 = bincode::deserialize(&last_offset)?;
-        run(Some(last_offset), Some(db)).await;
-    } else {
-        run(None, None).await;
-    }
-
-    Ok(())
+    run().await;
 }
 
 fn grpc_run(state: Arc<RwLock<GlobalState>>) -> Option<std::thread::JoinHandle<anyhow::Result<()>>> {
@@ -56,16 +46,9 @@ fn process_msgs(
     msg_receiver: crossbeam_channel::Receiver<WrappedMessage>,
     block_sender: crossbeam_channel::Sender<L2Block>,
     state: Arc<RwLock<GlobalState>>,
-    db: Option<sled::Db>,
+    block_offset: Option<usize>,
 ) -> Option<std::thread::JoinHandle<anyhow::Result<()>>> {
     Some(std::thread::spawn(move || {
-        let block_offset: Option<usize> = if let Some(db) = db {
-            state.write().unwrap().load_persist(&db).unwrap();
-            db.get(BLOCK_OFFSET_KEY).ok().flatten().and_then(|v| bincode::deserialize(&v).ok())
-        } else {
-            None
-        };
-
         let manager = ManagerWrapper::new(state, *params::NTXS, block_offset, *params::VERBOSE);
         // TODO: change to to_hex_string, remove 'Fr(' and ')'
         log::info!("genesis root {}", manager.root().to_string());
@@ -74,7 +57,7 @@ fn process_msgs(
     }))
 }
 
-async fn run(offset: Option<i64>, db: Option<sled::Db>) {
+async fn run() {
     let state = Arc::new(RwLock::new(GlobalState::new(
         *params::BALANCELEVELS,
         *params::ORDERLEVELS,
@@ -82,11 +65,13 @@ async fn run(offset: Option<i64>, db: Option<sled::Db>) {
         *params::VERBOSE,
     )));
 
+    let (block_offset, kafka_offset) = get_persistent_offsets(Arc::clone(&state));
+
     let (msg_sender, msg_receiver) = crossbeam_channel::unbounded();
     let (blk_sender, blk_receiver) = crossbeam_channel::unbounded();
 
-    let loader_thread = msg_loader::load_msgs_from_mq(Settings::brokers(), offset, msg_sender);
-    let replay_thread = process_msgs(msg_receiver, blk_sender, Arc::clone(&state), db);
+    let loader_thread = msg_loader::load_msgs_from_mq(Settings::brokers(), kafka_offset, msg_sender);
+    let replay_thread = process_msgs(msg_receiver, blk_sender, Arc::clone(&state), block_offset);
     let server_thread = grpc_run(state);
 
     let db_pool = PgPool::connect(Settings::db()).await.unwrap();
@@ -268,4 +253,36 @@ fn get_latest_dump() -> anyhow::Result<Option<usize>> {
         .collect::<Result<Vec<usize>, _>>()?;
     dumps.sort_unstable();
     Ok(dumps.last().copied())
+}
+
+#[cfg(feature = "persist_sled")]
+fn get_block_offset(db: &Option<sled::Db>, state: Arc<RwLock<GlobalState>>) -> Option<usize> {
+    db.as_ref().and_then(|db| {
+        state.write().unwrap().load_persist(db).unwrap();
+        db.get(BLOCK_OFFSET_KEY).ok().flatten().and_then(|v| bincode::deserialize(&v).ok())
+    })
+}
+
+#[cfg(feature = "persist_sled")]
+fn get_kafka_offset(db: &Option<sled::Db>) -> Option<i64> {
+    db.as_ref()
+        .and_then(|db| db.get(KAFKA_OFFSET_KEY).ok().flatten().and_then(|v| bincode::deserialize(&v).ok()))
+}
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "persist_sled")] {
+        fn get_persistent_offsets(state: Arc<RwLock<GlobalState>>) -> (Option<usize>, Option<i64>) {
+            get_latest_dump().unwrap().map_or_else(
+                || (None, None),
+                |id| {
+                log::info!("found dump #{}", id);
+                let db = sled::open(Settings::persist_dir().join(format!("{}.db", id))).ok();
+                (get_block_offset(&db, state), get_kafka_offset(&db))
+                })
+        }
+    } else {
+        fn get_persistent_offsets(_state: Arc<RwLock<GlobalState>>) -> (Option<usize>, Option<i64>) {
+            (None, None)
+        }
+    }
 }
