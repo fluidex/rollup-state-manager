@@ -7,12 +7,7 @@ function install_prebuilt_circom() {
 }
 
 function install_circom_from_source() {
-  mkdir -p ~/bin
-  git clone https://github.com/iden3/circom.git
-  pushd circom
-  cargo build --release
-  cargo install --path circom
-  popd
+  cargo install --git https://github.com/iden3/circom
 }
 
 install_prebuilt_circom
