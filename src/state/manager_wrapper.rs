@@ -2,9 +2,6 @@
 #![allow(clippy::vec_init_then_push)]
 
 use super::global::{AccountUpdates, GlobalState};
-use crate::config::Settings;
-#[cfg(feature = "persist_sled")]
-use crate::r#const::sled_db::*;
 use crate::types::l2::{
     tx_detail_idx,
     tx_encode::{self, EncodeForScheme},
@@ -19,7 +16,14 @@ use fluidex_common::l2::account::{L2Account, SignatureBJJ};
 use fluidex_common::{num_bigint::BigInt, num_traits::ToPrimitive};
 use fluidex_common::{types::FrExt, Fr};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use std::time::Instant;
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "persist_sled")] {
+        use crate::config::Settings;
+        use crate::r#const::sled_db::*;
+        use std::time::Instant;
+    }
+}
 
 // TODO: too many unwrap here
 pub struct ManagerWrapper {
