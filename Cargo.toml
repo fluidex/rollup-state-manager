@@ -36,7 +36,7 @@ tokio = { version = "1.6.0", features = [ "full" ] }
 tonic = "0.5.2"
 
 [dev-dependencies]
-pprof = { version = "0.4", features = [ "flamegraph", "protobuf" ] }
+pprof = { version = "0.6", features = [ "flamegraph", "protobuf" ] }
 
 [[bin]]
 name = "rollup_state_manager"
