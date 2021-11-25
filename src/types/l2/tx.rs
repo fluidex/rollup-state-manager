@@ -64,7 +64,7 @@ pub struct NopTx {}
 pub struct DepositTx {
     pub account_id: u32,
     pub token_id: u32,
-    pub amount: AmountType,
+    pub amount: u128,
     // when l2key is none, deposit to existed account
     // else, deposit and create new account
     pub l2key: Option<L2Key>,
@@ -101,14 +101,14 @@ pub struct TransferTx {
     pub from: u32,
     pub to: u32,
     pub token_id: u32,
-    pub amount: AmountType,
+    pub amount: u128,
     pub from_nonce: Fr,
     pub sig: Signature,
     pub l2key: Option<L2Key>,
 }
 
 impl TransferTx {
-    pub fn new(from: u32, to: u32, token_id: u32, amount: AmountType) -> Self {
+    pub fn new(from: u32, to: u32, token_id: u32, amount: u128) -> Self {
         Self {
             from,
             to,
@@ -123,7 +123,7 @@ impl TransferTx {
     pub fn hash(&self) -> Fr {
         // adhoc ... FIXME
         // fluidex.js / dingir-exchange does not handle precision correctly now
-        let amount = Fr::from_u32(self.amount.to_fr().to_i64() as u32 / 1000000);
+        let amount = Fr::from_bigint(BigInt::from(self.amount / 1000000u128));
         Fr::hash(&[
             Fr::from_u32(TxType::Transfer as u32),
             Fr::from_u32(self.token_id),
@@ -151,14 +151,14 @@ impl TransferTx {
 pub struct WithdrawTx {
     pub account_id: u32,
     pub token_id: u32,
-    pub amount: AmountType,
+    pub amount: u128,
     pub nonce: Fr,
     pub old_balance: Fr,
     pub sig: Signature,
 }
 
 impl WithdrawTx {
-    pub fn new(account_id: u32, token_id: u32, amount: AmountType, _old_balance: Fr) -> Self {
+    pub fn new(account_id: u32, token_id: u32, amount: u128, _old_balance: Fr) -> Self {
         Self {
             account_id,
             token_id,
@@ -173,7 +173,7 @@ impl WithdrawTx {
     pub fn hash(&self) -> Fr {
         // adhoc ... FIXME
         // fluidex.js / dingir-exchange does not handle precision correctly now
-        let amount = Fr::from_u32(self.amount.to_fr().to_i64() as u32 / 1000000);
+        let amount = Fr::from_bigint(BigInt::from(self.amount / 1000000u128));
         Fr::hash(&[
             Fr::from_u32(TxType::Withdraw as u32),
             Fr::from_u32(self.account_id),
@@ -344,17 +344,18 @@ impl TxDataEncoder {
         self.ctx.as_mut().unwrap().encode_primint(token_id, self.token_bits)
     }
 
-    pub fn encode_order(&mut self, order_id: u32) -> Result<()> {
-        self.ctx.as_mut().unwrap().encode_primint(order_id, self.order_bits)
+    pub fn encode_order(&mut self, order_pos: u32) -> Result<()> {
+        self.ctx.as_mut().unwrap().encode_primint(order_pos, self.order_bits)
     }
 
-    pub fn encode_amount(&mut self, amount: &AmountType) -> Result<()> {
-        let encoded_big = amount.to_encoded_int()?;
-        assert_eq!(AMOUNT_LEN, AmountType::encode_len() as u32);
-        self.ctx
-            .as_mut()
-            .unwrap()
-            .encode_primint(encoded_big.to_u128().unwrap(), AMOUNT_LEN * 8)
+    //currently order id is encoded to 32bit but we may deprecate it later
+    pub fn encode_order_id(&mut self, order_id: u32) -> Result<()> {
+        self.ctx.as_mut().unwrap().encode_primint(order_id, 32)
+    }
+
+    //amount has been updated no non-compressed primint type (often u128)
+    pub fn encode_amount(&mut self, amount: u128) -> Result<()> {
+        self.ctx.as_mut().unwrap().encode_primint(amount, 128)
     }
 
     pub fn encode_fr(&mut self, fr: &Fr, bits: u32) -> Result<()> {
@@ -363,6 +364,16 @@ impl TxDataEncoder {
         } else {
             self.ctx.as_mut().unwrap().encode_big(fr.to_bigint(), bits)
         }
+    }
+
+    //compressed fr into float 40 form
+    pub fn encode_fr_compressed(&mut self, fr: &Fr) -> Result<()> {
+        assert_eq!(AMOUNT_LEN, AmountType::encode_len() as u32);
+        let encoded_big = AmountType::from_bigint(fr.to_bigint())?.to_encoded_int()?;
+        self.ctx
+            .as_mut()
+            .unwrap()
+            .encode_primint(encoded_big.to_u128().unwrap(), AMOUNT_LEN * 8)
     }
 
     pub fn encode_heading(&mut self, head: u32) -> Result<()> {
@@ -381,13 +392,13 @@ impl TxDataEncoder {
     //finish encoding, output the result hash, and prepare for next encoding
     pub fn finish(&mut self) -> U256 {
         let (hash, _) = self.finish_with_raw();
-        //        println!("{:02x?}", &encoded_bytes);
         hash
     }
 
     pub fn finish_with_raw(&mut self) -> (U256, Vec<u8>) {
         let encoded_bytes = self.ctx.replace(BitEncodeContext::new()).unwrap().seal();
         let hash = U256::from_big_endian(&sha2::Sha256::digest(&encoded_bytes));
+        //        println!("{:02x?}", &encoded_bytes);
         (hash, encoded_bytes)
     }
 }
@@ -426,8 +437,7 @@ impl EncodeForPubData for DepositTx {
         encoder.encode_account(self.account_id)?;
         encoder.encode_account(self.account_id)?;
         encoder.encode_token(self.token_id)?;
-        encoder.encode_token(self.token_id)?;
-        encoder.encode_amount(&self.amount)?;
+        encoder.encode_amount(self.amount)?;
         encoder.encode_padding();
         Ok(())
     }
@@ -439,18 +449,18 @@ impl EncodeForPubData for TransferTx {
         encoder.encode_account(self.from)?;
         encoder.encode_account(self.to)?;
         encoder.encode_token(self.token_id)?;
-        encoder.encode_token(self.token_id)?;
-        encoder.encode_amount(&self.amount)?;
+        encoder.encode_amount(self.amount)?;
         encoder.encode_padding();
         Ok(())
     }
 }
 
-impl EncodeForPubData for FullSpotTradeTx {
+impl EncodeForPubData for (FullSpotTradeTx, (u32, u32)) {
     fn encode_pubdata(&self, encoder: &mut TxDataEncoder) -> Result<()> {
-        let order1 = self.maker_order.as_ref().unwrap();
-        let order2 = self.taker_order.as_ref().unwrap();
-        let trade = &self.trade;
+        let (full_trade, (order1_pos, order2_pos)) = self;
+        let order1 = full_trade.maker_order.as_ref().unwrap();
+        let order2 = full_trade.taker_order.as_ref().unwrap();
+        let trade = &full_trade.trade;
         let mut h = 0;
         //order 1
         h += if order1.is_filled() { 2 } else { 0 };
@@ -460,12 +470,14 @@ impl EncodeForPubData for FullSpotTradeTx {
         encoder.encode_account(trade.order2_account_id)?;
         encoder.encode_token(trade.token_id_1to2)?;
         encoder.encode_token(trade.token_id_2to1)?;
-        encoder.encode_fr(&order1.total_sell, AMOUNT_LEN * 8)?;
-        encoder.encode_fr(&order1.total_buy, AMOUNT_LEN * 8)?;
-        encoder.encode_order(order1.order_id)?;
-        encoder.encode_fr(&order2.total_sell, AMOUNT_LEN * 8)?;
-        encoder.encode_fr(&order2.total_buy, AMOUNT_LEN * 8)?;
-        encoder.encode_order(order2.order_id)?;
+        encoder.encode_fr_compressed(&order1.total_sell)?;
+        encoder.encode_fr_compressed(&order1.total_buy)?;
+        encoder.encode_order(*order1_pos)?;
+        encoder.encode_order_id(order1.order_id)?;
+        encoder.encode_fr_compressed(&order2.total_sell)?;
+        encoder.encode_fr_compressed(&order2.total_buy)?;
+        encoder.encode_order(*order2_pos)?;
+        encoder.encode_order_id(order2.order_id)?;
         encoder.encode_padding();
         Ok(())
     }
@@ -477,8 +489,7 @@ impl EncodeForPubData for WithdrawTx {
         encoder.encode_account(self.account_id)?;
         encoder.encode_account(self.account_id)?;
         encoder.encode_token(self.token_id)?;
-        encoder.encode_token(self.token_id)?;
-        encoder.encode_amount(&self.amount)?;
+        encoder.encode_amount(self.amount)?;
         encoder.encode_padding();
         Ok(())
     }
@@ -550,25 +561,19 @@ fn test_tx_pubdata() {
     let tx = DepositTx {
         account_id: 0,
         token_id: 0,
-        amount: AmountType {
-            exponent: 2u8,
-            significand: 2,
-        }, //200
+        amount: 200u128,
         l2key: None,
     };
 
     tx.encode_pubdata(&mut tx_encoder).unwrap();
     let hash = tx_encoder.finish();
-    assert_eq!(hash.low_u128(), 23985885059632108908906696405152872466u128);
+    assert_eq!(hash.low_u128(), 165746834740124453735712471645371051648u128);
 
     //block 1
     let tx = DepositTx {
         account_id: 1,
         token_id: 0,
-        amount: AmountType {
-            exponent: 2u8,
-            significand: 1,
-        }, //100,
+        amount: 100u128,
         l2key: None,
     };
 
@@ -578,10 +583,7 @@ fn test_tx_pubdata() {
         from: 1,
         to: 0,
         token_id: 0,
-        amount: AmountType {
-            exponent: 1u8,
-            significand: 5,
-        }, //50
+        amount: 50u128,
         l2key: None,
         from_nonce: Fr::zero(),
         sig: Signature::default(),
@@ -590,16 +592,13 @@ fn test_tx_pubdata() {
     tx.encode_pubdata(&mut tx_encoder).unwrap();
 
     let hash = tx_encoder.finish();
-    assert_eq!(hash.low_u128(), 263734781515133552465673106314305164970u128);
+    assert_eq!(hash.low_u128(), 96699439624803546054792503747068115481u128);
 
     //block 2
     let tx = WithdrawTx {
         account_id: 0,
         token_id: 0,
-        amount: AmountType {
-            exponent: 1u8,
-            significand: 15,
-        }, //150
+        amount: 150u128,
         nonce: Fr::zero(),
         old_balance: Fr::zero(),
         sig: Signature::default(),
@@ -610,26 +609,20 @@ fn test_tx_pubdata() {
     let tx = DepositTx {
         account_id: 1,
         token_id: 0,
-        amount: AmountType {
-            exponent: 0u8,
-            significand: 199,
-        },
+        amount: 199u128,
         l2key: None,
     };
 
     tx.encode_pubdata(&mut tx_encoder).unwrap();
 
     let hash = tx_encoder.finish();
-    assert_eq!(hash.low_u128(), 113591718068163649357370944225903641747u128);
+    assert_eq!(hash.low_u128(), 194570598735512170151663043076702284778u128);
 
     //block 3
     let tx = DepositTx {
         account_id: 2,
         token_id: 1,
-        amount: AmountType {
-            exponent: 1u8,
-            significand: 199,
-        }, //1990
+        amount: 1990u128,
         l2key: None,
     };
 
@@ -642,31 +635,15 @@ fn test_tx_pubdata() {
     mk_order.token_buy = Fr::from_u32(1);
     mk_order.filled_buy = Fr::from_u32(1200);
     mk_order.filled_sell = Fr::from_u32(120);
-    let amt = AmountType {
-        exponent: 4u8,
-        significand: 1,
-    }; // 10000
-    mk_order.total_buy = Fr::from_bigint(amt.to_encoded_int().unwrap());
-    let amt = AmountType {
-        exponent: 3u8,
-        significand: 1,
-    }; // 1000
-    mk_order.total_sell = Fr::from_bigint(amt.to_encoded_int().unwrap());
+    mk_order.total_buy = Fr::from_u32(10000);
+    mk_order.total_sell = Fr::from_u32(1000);
 
     tk_order.order_id = 1;
     tk_order.token_sell = Fr::from_u32(1);
     tk_order.filled_sell = Fr::from_u32(1210);
     tk_order.filled_buy = Fr::from_u32(121);
-    let amt = AmountType {
-        exponent: 0u8,
-        significand: 121,
-    }; //121
-    tk_order.total_buy = Fr::from_bigint(amt.to_encoded_int().unwrap());
-    let amt = AmountType {
-        exponent: 1u8,
-        significand: 121,
-    }; //1210
-    tk_order.total_sell = Fr::from_bigint(amt.to_encoded_int().unwrap());
+    tk_order.total_buy = Fr::from_u32(121);
+    tk_order.total_sell = Fr::from_u32(1210);
 
     let tx = FullSpotTradeTx {
         trade: SpotTradeTx {
@@ -683,10 +660,12 @@ fn test_tx_pubdata() {
         taker_order: Some(tk_order),
     };
 
-    tx.encode_pubdata(&mut tx_encoder).unwrap();
+    //simply purpose two order pos
+    let full_encoding = (tx, (0u32, 0u32));
+    full_encoding.encode_pubdata(&mut tx_encoder).unwrap();
 
     let hash = tx_encoder.finish();
-    assert_eq!(hash.low_u128(), 146266009004152019134474450994520485822u128);
+    assert_eq!(hash.low_u128(), 45067006840171976501491216447014895325u128);
 }
 /*
 #[cfg(test)]
