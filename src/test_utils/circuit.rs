@@ -58,7 +58,7 @@ fn write_circuit(circuit_repo: &Path, test_dir: &Path, source: &CircuitSource) -
     let src_path: PathBuf = source.src.split('/').collect();
 
     let file_content = format!(
-        "include \"{}\";\ncomponent main = {};",
+        "pragma circom 2.0.0;\ninclude \"{}\";\ncomponent main = {};",
         circuit_repo.join(src_path).to_str().unwrap(),
         source.main
     );
