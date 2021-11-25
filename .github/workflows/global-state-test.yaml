@@ -96,7 +96,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: run
-          args: --bin version_check
+          args: --bin version_check --features version_check
 
       - name: Test global_state
         run: bash tests/global_state/test.sh

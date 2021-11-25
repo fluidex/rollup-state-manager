@@ -44,6 +44,11 @@ name = "rollup_state_manager"
 path = "src/bin/main.rs"
 
 [[bin]]
+name = "version_check"
+path = "src/bin/version_check.rs"
+required-features = [ "version_check" ]
+
+[[bin]]
 name = "dump_sled"
 path = "src/bin/dump_sled.rs"
 required-features = [ "persist_sled" ]
@@ -65,6 +70,7 @@ bench_global_state = [ ]
 default = ["persist_sled"]
 windows_build = [ "fluidex-common/rdkafka-dynamic" ]
 fr_string_repr = [ ]
+version_check = [ ]
 persist_sled = [ "sled", "bincode" ]
 
 [profile.release]
