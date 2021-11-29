@@ -1,9 +1,10 @@
+use super::user_cache::UserCache;
 use crate::config::Settings;
 use crate::state::global::GlobalState;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{tx_detail_idx, AmountType, L2BlockSerde, TxType};
 use core::cmp::min;
-use fluidex_common::db::models::{l2_block, tablenames};
+use fluidex_common::db::models::{account, l2_block, tablenames};
 use fluidex_common::db::DbType;
 use fluidex_common::num_traits::ToPrimitive;
 use fluidex_common::rust_decimal::Decimal;
@@ -16,12 +17,18 @@ use tonic::{Code, Status};
 pub struct Controller {
     db_pool: sqlx::Pool<DbType>,
     state: Arc<RwLock<GlobalState>>,
+    user_cache: Arc<RwLock<UserCache>>,
 }
 
 impl Controller {
     pub async fn new(state: Arc<RwLock<GlobalState>>) -> Self {
         let db_pool = sqlx::postgres::PgPool::connect(Settings::db()).await.unwrap();
-        Self { db_pool, state }
+        let user_cache = Arc::new(RwLock::new(UserCache::new()));
+        Self {
+            db_pool,
+            state,
+            user_cache,
+        }
     }
 
     // TODO: cache
@@ -246,6 +253,34 @@ impl Controller {
             precision,
         })
     }
+
+    pub async fn user_info_query(&self, request: UserInfoQueryRequest) -> Result<UserInfoQueryResponse, Status> {
+        if let Some(user_info) = self
+            .user_cache
+            .read()
+            .unwrap()
+            .get_user_info(request.user_id, &request.l1_address, &request.l2_pubkey)
+        {
+            let user_id = user_info.id as u32;
+            return Ok(UserInfoQueryResponse {
+                user_id,
+                l1_address: user_info.l1_address.clone(),
+                l2_pubkey: user_info.l2_pubkey.clone(),
+                nonce: self.state.read().unwrap().get_account_nonce(user_id).to_u32(),
+            });
+        }
+
+        let user_info = get_user_info_from_db(&self.db_pool, request).await?;
+        self.user_cache.write().unwrap().set_user_info(user_info.clone());
+
+        let user_id = user_info.id as u32;
+        Ok(UserInfoQueryResponse {
+            user_id,
+            l1_address: user_info.l1_address,
+            l2_pubkey: user_info.l2_pubkey,
+            nonce: self.state.read().unwrap().get_account_nonce(user_id).to_u32(),
+        })
+    }
 }
 
 async fn get_l2_blocks(
@@ -318,4 +353,18 @@ async fn get_status_by_block_id(db_pool: &sqlx::Pool<DbType>, block_id: i64) -> 
         Err(sqlx::Error::RowNotFound) => Err(Status::new(Code::NotFound, "db l2_block record not found")),
         Err(_) => Err(Status::new(Code::Internal, "db table l2_block fetch error")),
     }
+}
+
+async fn get_user_info_from_db(db_pool: &sqlx::Pool<DbType>, request: UserInfoQueryRequest) -> Result<account::AccountDesc, Status> {
+    let query = format!(
+        "select * from {} where id = $1 OR l1_address = $2 OR l2_pubkey = $2",
+        tablenames::ACCOUNT
+    );
+    sqlx::query_as(&query)
+        .bind(request.user_id.unwrap_or(0))
+        .bind(request.l1_address.unwrap_or_else(|| "".to_owned()))
+        .bind(request.l2_pubkey.unwrap_or_else(|| "".to_owned()))
+        .fetch_one(db_pool)
+        .await
+        .map_err(|_| Status::not_found("no specified user info"))
 }
