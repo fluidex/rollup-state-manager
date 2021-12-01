@@ -29,4 +29,8 @@ impl rollup_state_server::RollupState for Handler {
     async fn token_balance_query(&self, request: Request<TokenBalanceQueryRequest>) -> Result<Response<TokenBalanceQueryResponse>, Status> {
         Ok(Response::new(self.controller.token_balance_query(request.into_inner())?))
     }
+
+    async fn user_info_query(&self, request: Request<UserInfoQueryRequest>) -> Result<Response<UserInfoQueryResponse>, Status> {
+        Ok(Response::new(self.controller.user_info_query(request.into_inner()).await?))
+    }
 }
