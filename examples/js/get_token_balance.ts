@@ -1,4 +1,4 @@
-require('dotenv').config()
+require("dotenv").config();
 
 import { grpcClient } from "./grpc_client";
 import { kafkaProducer } from "./kafka_producer";

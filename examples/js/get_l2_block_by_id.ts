@@ -1,4 +1,4 @@
-require('dotenv').config()
+require("dotenv").config();
 
 import * as dayjs from "dayjs";
 import { grpcClient } from "./grpc_client";
