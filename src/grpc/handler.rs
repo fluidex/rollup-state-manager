@@ -40,6 +40,7 @@ impl rollup_state_server::RollupState for Handler {
     }
 
     async fn register_user(&self, request: Request<RegisterUserRequest>) -> Result<Response<RegisterUserResponse>, Status> {
+        // TODO: Dispatch to another thread.
         let mut controller = self.controller.write().await;
         Ok(Response::new(controller.register_user(true, request.into_inner()).await?))
     }
