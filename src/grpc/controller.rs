@@ -1,7 +1,10 @@
 use core::cmp::min;
 use crate::config::Settings;
+use crate::message::{FullOrderMessageManager, SimpleMessageManager};
+use crate::persist::history::DatabaseHistoryWriter;
 use crate::persist::persistor::{CompositePersistor, DBBasedPersistor, FileBasedPersistor, MessengerBasedPersistor, PersistExector};
 use crate::state::global::GlobalState;
+use crate::storage::database::{DatabaseWriterConfig, OperationLogSender};
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{tx_detail_idx, AmountType, L2BlockSerde, TxType};
 use fluidex_common::db::DbType;
@@ -13,6 +16,7 @@ use fluidex_common::utils::timeutil::{current_timestamp, FTimestamp};
 use orchestra::rpc::rollup::*;
 use serde::Serialize;
 use std::sync::{Arc, RwLock};
+use super::sequencer::Sequencer;
 use super::user_cache::UserCache;
 use tonic::{Code, Status};
 
@@ -20,7 +24,9 @@ const OPERATION_REGISTER_USER: &str = "register_user";
 
 pub struct Controller {
     db_pool: sqlx::Pool<DbType>,
+    log_handler: Box<dyn OperationLogConsumer + Send + Sync>,
     persistor: Box<dyn PersistExector>,
+    sequencer: Sequencer,
     state: Arc<RwLock<GlobalState>>,
     user_cache: Arc<RwLock<UserCache>>,
 }
@@ -28,9 +34,22 @@ pub struct Controller {
 impl Controller {
     pub async fn new(state: Arc<RwLock<GlobalState>>) -> Self {
         let db_pool = sqlx::postgres::PgPool::connect(Settings::db()).await.unwrap();
+        let log_handler = Box::new(OperationLogSender::new(&DatabaseWriterConfig {
+            spawn_limit: 4,
+            apply_benchmark: true,
+            capability_limit: 8192,
+        })
+        .start_schedule(&db_pool)
+        .unwrap());
+        let persistor = create_persistor();
+        let sequencer = Sequencer::default();
         let user_cache = Arc::new(RwLock::new(UserCache::new()));
+
         Self {
             db_pool,
+            log_handler,
+            persistor,
+            sequencer,
             state,
             user_cache,
         }
@@ -285,7 +304,7 @@ impl Controller {
         self.user_cache.write().unwrap().set_user_info(user.clone());
 
         if real {
-            self.persistor.register_user(user);
+            self.persistor.register_user(user.clone());
             self.append_operation_log(OPERATION_REGISTER_USER, &request);
         }
 
@@ -309,6 +328,20 @@ impl Controller {
             params,
         };
         (*self.log_handler).append_operation_log(operation_log).ok();
+    }
+}
+
+trait OperationLogConsumer {
+    fn is_block(&self) -> bool;
+    fn append_operation_log(&mut self, item: operation_log::OperationLog) -> anyhow::Result<(), operation_log::OperationLog>;
+}
+
+impl OperationLogConsumer for OperationLogSender {
+    fn is_block(&self) -> bool {
+        self.is_block()
+    }
+    fn append_operation_log(&mut self, item: operation_log::OperationLog) -> anyhow::Result<(), operation_log::OperationLog> {
+        self.append(item)
     }
 }
 
@@ -399,25 +432,25 @@ async fn get_user_info_from_db(db_pool: &sqlx::Pool<DbType>, request: UserInfoQu
 }
 
 // TODO: reuse pool of two dbs when they are same?
-fn create_persistor(settings: &config::Settings) -> Box<dyn PersistExector> {
+fn create_persistor() -> Box<dyn PersistExector> {
     let persist_to_mq = true;
     let persist_to_mq_full_order = true;
     let persist_to_db = false;
     let persist_to_file = false;
     let mut persistor = Box::new(CompositePersistor::default());
-    if !settings.brokers.is_empty() && persist_to_mq {
+    if !Settings::brokers().is_empty() && persist_to_mq {
         persistor.add_persistor(Box::new(MessengerBasedPersistor::new(Box::new(
-            SimpleMessageManager::new_and_run(&settings.brokers).unwrap(),
+            SimpleMessageManager::new_and_run(Settings::brokers()).unwrap(),
         ))));
     }
-    if !settings.brokers.is_empty() && persist_to_mq_full_order {
+    if !Settings::brokers().is_empty() && persist_to_mq_full_order {
         persistor.add_persistor(Box::new(MessengerBasedPersistor::new(Box::new(
-            FullOrderMessageManager::new_and_run(&settings.brokers).unwrap(),
+            FullOrderMessageManager::new_and_run(Settings::brokers()).unwrap(),
         ))));
     }
     if persist_to_db {
         // persisting to db is disabled now
-        let pool = sqlx::Pool::<DbType>::connect_lazy(&settings.db_history).unwrap();
+        let pool = sqlx::Pool::<DbType>::connect_lazy(Settings::db()).unwrap();
         persistor.add_persistor(Box::new(DBBasedPersistor::new(Box::new(
             DatabaseHistoryWriter::new(
                 &DatabaseWriterConfig {
@@ -430,7 +463,7 @@ fn create_persistor(settings: &config::Settings) -> Box<dyn PersistExector> {
             .unwrap(),
         ))));
     }
-    if settings.brokers.is_empty() || persist_to_file {
+    if Settings::brokers().is_empty() || persist_to_file {
         persistor.add_persistor(Box::new(FileBasedPersistor::new("persistor_output.txt")));
     }
     persistor

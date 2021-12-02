@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use fluidex_common::db::DbType;
+use fluidex_common::db::models::operation_log;
 use std::collections::{hash_map, HashMap, VecDeque};
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
@@ -474,7 +475,8 @@ where
         self.status.borrow().clone()
     }
 
-    pub async fn finish(self) -> types::SimpleResult {
+    pub async fn finish(self) -> anyhow::Result<()> {
+
         match self.sender {
             Some(sd) => {
                 sd.send(WriterMsg::Exit(true))
@@ -625,4 +627,4 @@ where
     }
 }
 
-pub type OperationLogSender = DatabaseWriter<models::OperationLog>;
+pub type OperationLogSender = DatabaseWriter<operation_log::OperationLog>;

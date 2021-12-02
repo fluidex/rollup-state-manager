@@ -55,3 +55,5 @@ impl sqlxextend::BindQueryArg<'_, DbType> for operation_log::OperationLog {
         arg.add(&self.params);
     }
 }
+
+impl sqlxextend::SqlxAction<'_, sqlxextend::InsertTable, DbType> for operation_log::OperationLog {}

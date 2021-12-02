@@ -35,6 +35,6 @@ impl rollup_state_server::RollupState for Handler {
     }
 
     async fn register_user(&self, request: Request<RegisterUserRequest>) -> Result<Response<RegisterUserResponse>, Status> {
-        Ok(Response::new(self.controller.register_user(request.into_inner()).await?))
+        Ok(Response::new(self.controller.register_user(true, request.into_inner()).await?))
     }
 }
