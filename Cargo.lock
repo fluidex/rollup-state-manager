@@ -996,10 +996,14 @@ dependencies = [
 name = "ethers"
 version = "0.6.0"
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/gakonst/ethers-rs#23c356ce3823272dd96e70f5453dea732c182d7b"
 =======
 source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
 >>>>>>> cf6f671 (Move `get_user_info` API from exchange (#248))
+=======
+source = "git+https://github.com/gakonst/ethers-rs#24f9bd0f4f94eecb173e39e896eeed1040a0948c"
+>>>>>>> c6e28de (Move `register_user` from exchange.)
 dependencies = [
  "ethers-contract",
  "ethers-core",
@@ -1014,10 +1018,14 @@ dependencies = [
 name = "ethers-contract"
 version = "0.6.0"
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/gakonst/ethers-rs#23c356ce3823272dd96e70f5453dea732c182d7b"
 =======
 source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
 >>>>>>> cf6f671 (Move `get_user_info` API from exchange (#248))
+=======
+source = "git+https://github.com/gakonst/ethers-rs#24f9bd0f4f94eecb173e39e896eeed1040a0948c"
+>>>>>>> c6e28de (Move `register_user` from exchange.)
 dependencies = [
  "ethers-contract-abigen",
  "ethers-contract-derive",
@@ -1036,10 +1044,14 @@ dependencies = [
 name = "ethers-contract-abigen"
 version = "0.6.0"
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/gakonst/ethers-rs#23c356ce3823272dd96e70f5453dea732c182d7b"
 =======
 source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
 >>>>>>> cf6f671 (Move `get_user_info` API from exchange (#248))
+=======
+source = "git+https://github.com/gakonst/ethers-rs#24f9bd0f4f94eecb173e39e896eeed1040a0948c"
+>>>>>>> c6e28de (Move `register_user` from exchange.)
 dependencies = [
  "Inflector",
  "anyhow",
@@ -1061,10 +1073,14 @@ dependencies = [
 name = "ethers-contract-derive"
 version = "0.6.0"
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/gakonst/ethers-rs#23c356ce3823272dd96e70f5453dea732c182d7b"
 =======
 source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
 >>>>>>> cf6f671 (Move `get_user_info` API from exchange (#248))
+=======
+source = "git+https://github.com/gakonst/ethers-rs#24f9bd0f4f94eecb173e39e896eeed1040a0948c"
+>>>>>>> c6e28de (Move `register_user` from exchange.)
 dependencies = [
  "ethers-contract-abigen",
  "ethers-core",
@@ -1079,10 +1095,14 @@ dependencies = [
 name = "ethers-core"
 version = "0.6.0"
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/gakonst/ethers-rs#23c356ce3823272dd96e70f5453dea732c182d7b"
 =======
 source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
 >>>>>>> cf6f671 (Move `get_user_info` API from exchange (#248))
+=======
+source = "git+https://github.com/gakonst/ethers-rs#24f9bd0f4f94eecb173e39e896eeed1040a0948c"
+>>>>>>> c6e28de (Move `register_user` from exchange.)
 dependencies = [
  "arrayvec 0.7.2",
  "bytes",
@@ -1115,10 +1135,14 @@ dependencies = [
 name = "ethers-etherscan"
 version = "0.2.0"
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/gakonst/ethers-rs#23c356ce3823272dd96e70f5453dea732c182d7b"
 =======
 source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
 >>>>>>> cf6f671 (Move `get_user_info` API from exchange (#248))
+=======
+source = "git+https://github.com/gakonst/ethers-rs#24f9bd0f4f94eecb173e39e896eeed1040a0948c"
+>>>>>>> c6e28de (Move `register_user` from exchange.)
 dependencies = [
  "ethers-core",
  "reqwest",
@@ -1132,10 +1156,14 @@ dependencies = [
 name = "ethers-middleware"
 version = "0.6.0"
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/gakonst/ethers-rs#23c356ce3823272dd96e70f5453dea732c182d7b"
 =======
 source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
 >>>>>>> cf6f671 (Move `get_user_info` API from exchange (#248))
+=======
+source = "git+https://github.com/gakonst/ethers-rs#24f9bd0f4f94eecb173e39e896eeed1040a0948c"
+>>>>>>> c6e28de (Move `register_user` from exchange.)
 dependencies = [
  "async-trait",
  "ethers-contract",
@@ -1159,10 +1187,14 @@ dependencies = [
 name = "ethers-providers"
 version = "0.6.0"
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/gakonst/ethers-rs#23c356ce3823272dd96e70f5453dea732c182d7b"
 =======
 source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
 >>>>>>> cf6f671 (Move `get_user_info` API from exchange (#248))
+=======
+source = "git+https://github.com/gakonst/ethers-rs#24f9bd0f4f94eecb173e39e896eeed1040a0948c"
+>>>>>>> c6e28de (Move `register_user` from exchange.)
 dependencies = [
  "async-trait",
  "auto_impl",
@@ -1192,10 +1224,14 @@ dependencies = [
 name = "ethers-signers"
 version = "0.6.0"
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/gakonst/ethers-rs#23c356ce3823272dd96e70f5453dea732c182d7b"
 =======
 source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
 >>>>>>> cf6f671 (Move `get_user_info` API from exchange (#248))
+=======
+source = "git+https://github.com/gakonst/ethers-rs#24f9bd0f4f94eecb173e39e896eeed1040a0948c"
+>>>>>>> c6e28de (Move `register_user` from exchange.)
 dependencies = [
  "async-trait",
  "coins-bip32",
@@ -1220,10 +1256,14 @@ dependencies = [
 name = "ethers-solc"
 version = "0.1.0"
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/gakonst/ethers-rs#23c356ce3823272dd96e70f5453dea732c182d7b"
 =======
 source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
 >>>>>>> cf6f671 (Move `get_user_info` API from exchange (#248))
+=======
+source = "git+https://github.com/gakonst/ethers-rs#24f9bd0f4f94eecb173e39e896eeed1040a0948c"
+>>>>>>> c6e28de (Move `register_user` from exchange.)
 dependencies = [
  "colored",
  "ethers-core",
@@ -1305,10 +1345,14 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 name = "fluidex-common"
 version = "0.1.0"
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/fluidex/common-rs?branch=master#671a92a986920b013e5457a9c2be2b295f1bc733"
 =======
 source = "git+https://github.com/fluidex/common-rs?branch=master#eb9440fe1c8d4082602a0a850e6599f1901ac6bf"
 >>>>>>> cf6f671 (Move `get_user_info` API from exchange (#248))
+=======
+source = "git+https://github.com/fluidex/common-rs?branch=add-table-operation-log-to-rollup#acabaede79a9e841084f110f3212422938c112ca"
+>>>>>>> c6e28de (Move `register_user` from exchange.)
 dependencies = [
  "anyhow",
  "babyjubjub-rs",
@@ -2327,10 +2371,14 @@ dependencies = [
 name = "orchestra"
 version = "0.1.0"
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/fluidex/orchestra.git?branch=master#550e3f1f1f82550f7e92c4938f6bc5f6e59f07cf"
 =======
 source = "git+https://github.com/fluidex/orchestra.git?branch=master#7c012af8f65a97475836bdd1a198155608ccf9b0"
 >>>>>>> cf6f671 (Move `get_user_info` API from exchange (#248))
+=======
+source = "git+https://github.com/fluidex/orchestra.git?branch=master#554bc7d9a933b1e5298069fb8586e11d865da8e9"
+>>>>>>> c6e28de (Move `register_user` from exchange.)
 dependencies = [
  "prost",
  "serde 1.0.130",
@@ -2917,6 +2965,7 @@ dependencies = [
  "arrayref",
  "bincode",
  "cfg-if",
+ "chrono",
  "coins-bip32",
  "config",
  "crossbeam-channel",

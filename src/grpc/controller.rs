@@ -1,19 +1,26 @@
-use super::user_cache::UserCache;
+use core::cmp::min;
 use crate::config::Settings;
+use crate::persist::persistor::{CompositePersistor, DBBasedPersistor, FileBasedPersistor, MessengerBasedPersistor, PersistExector};
 use crate::state::global::GlobalState;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
-use crate::types::l2::{tx_detail_idx, L2BlockSerde, TxType};
-use core::cmp::min;
-use fluidex_common::db::models::{account, l2_block, tablenames};
+use crate::types::l2::{tx_detail_idx, AmountType, L2BlockSerde, TxType};
 use fluidex_common::db::DbType;
+use fluidex_common::db::models::{account, l2_block, operation_log, tablenames};
+use fluidex_common::num_traits::ToPrimitive;
+use fluidex_common::rust_decimal::Decimal;
 use fluidex_common::types::FrExt;
-use fluidex_common::utils::timeutil::FTimestamp;
+use fluidex_common::utils::timeutil::{current_timestamp, FTimestamp};
 use orchestra::rpc::rollup::*;
+use serde::Serialize;
 use std::sync::{Arc, RwLock};
+use super::user_cache::UserCache;
 use tonic::{Code, Status};
+
+const OPERATION_REGISTER_USER: &str = "register_user";
 
 pub struct Controller {
     db_pool: sqlx::Pool<DbType>,
+    persistor: Box<dyn PersistExector>,
     state: Arc<RwLock<GlobalState>>,
     user_cache: Arc<RwLock<UserCache>>,
 }
@@ -245,24 +252,63 @@ impl Controller {
             .get_user_info(request.user_id, &request.l1_address, &request.l2_pubkey)
         {
             let user_id = user_info.id as u32;
-            return Ok(UserInfoQueryResponse {
-                user_id,
-                l1_address: user_info.l1_address.clone(),
-                l2_pubkey: user_info.l2_pubkey.clone(),
-                nonce: self.state.read().unwrap().get_account_nonce(user_id).to_u32(),
-            });
+            let user_info  = Some(UserInfo {
+                    user_id,
+                    l1_address: user_info.l1_address.clone(),
+                    l2_pubkey: user_info.l2_pubkey.clone(),
+                    nonce: self.state.read().unwrap().get_account_nonce(user_id).to_u32(),
+                });
+            return Ok(UserInfoQueryResponse { user_info });
         }
 
         let user_info = get_user_info_from_db(&self.db_pool, request).await?;
         self.user_cache.write().unwrap().set_user_info(user_info.clone());
 
         let user_id = user_info.id as u32;
-        Ok(UserInfoQueryResponse {
+        let user_info  = Some(UserInfo {
             user_id,
             l1_address: user_info.l1_address,
             l2_pubkey: user_info.l2_pubkey,
             nonce: self.state.read().unwrap().get_account_nonce(user_id).to_u32(),
-        })
+        });
+        Ok(UserInfoQueryResponse { user_info })
+    }
+
+    pub async fn register_user(&self, real: bool, request: RegisterUserRequest) -> Result<RegisterUserResponse, Status> {
+        let user_id = request.user_id;
+        let user = account::AccountDesc {
+            id: user_id as i32,
+            l1_address: request.l1_address.to_lowercase(),
+            l2_pubkey: request.l2_pubkey.to_lowercase(),
+        };
+
+        self.user_cache.write().unwrap().set_user_info(user.clone());
+
+        if real {
+            self.persistor.register_user(user);
+            self.append_operation_log(OPERATION_REGISTER_USER, &request);
+        }
+
+        Ok(RegisterUserResponse { user_info: Some(UserInfo {
+            user_id,
+            l1_address: user.l1_address,
+            l2_pubkey: user.l2_pubkey,
+            nonce: self.state.read().unwrap().get_account_nonce(user_id).to_u32(),
+        }) })
+    }
+
+    fn append_operation_log<Operation>(&mut self, method: &str, req: &Operation)
+    where
+        Operation: Serialize,
+    {
+        let params = serde_json::to_string(req).unwrap();
+        let operation_log = operation_log::OperationLog {
+            id: self.sequencer.next_operation_log_id() as i64,
+            time: FTimestamp(current_timestamp()).into(),
+            method: method.to_owned(),
+            params,
+        };
+        (*self.log_handler).append_operation_log(operation_log).ok();
     }
 }
 
@@ -350,4 +396,42 @@ async fn get_user_info_from_db(db_pool: &sqlx::Pool<DbType>, request: UserInfoQu
         .fetch_one(db_pool)
         .await
         .map_err(|_| Status::not_found("no specified user info"))
+}
+
+// TODO: reuse pool of two dbs when they are same?
+fn create_persistor(settings: &config::Settings) -> Box<dyn PersistExector> {
+    let persist_to_mq = true;
+    let persist_to_mq_full_order = true;
+    let persist_to_db = false;
+    let persist_to_file = false;
+    let mut persistor = Box::new(CompositePersistor::default());
+    if !settings.brokers.is_empty() && persist_to_mq {
+        persistor.add_persistor(Box::new(MessengerBasedPersistor::new(Box::new(
+            SimpleMessageManager::new_and_run(&settings.brokers).unwrap(),
+        ))));
+    }
+    if !settings.brokers.is_empty() && persist_to_mq_full_order {
+        persistor.add_persistor(Box::new(MessengerBasedPersistor::new(Box::new(
+            FullOrderMessageManager::new_and_run(&settings.brokers).unwrap(),
+        ))));
+    }
+    if persist_to_db {
+        // persisting to db is disabled now
+        let pool = sqlx::Pool::<DbType>::connect_lazy(&settings.db_history).unwrap();
+        persistor.add_persistor(Box::new(DBBasedPersistor::new(Box::new(
+            DatabaseHistoryWriter::new(
+                &DatabaseWriterConfig {
+                    spawn_limit: 4,
+                    apply_benchmark: true,
+                    capability_limit: 8192,
+                },
+                &pool,
+            )
+            .unwrap(),
+        ))));
+    }
+    if settings.brokers.is_empty() || persist_to_file {
+        persistor.add_persistor(Box::new(FileBasedPersistor::new("persistor_output.txt")));
+    }
+    persistor
 }
