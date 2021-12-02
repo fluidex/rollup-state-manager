@@ -1,6 +1,6 @@
+use super::history::HistoryWriter;
 use crate::message::{Message, MessageManager};
 use fluidex_common::db::models::account;
-use super::history::HistoryWriter;
 
 ///////////////////////////// PersistExector interface ////////////////////////////
 

@@ -1,7 +1,7 @@
+use super::sqlxextend;
 use fluidex_common::db::models::{account, operation_log, tablenames};
 use fluidex_common::db::{DbType, TimestampDbType};
 use serde::ser::Serializer;
-use super::sqlxextend;
 
 pub type DecimalDbType = fluidex_common::rust_decimal::Decimal;
 

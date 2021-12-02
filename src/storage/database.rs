@@ -1,10 +1,10 @@
+use super::sqlxextend::*;
 use anyhow::{anyhow, Result};
-use fluidex_common::db::DbType;
 use fluidex_common::db::models::operation_log;
+use fluidex_common::db::DbType;
 use std::collections::{hash_map, HashMap, VecDeque};
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
-use super::sqlxextend::*;
 use tokio::sync::mpsc::error::TrySendError;
 use tokio::{sync, task};
 
@@ -476,7 +476,6 @@ where
     }
 
     pub async fn finish(self) -> anyhow::Result<()> {
-
         match self.sender {
             Some(sd) => {
                 sd.send(WriterMsg::Exit(true))

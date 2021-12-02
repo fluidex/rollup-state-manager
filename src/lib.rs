@@ -7,12 +7,12 @@
 #![allow(dead_code)]
 pub mod account;
 pub mod config;
+pub mod r#const;
 pub mod grpc;
 pub mod message;
 pub mod msg;
 pub mod params;
 pub mod persist;
-pub mod r#const;
 pub mod state;
 pub mod storage;
 pub mod test_utils;

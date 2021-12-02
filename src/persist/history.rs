@@ -1,7 +1,7 @@
-use anyhow::Result;
 use crate::storage::database::{DatabaseWriter, DatabaseWriterConfig};
-use fluidex_common::db::DbType;
+use anyhow::Result;
 use fluidex_common::db::models::account;
+use fluidex_common::db::DbType;
 
 type UserWriter = DatabaseWriter<account::AccountDesc>;
 
@@ -12,7 +12,9 @@ pub trait HistoryWriter: Sync + Send {
 
 pub struct DummyHistoryWriter;
 impl HistoryWriter for DummyHistoryWriter {
-    fn is_block(&self) -> bool { false }
+    fn is_block(&self) -> bool {
+        false
+    }
     fn append_user(&mut self, _user: account::AccountDesc) {}
 }
 
@@ -29,7 +31,9 @@ impl DatabaseHistoryWriter {
 }
 
 impl HistoryWriter for DatabaseHistoryWriter {
-    fn is_block(&self) -> bool { false }
+    fn is_block(&self) -> bool {
+        false
+    }
     fn append_user(&mut self, user: account::AccountDesc) {
         self.user_writer.append(user).ok();
     }

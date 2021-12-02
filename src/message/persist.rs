@@ -1,10 +1,10 @@
+use super::consumer::{self, RdConsumerExt, SyncTyped, TypedMessageHandler, TypedMessageHandlerAsync};
 use crate::storage::database::{DatabaseWriter, DatabaseWriterEntry, TaskNotification, TaskNotifyFlag};
-use std::collections::HashMap;
+use fluidex_common::db::models::account;
 use serde::Deserialize;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::marker::PhantomData;
-use super::consumer::{self, RdConsumerExt, SyncTyped, TypedMessageHandler, TypedMessageHandlerAsync};
-use fluidex_common::db::models::account;
 
 pub struct MsgDataPersistor<T: Clone + Send, UM = ()> {
     pub writer: RefCell<DatabaseWriterEntry<T>>,

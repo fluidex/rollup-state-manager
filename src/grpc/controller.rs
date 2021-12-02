@@ -1,4 +1,5 @@
-use core::cmp::min;
+use super::sequencer::Sequencer;
+use super::user_cache::UserCache;
 use crate::config::Settings;
 use crate::message::{FullOrderMessageManager, SimpleMessageManager};
 use crate::persist::history::DatabaseHistoryWriter;
@@ -7,8 +8,9 @@ use crate::state::global::GlobalState;
 use crate::storage::database::{DatabaseWriterConfig, OperationLogSender};
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{tx_detail_idx, AmountType, L2BlockSerde, TxType};
-use fluidex_common::db::DbType;
+use core::cmp::min;
 use fluidex_common::db::models::{account, l2_block, operation_log, tablenames};
+use fluidex_common::db::DbType;
 use fluidex_common::num_traits::ToPrimitive;
 use fluidex_common::rust_decimal::Decimal;
 use fluidex_common::types::FrExt;
@@ -16,8 +18,6 @@ use fluidex_common::utils::timeutil::{current_timestamp, FTimestamp};
 use orchestra::rpc::rollup::*;
 use serde::Serialize;
 use std::sync::{Arc, RwLock};
-use super::sequencer::Sequencer;
-use super::user_cache::UserCache;
 use tonic::{Code, Status};
 
 const OPERATION_REGISTER_USER: &str = "register_user";
@@ -34,13 +34,15 @@ pub struct Controller {
 impl Controller {
     pub async fn new(state: Arc<RwLock<GlobalState>>) -> Self {
         let db_pool = sqlx::postgres::PgPool::connect(Settings::db()).await.unwrap();
-        let log_handler = Box::new(OperationLogSender::new(&DatabaseWriterConfig {
-            spawn_limit: 4,
-            apply_benchmark: true,
-            capability_limit: 8192,
-        })
-        .start_schedule(&db_pool)
-        .unwrap());
+        let log_handler = Box::new(
+            OperationLogSender::new(&DatabaseWriterConfig {
+                spawn_limit: 4,
+                apply_benchmark: true,
+                capability_limit: 8192,
+            })
+            .start_schedule(&db_pool)
+            .unwrap(),
+        );
         let persistor = create_persistor();
         let sequencer = Sequencer::default();
         let user_cache = Arc::new(RwLock::new(UserCache::new()));
@@ -271,12 +273,12 @@ impl Controller {
             .get_user_info(request.user_id, &request.l1_address, &request.l2_pubkey)
         {
             let user_id = user_info.id as u32;
-            let user_info  = Some(UserInfo {
-                    user_id,
-                    l1_address: user_info.l1_address.clone(),
-                    l2_pubkey: user_info.l2_pubkey.clone(),
-                    nonce: self.state.read().unwrap().get_account_nonce(user_id).to_u32(),
-                });
+            let user_info = Some(UserInfo {
+                user_id,
+                l1_address: user_info.l1_address.clone(),
+                l2_pubkey: user_info.l2_pubkey.clone(),
+                nonce: self.state.read().unwrap().get_account_nonce(user_id).to_u32(),
+            });
             return Ok(UserInfoQueryResponse { user_info });
         }
 
@@ -284,7 +286,7 @@ impl Controller {
         self.user_cache.write().unwrap().set_user_info(user_info.clone());
 
         let user_id = user_info.id as u32;
-        let user_info  = Some(UserInfo {
+        let user_info = Some(UserInfo {
             user_id,
             l1_address: user_info.l1_address,
             l2_pubkey: user_info.l2_pubkey,
@@ -293,7 +295,7 @@ impl Controller {
         Ok(UserInfoQueryResponse { user_info })
     }
 
-    pub async fn register_user(&self, real: bool, request: RegisterUserRequest) -> Result<RegisterUserResponse, Status> {
+    pub async fn register_user(&mut self, real: bool, request: RegisterUserRequest) -> Result<RegisterUserResponse, Status> {
         let user_id = request.user_id;
         let user = account::AccountDesc {
             id: user_id as i32,
@@ -308,12 +310,14 @@ impl Controller {
             self.append_operation_log(OPERATION_REGISTER_USER, &request);
         }
 
-        Ok(RegisterUserResponse { user_info: Some(UserInfo {
-            user_id,
-            l1_address: user.l1_address,
-            l2_pubkey: user.l2_pubkey,
-            nonce: self.state.read().unwrap().get_account_nonce(user_id).to_u32(),
-        }) })
+        Ok(RegisterUserResponse {
+            user_info: Some(UserInfo {
+                user_id,
+                l1_address: user.l1_address,
+                l2_pubkey: user.l2_pubkey,
+                nonce: self.state.read().unwrap().get_account_nonce(user_id).to_u32(),
+            }),
+        })
     }
 
     fn append_operation_log<Operation>(&mut self, method: &str, req: &Operation)
