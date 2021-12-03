@@ -1,7 +1,7 @@
 use crate::msg::msg_utils::bytes_to_sig;
 use crate::state::ManagerWrapper;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
-use crate::types::l2::{self, AmountType, OrderInput, OrderSide};
+use crate::types::l2::{self, OrderInput, OrderSide};
 use crate::types::matchengine::messages;
 use fluidex_common::babyjubjub_rs::{self, Point};
 use fluidex_common::ff::Field;
@@ -74,7 +74,7 @@ impl Processor {
         assert_eq!(expected_balance_before, balance_before.to_fr(prec_token_id(token_id)));
 
         let timing = Instant::now();
-        let amount = AmountType::from_decimal(&deposit.change, prec_token_id(token_id)).unwrap();
+        let amount = deposit.change.to_u64(prec_token_id(token_id));
 
         /*
         let rounding = deposit.change - amount.to_decimal(prec_token_id(token_id));
@@ -85,7 +85,7 @@ impl Processor {
                 l2::DepositTx {
                     token_id,
                     account_id,
-                    amount,
+                    amount: amount as u128,
                     l2key: None,
                 },
                 offset,
@@ -109,11 +109,11 @@ impl Processor {
         assert_eq!(expected_balance_before, balance_before.to_fr(prec_token_id(token_id)));
 
         let precision = prec_token_id(token_id);
-        let amount = AmountType::from_decimal(&-withdraw.change, precision).unwrap();
+        let amount = (-withdraw.change).to_u64(precision);
 
         let timing = Instant::now();
         let raw_sig = bytes_to_sig(withdraw.signature);
-        let mut withdraw_tx = l2::WithdrawTx::new(account_id, token_id, amount, balance_before.to_fr(precision));
+        let mut withdraw_tx = l2::WithdrawTx::new(account_id, token_id, amount as u128, balance_before.to_fr(precision));
         withdraw_tx.sig = Signature::from_raw(withdraw_tx.hash(), &raw_sig);
         if self.enable_check_sig {
             check_withdraw_sig(manager, &withdraw_tx, &raw_sig);
@@ -209,11 +209,10 @@ impl Processor {
         assert!(from_balance >= amount, "From user must have sufficient balance");
 
         let to = transfer.user_to;
-        let amount = AmountType::from_decimal(&amount, prec_token_id(token_id)).unwrap();
 
         let timing = Instant::now();
         let raw_sig = bytes_to_sig(transfer.signature);
-        let mut transfer_tx = l2::TransferTx::new(from, to, token_id, amount);
+        let mut transfer_tx = l2::TransferTx::new(from, to, token_id, amount.to_u64(prec_token_id(token_id)) as u128);
         transfer_tx.sig = Signature::from_raw(transfer_tx.hash(), &raw_sig);
         if self.enable_check_sig {
             check_transfer_sig(manager, &transfer_tx, &raw_sig);

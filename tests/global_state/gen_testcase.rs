@@ -5,13 +5,13 @@
 #![allow(clippy::unnecessary_wraps)]
 
 use anyhow::Result;
+use normpath::PathExt;
 use rollup_state_manager::params;
 use rollup_state_manager::state::{GlobalState, ManagerWrapper};
 use rollup_state_manager::test_utils;
 use rollup_state_manager::test_utils::circuit::{write_test_case, CircuitTestCase, CircuitTestData};
 use rollup_state_manager::test_utils::messages::WrappedMessage;
 use rollup_state_manager::types::l2::{L2Block, L2BlockSerde};
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
@@ -90,7 +90,11 @@ fn replay_msgs(
 }
 
 pub fn run(src: &str) -> Result<()> {
-    let circuit_repo = fs::canonicalize(PathBuf::from("circuits")).expect("invalid circuits repo path");
+    let circuit_repo = PathBuf::from("circuits")
+        .as_path()
+        .normalize()
+        .expect("invalid circuits repo path")
+        .into_path_buf();
     let filepath = PathBuf::from(src);
     let (msg_sender, msg_receiver) = crossbeam_channel::unbounded();
     let (blk_sender, blk_receiver) = crossbeam_channel::unbounded();

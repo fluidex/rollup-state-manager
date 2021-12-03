@@ -992,7 +992,7 @@ dependencies = [
 [[package]]
 name = "ethers"
 version = "0.6.0"
-source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
+source = "git+https://github.com/gakonst/ethers-rs#28094e8a83a0335f51c79bf0ae7c5d4568db5367"
 dependencies = [
  "ethers-contract",
  "ethers-core",
@@ -1006,7 +1006,7 @@ dependencies = [
 [[package]]
 name = "ethers-contract"
 version = "0.6.0"
-source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
+source = "git+https://github.com/gakonst/ethers-rs#28094e8a83a0335f51c79bf0ae7c5d4568db5367"
 dependencies = [
  "ethers-contract-abigen",
  "ethers-contract-derive",
@@ -1024,7 +1024,7 @@ dependencies = [
 [[package]]
 name = "ethers-contract-abigen"
 version = "0.6.0"
-source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
+source = "git+https://github.com/gakonst/ethers-rs#28094e8a83a0335f51c79bf0ae7c5d4568db5367"
 dependencies = [
  "Inflector",
  "anyhow",
@@ -1045,7 +1045,7 @@ dependencies = [
 [[package]]
 name = "ethers-contract-derive"
 version = "0.6.0"
-source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
+source = "git+https://github.com/gakonst/ethers-rs#28094e8a83a0335f51c79bf0ae7c5d4568db5367"
 dependencies = [
  "ethers-contract-abigen",
  "ethers-core",
@@ -1059,7 +1059,7 @@ dependencies = [
 [[package]]
 name = "ethers-core"
 version = "0.6.0"
-source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
+source = "git+https://github.com/gakonst/ethers-rs#28094e8a83a0335f51c79bf0ae7c5d4568db5367"
 dependencies = [
  "arrayvec 0.7.2",
  "bytes",
@@ -1087,7 +1087,7 @@ dependencies = [
 [[package]]
 name = "ethers-etherscan"
 version = "0.2.0"
-source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
+source = "git+https://github.com/gakonst/ethers-rs#28094e8a83a0335f51c79bf0ae7c5d4568db5367"
 dependencies = [
  "ethers-core",
  "reqwest",
@@ -1100,7 +1100,7 @@ dependencies = [
 [[package]]
 name = "ethers-middleware"
 version = "0.6.0"
-source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
+source = "git+https://github.com/gakonst/ethers-rs#28094e8a83a0335f51c79bf0ae7c5d4568db5367"
 dependencies = [
  "async-trait",
  "ethers-contract",
@@ -1123,7 +1123,7 @@ dependencies = [
 [[package]]
 name = "ethers-providers"
 version = "0.6.0"
-source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
+source = "git+https://github.com/gakonst/ethers-rs#28094e8a83a0335f51c79bf0ae7c5d4568db5367"
 dependencies = [
  "async-trait",
  "auto_impl",
@@ -1152,7 +1152,7 @@ dependencies = [
 [[package]]
 name = "ethers-signers"
 version = "0.6.0"
-source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
+source = "git+https://github.com/gakonst/ethers-rs#28094e8a83a0335f51c79bf0ae7c5d4568db5367"
 dependencies = [
  "async-trait",
  "coins-bip32",
@@ -1172,7 +1172,7 @@ dependencies = [
 [[package]]
 name = "ethers-solc"
 version = "0.1.0"
-source = "git+https://github.com/gakonst/ethers-rs#d06bfdc15ca387f5e1327be8e48ef1a695a31ae8"
+source = "git+https://github.com/gakonst/ethers-rs#28094e8a83a0335f51c79bf0ae7c5d4568db5367"
 dependencies = [
  "colored",
  "ethers-core",
@@ -1252,7 +1252,7 @@ checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 [[package]]
 name = "fluidex-common"
 version = "0.1.0"
-source = "git+https://github.com/fluidex/common-rs?branch=master#eb9440fe1c8d4082602a0a850e6599f1901ac6bf"
+source = "git+https://github.com/fluidex/common-rs?branch=master#671a92a986920b013e5457a9c2be2b295f1bc733"
 dependencies = [
  "anyhow",
  "babyjubjub-rs",
@@ -2050,6 +2050,15 @@ dependencies = [
  "lexical-core",
  "memchr",
  "version_check",
+]
+
+[[package]]
+name = "normpath"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "640c20e9df4a2d4a5adad5b47e17d76dac3e824346b181931c3ec9f7a85687b1"
+dependencies = [
+ "winapi",
 ]
 
 [[package]]
@@ -2870,6 +2879,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "log",
+ "normpath",
  "num",
  "once_cell",
  "orchestra",

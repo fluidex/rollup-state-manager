@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 import * as dayjs from "dayjs";
 import { grpcClient } from "./grpc_client";
 import { kafkaProducer } from "./kafka_producer";

@@ -15,7 +15,7 @@ use rollup_state_manager::params;
 use rollup_state_manager::r#const::sled_db::*;
 use rollup_state_manager::state::{GlobalState, ManagerWrapper};
 use rollup_state_manager::test_utils::messages::WrappedMessage;
-use rollup_state_manager::types::l2::{L2Block, L2BlockSerde};
+use rollup_state_manager::types::l2::{L2Block, L2BlockSerde, L2PubDataAux};
 use sqlx::postgres::PgPool;
 use sqlx::Row;
 use std::option::Option::None;
@@ -203,15 +203,17 @@ async fn is_present_block(pool: &PgPool, block: &L2Block) -> anyhow::Result<bool
 
 async fn save_block_to_db(pool: &PgPool, block: &L2Block) -> anyhow::Result<()> {
     let new_root = block.detail.new_root.to_hex_string();
+    let aux = L2PubDataAux::from(block);
     let detail = L2BlockSerde::from(block.detail.clone());
     sqlx::query(&format!(
-        "insert into {} (block_id, new_root, detail, raw_public_data) values ($1, $2, $3, $4)",
+        "insert into {} (block_id, new_root, detail, raw_public_data, public_data_aux) values ($1, $2, $3, $4, $5)",
         tablenames::L2_BLOCK
     ))
     .bind(block.block_id as u32)
     .bind(new_root)
     .bind(sqlx::types::Json(detail))
     .bind(&block.public_data)
+    .bind(sqlx::types::Json(aux))
     .execute(pool)
     .await?;
 

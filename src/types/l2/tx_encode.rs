@@ -6,7 +6,7 @@ use anyhow::Result;
 impl EncodingParam for TxDataEncoder {
     fn data_bits(&self) -> usize {
         let mut ret = 0;
-        let scheme_len = self.account_bits * 2 + self.token_bits * 2 + 40 * 1;
+        let scheme_len = 128 * 1 + self.account_bits * 2 + self.token_bits * 1;
         ret = if ret < scheme_len { scheme_len } else { ret };
         let scheme_len = 32 * 2 + self.account_bits * 2 + self.token_bits * 2 + 40 * 4 + self.order_bits * 2;
         ret = if ret < scheme_len { scheme_len } else { ret };
@@ -34,8 +34,7 @@ impl EncodeForScheme for ForCommonTx<'_> {
         encoder.encode_fr(&payload[tx_detail_idx::ACCOUNT_ID1], encoder.account_bits)?;
         encoder.encode_fr(&payload[tx_detail_idx::ACCOUNT_ID2], encoder.account_bits)?;
         encoder.encode_fr(&payload[tx_detail_idx::TOKEN_ID1], encoder.token_bits)?;
-        encoder.encode_fr(&payload[tx_detail_idx::TOKEN_ID2], encoder.token_bits)?;
-        encoder.encode_fr(&payload[tx_detail_idx::AMOUNT], 40)?;
+        encoder.encode_fr(&payload[tx_detail_idx::AMOUNT], 128)?;
 
         Ok(())
     }
