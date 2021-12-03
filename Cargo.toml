@@ -34,6 +34,7 @@ sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "postgres", "chro
 thiserror = "1.0.25"
 tokio = { version = "1.6.0", features = [ "full" ] }
 tonic = "0.5.2"
+normpath = "0.3"
 
 [dev-dependencies]
 pprof = { version = "0.5", features = [ "flamegraph", "protobuf" ] }
@@ -41,6 +42,11 @@ pprof = { version = "0.5", features = [ "flamegraph", "protobuf" ] }
 [[bin]]
 name = "rollup_state_manager"
 path = "src/bin/main.rs"
+
+[[bin]]
+name = "version_check"
+path = "src/bin/version_check.rs"
+required-features = [ "version_check" ]
 
 [[bin]]
 name = "dump_sled"
@@ -64,6 +70,7 @@ bench_global_state = [ ]
 default = ["persist_sled"]
 windows_build = [ "fluidex-common/rdkafka-dynamic" ]
 fr_string_repr = [ ]
+version_check = [ ]
 persist_sled = [ "sled", "bincode" ]
 
 [profile.release]

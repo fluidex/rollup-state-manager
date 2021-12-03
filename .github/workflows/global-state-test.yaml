@@ -92,6 +92,12 @@ jobs:
           cd circuits
           npm ci
 
+      - name: circuit version check
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: --bin version_check --features version_check
+
       - name: Test global_state
         run: bash tests/global_state/test.sh
 

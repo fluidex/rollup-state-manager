@@ -349,7 +349,7 @@ impl ManagerWrapper {
         let nonce = acc.nonce;
 
         let mut encoded_tx = [Fr::zero(); TX_LENGTH];
-        encoded_tx[tx_detail_idx::AMOUNT] = encode_amount_to_compressed_fr(&tx.amount)?;
+        encoded_tx[tx_detail_idx::AMOUNT] = Fr::from_bigint(BigInt::from(tx.amount));
 
         encoded_tx[tx_detail_idx::TOKEN_ID1] = Fr::from_u32(tx.token_id);
         encoded_tx[tx_detail_idx::ACCOUNT_ID1] = Fr::from_u32(tx.account_id);
@@ -360,7 +360,7 @@ impl ManagerWrapper {
 
         encoded_tx[tx_detail_idx::TOKEN_ID2] = Fr::from_u32(tx.token_id);
         encoded_tx[tx_detail_idx::ACCOUNT_ID2] = Fr::from_u32(tx.account_id);
-        encoded_tx[tx_detail_idx::BALANCE2] = old_balance.add(&tx.amount.to_fr());
+        encoded_tx[tx_detail_idx::BALANCE2] = old_balance.add(&Fr::from_bigint(BigInt::from(tx.amount)));
         encoded_tx[tx_detail_idx::NONCE2] = nonce;
         if deposit_to_new {
             let l2key = tx.l2key.clone().unwrap();
@@ -394,7 +394,7 @@ impl ManagerWrapper {
         };
 
         let mut balance = old_balance;
-        balance.add_assign(&tx.amount.to_fr());
+        balance.add_assign(&Fr::from_bigint(BigInt::from(tx.amount)));
         state.set_token_balance(tx.account_id, tx.token_id, balance);
         if deposit_to_new {
             let l2key = tx.l2key.clone().unwrap();
@@ -429,20 +429,20 @@ impl ManagerWrapper {
         let from_old_balance = state.get_token_balance(tx.from, tx.token_id);
         let to_old_balance = state.get_token_balance(tx.to, tx.token_id);
         assert!(
-            from_old_balance >= tx.amount.to_fr(),
+            from_old_balance >= Fr::from_bigint(BigInt::from(tx.amount)),
             "Transfer balance not enough {} < {}",
             from_old_balance,
-            tx.amount.to_fr()
+            Fr::from_bigint(BigInt::from(tx.amount))
         );
-        let from_new_balance = from_old_balance.sub(&tx.amount.to_fr());
-        let to_new_balance = to_old_balance.add(&tx.amount.to_fr());
+        let from_new_balance = from_old_balance.sub(&Fr::from_bigint(BigInt::from(tx.amount)));
+        let to_new_balance = to_old_balance.add(&Fr::from_bigint(BigInt::from(tx.amount)));
 
         let mut encoded_tx = [Fr::zero(); TX_LENGTH];
         encoded_tx[tx_detail_idx::ACCOUNT_ID1] = Fr::from_u32(tx.from);
         encoded_tx[tx_detail_idx::ACCOUNT_ID2] = Fr::from_u32(tx.to);
         encoded_tx[tx_detail_idx::TOKEN_ID1] = Fr::from_u32(tx.token_id);
         encoded_tx[tx_detail_idx::TOKEN_ID2] = Fr::from_u32(tx.token_id);
-        encoded_tx[tx_detail_idx::AMOUNT] = encode_amount_to_compressed_fr(&tx.amount).unwrap();
+        encoded_tx[tx_detail_idx::AMOUNT] = Fr::from_bigint(BigInt::from(tx.amount));
 
         encoded_tx[tx_detail_idx::BALANCE1] = from_old_balance;
         encoded_tx[tx_detail_idx::NONCE1] = from_account.nonce;
@@ -525,14 +525,14 @@ impl ManagerWrapper {
 
         let acc = state.get_account(account_id);
         let old_balance = state.get_token_balance(account_id, token_id);
-        let new_balance = old_balance.sub(&tx.amount.to_fr());
+        let new_balance = old_balance.sub(&Fr::from_bigint(BigInt::from(tx.amount)));
         let nonce = acc.nonce;
         // assert(oldBalance > tx.amount, 'Withdraw balance');
 
         // first, generate the tx
         let mut encoded_tx = [Fr::zero(); TX_LENGTH];
 
-        encoded_tx[tx_detail_idx::AMOUNT] = encode_amount_to_compressed_fr(&tx.amount).unwrap();
+        encoded_tx[tx_detail_idx::AMOUNT] = Fr::from_bigint(BigInt::from(tx.amount));
 
         encoded_tx[tx_detail_idx::TOKEN_ID1] = Fr::from_u32(token_id);
         encoded_tx[tx_detail_idx::ACCOUNT_ID1] = Fr::from_u32(account_id);
@@ -901,7 +901,6 @@ impl ManagerWrapper {
 #[cfg(test)]
 mod test {
 
-    use fluidex_common::rust_decimal::Decimal;
     //use crate::account::Signature;
     use super::*;
     use crate::config::Settings;
@@ -914,19 +913,19 @@ mod test {
         s.persist_every_n_block = 1000;
         Settings::set(s);
 
-        let gs = GlobalState::new(2, 3, 2, false);
+        let gs = GlobalState::new(3, 4, 4, false);
         let mut wrapper = ManagerWrapper::new(Arc::new(RwLock::new(gs)), 2, None, false);
 
         let key1 = L2Key {
             eth_addr: Fr::zero(),
-            sign: Fr::zero(),
-            ay: Fr::from_str("12651997034108828793201924845334010433472202362737359078204512710424413547138"),
+            sign: Fr::one(),
+            ay: Fr::from_str("4841748469402798113167421243626708851164748635262722595336284694326929201830"),
         };
 
         let key2 = L2Key {
             eth_addr: Fr::zero(),
-            sign: Fr::zero(),
-            ay: Fr::from_str("14696714050843746842272235061621223134990844289270786347035843272317411381964"),
+            sign: Fr::one(),
+            ay: Fr::from_str("5318454723513745944372537436315340713677445476743393589149975000072247793586"),
         };
 
         //notice offset is of no use if we do not persist tx locally ...
@@ -946,7 +945,7 @@ mod test {
                 DepositTx {
                     account_id: 0,
                     token_id: 1,
-                    amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
+                    amount: 1_000_000_000000u128, //simlulate an amount of 1_000_000i64, prec 6
                     l2key: None,
                 },
                 None,
@@ -959,7 +958,7 @@ mod test {
                 DepositTx {
                     account_id: 0,
                     token_id: 0,
-                    amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
+                    amount: 1_000_000_0000u128, //simlulate an amount of 1_000_000i64, prec 4
                     l2key: None,
                 },
                 None,
@@ -981,7 +980,7 @@ mod test {
                 DepositTx {
                     account_id: 1,
                     token_id: 1,
-                    amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
+                    amount: 1_000_000_000000u128,
                     l2key: None,
                 },
                 None,
@@ -993,7 +992,7 @@ mod test {
                 DepositTx {
                     account_id: 1,
                     token_id: 0,
-                    amount: AmountType::from_decimal(&Decimal::new(1000000i64, 0), 6).unwrap(),
+                    amount: 1_000_000_0000u128,
                     l2key: None,
                 },
                 None,
@@ -1001,8 +1000,8 @@ mod test {
             .unwrap();
 
         let blks = wrapper.pop_all_blocks();
-        assert_eq!(blks[0].detail.txdata_hash.low_u128(), 210768282952759810590552623169132871868u128);
-        assert_eq!(blks[1].detail.txdata_hash.low_u128(), 159409240260550832134647856072165320498u128);
-        assert_eq!(blks[2].detail.txdata_hash.low_u128(), 4036618609204034397054436922352855460u128);
+        assert_eq!(blks[0].detail.txdata_hash.low_u128(), 19616728804774751320168438740415224383u128);
+        assert_eq!(blks[1].detail.txdata_hash.low_u128(), 229380481089431957009116204147712640854u128);
+        assert_eq!(blks[2].detail.txdata_hash.low_u128(), 16562419241364283837688117385709745071u128);
     }
 }
