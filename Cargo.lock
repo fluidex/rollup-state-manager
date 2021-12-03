@@ -1346,6 +1346,7 @@ name = "fluidex-common"
 version = "0.1.0"
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/fluidex/common-rs?branch=master#671a92a986920b013e5457a9c2be2b295f1bc733"
 =======
 source = "git+https://github.com/fluidex/common-rs?branch=master#eb9440fe1c8d4082602a0a850e6599f1901ac6bf"
@@ -1353,6 +1354,9 @@ source = "git+https://github.com/fluidex/common-rs?branch=master#eb9440fe1c8d408
 =======
 source = "git+https://github.com/fluidex/common-rs?branch=add-table-operation-log-to-rollup#acabaede79a9e841084f110f3212422938c112ca"
 >>>>>>> c6e28de (Move `register_user` from exchange.)
+=======
+source = "git+https://github.com/fluidex/common-rs?branch=master#671a92a986920b013e5457a9c2be2b295f1bc733"
+>>>>>>> e590c5f (Delete operation log code.)
 dependencies = [
  "anyhow",
  "babyjubjub-rs",

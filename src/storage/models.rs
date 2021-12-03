@@ -1,5 +1,5 @@
 use super::sqlxextend;
-use fluidex_common::db::models::{account, operation_log, tablenames};
+use fluidex_common::db::models::{account, tablenames};
 use fluidex_common::db::{DbType, TimestampDbType};
 use serde::ser::Serializer;
 
@@ -38,22 +38,3 @@ impl sqlxextend::BindQueryArg<'_, DbType> for account::AccountDesc {
 }
 
 impl sqlxextend::SqlxAction<'_, sqlxextend::InsertTable, DbType> for account::AccountDesc {}
-
-/* --------------------- models::OperationLog -----------------------------*/
-impl sqlxextend::TableSchemas for operation_log::OperationLog {
-    const ARGN: i32 = 4;
-    fn table_name() -> &'static str {
-        tablenames::OPERATION_LOG
-    }
-}
-
-impl sqlxextend::BindQueryArg<'_, DbType> for operation_log::OperationLog {
-    fn bind_args<'g, 'q: 'g>(&'q self, arg: &mut impl sqlx::Arguments<'g, Database = DbType>) {
-        arg.add(self.id);
-        arg.add(self.time);
-        arg.add(&self.method);
-        arg.add(&self.params);
-    }
-}
-
-impl sqlxextend::SqlxAction<'_, sqlxextend::InsertTable, DbType> for operation_log::OperationLog {}

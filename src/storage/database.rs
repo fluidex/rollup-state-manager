@@ -1,6 +1,5 @@
 use super::sqlxextend::*;
 use anyhow::{anyhow, Result};
-use fluidex_common::db::models::operation_log;
 use fluidex_common::db::DbType;
 use std::collections::{hash_map, HashMap, VecDeque};
 use std::marker::PhantomData;
@@ -625,5 +624,3 @@ where
         Ok(self)
     }
 }
-
-pub type OperationLogSender = DatabaseWriter<operation_log::OperationLog>;

@@ -1,6 +1,5 @@
 mod controller;
 mod handler;
-mod sequencer;
 mod user_cache;
 
 use crate::grpc::handler::Handler;
