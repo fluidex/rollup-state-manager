@@ -280,7 +280,7 @@ impl Controller {
         Ok(UserInfoQueryResponse { user_info })
     }
 
-    pub async fn register_user(&mut self, real: bool, request: RegisterUserRequest) -> Result<RegisterUserResponse, Status> {
+    pub fn register_user(&mut self, real: bool, request: RegisterUserRequest) -> Result<RegisterUserResponse, Status> {
         let user_id = request.user_id;
         let user = account::AccountDesc {
             id: user_id as i32,

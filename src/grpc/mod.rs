@@ -22,7 +22,8 @@ pub fn run_grpc_server(addr: SocketAddr, state: Arc<RwLock<GlobalState>>) -> any
             tx.send(()).ok();
         });
 
-        let handler = Handler::new(state).await;
+        let mut handler = Handler::new(state).await;
+        let on_leave = handler.on_leave();
 
         tonic::transport::Server::builder()
             .add_service(RollupStateServer::new(handler))
@@ -30,6 +31,8 @@ pub fn run_grpc_server(addr: SocketAddr, state: Arc<RwLock<GlobalState>>) -> any
                 rx.await.ok();
             })
             .await?;
+
+        on_leave.leave().await;
 
         Ok(())
     })
