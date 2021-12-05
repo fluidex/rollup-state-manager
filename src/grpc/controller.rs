@@ -1,4 +1,4 @@
-use core::cmp::min;
+use super::user_cache::UserCache;
 use crate::config::Settings;
 use crate::message::{FullOrderMessageManager, SimpleMessageManager};
 use crate::persist::history::DatabaseHistoryWriter;
@@ -7,13 +7,13 @@ use crate::state::global::GlobalState;
 use crate::storage::database::DatabaseWriterConfig;
 use crate::test_utils::types::{get_token_id_by_name, prec_token_id};
 use crate::types::l2::{tx_detail_idx, L2BlockSerde, TxType};
-use fluidex_common::db::DbType;
+use core::cmp::min;
 use fluidex_common::db::models::{account, l2_block, tablenames};
+use fluidex_common::db::DbType;
 use fluidex_common::types::FrExt;
 use fluidex_common::utils::timeutil::FTimestamp;
 use orchestra::rpc::rollup::*;
 use std::sync::{Arc, RwLock};
-use super::user_cache::UserCache;
 use tonic::{Code, Status};
 
 const OPERATION_REGISTER_USER: &str = "register_user";
