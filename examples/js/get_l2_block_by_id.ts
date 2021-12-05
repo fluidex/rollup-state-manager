@@ -1,3 +1,7 @@
+// TODO:
+// Refactor to export User Info functions as common. For now, this script needs
+// to be run after `grpc_user_info.ts`.
+
 require("dotenv").config();
 
 import * as dayjs from "dayjs";
@@ -8,23 +12,8 @@ import { strict as assert } from "assert";
 
 const one_hour_milliseconds = 3_600_000;
 
-const blockId = 0;
 const userId1 = 1;
 const userId2 = 2;
-
-const userMsg1 = {
-  user_id: userId1,
-  l1_address: "0x6286d0A2FC1d4C12a4ACc274018b401c68157Fdb",
-  l2_pubkey:
-    "0x5d182c51bcfe99583d7075a7a0c10d96bef82b8a059c4bf8c5f6e7124cf2bba3"
-};
-
-const userMsg2 = {
-  user_id: userId2,
-  l1_address: "0xf40e08f651f2f7f96f5602114e5a77f1a7beea5d",
-  l2_pubkey:
-    "0xe9b54eb2dbf0a14faafd109ea2a6a292b78276c8381f8ef984dddefeafb2deaf"
-};
 
 const depositMsg = {
   timestamp: 16264463600,
@@ -64,26 +53,12 @@ async function main() {
 async function mainTest() {
   await kafkaProducer.Init();
 
-  await registerUsers();
   await depositBalance();
   await sleep(3000);
   await kafkaProducer.Stop();
 
   await testBlock0();
   await testBlock1();
-}
-
-async function registerUsers() {
-  await kafkaProducer.send([
-    {
-      key: "registeruser",
-      value: JSON.stringify(userMsg1)
-    },
-    {
-      key: "registeruser",
-      value: JSON.stringify(userMsg2)
-    }
-  ]);
 }
 
 async function depositBalance() {

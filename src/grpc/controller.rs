@@ -267,7 +267,10 @@ impl Controller {
         }
 
         let user_info = get_user_info_from_db(&self.db_pool, request).await?;
-        self.user_cache.write().unwrap().set_user_info(user_info.clone());
+        self.user_cache
+            .write()
+            .unwrap()
+            .set_user_info(user_info.id as u32, &user_info.l1_address, &user_info.l2_pubkey);
 
         let user_id = user_info.id as u32;
         let user_info = Some(UserInfo {
@@ -287,7 +290,10 @@ impl Controller {
             l2_pubkey: request.l2_pubkey.to_lowercase(),
         };
 
-        self.user_cache.write().unwrap().set_user_info(user.clone());
+        self.user_cache
+            .write()
+            .unwrap()
+            .set_user_info(user_id, &request.l1_address, &request.l2_pubkey);
 
         if real {
             self.persistor.register_user(user.clone());

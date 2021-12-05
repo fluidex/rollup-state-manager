@@ -17,7 +17,7 @@ class Client {
     this.client = caller(`${server}`, { file, load }, "RollupState");
   }
 
-  async regsiterUser(
+  async registerUser(
     user_id,
     l1_address,
     l2_pubkey
