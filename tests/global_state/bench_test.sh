@@ -16,7 +16,7 @@ git submodule update --init --recursive
 if [ -z ${CI+x} ]; then git pull --recurse-submodules; fi
 
 cargo run --no-default-features --features="profiling" --release --bin bench_global_state
-if command -v pprof &> /dev/null
+if command -v command -v ~/go/bin/pprof &> /dev/null
 then
     pprof -svg profile.pb
 else
