@@ -17,7 +17,6 @@ use std::option::Option::None;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
-#[cfg(test)]
 #[cfg(not(feature = "windows_build"))]
 use {pprof::protos::Message, std::io::Write};
 
@@ -218,7 +217,6 @@ fn run_bench() -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
 #[cfg(not(feature = "windows_build"))]
 fn profile_bench() {
     let guard = pprof::ProfilerGuard::new(100).unwrap();
@@ -241,5 +239,5 @@ fn profile_bench() {
 }
 
 fn main() {
-    run_bench().unwrap();
+    profile_bench();
 }
