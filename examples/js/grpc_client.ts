@@ -17,6 +17,20 @@ class Client {
     this.client = caller(`${server}`, { file, load }, "RollupState");
   }
 
+  async registerUser(
+    user_id,
+    l1_address,
+    l2_pubkey
+  ): Promise<Map<string, any>> {
+    return await this.client.registerUser({ user_id, l1_address, l2_pubkey });
+  }
+  async userInfoQuery(
+    user_id,
+    l1_address,
+    l2_pubkey
+  ): Promise<Map<string, any>> {
+    return await this.client.userInfoQuery({ user_id, l1_address, l2_pubkey });
+  }
   async l2BlockQuery(block_id): Promise<Map<string, any>> {
     return await this.client.l2BlockQuery({ block_id });
   }

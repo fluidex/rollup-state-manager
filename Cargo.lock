@@ -2229,7 +2229,7 @@ dependencies = [
 [[package]]
 name = "orchestra"
 version = "0.1.0"
-source = "git+https://github.com/fluidex/orchestra.git?branch=master#550e3f1f1f82550f7e92c4938f6bc5f6e59f07cf"
+source = "git+https://github.com/fluidex/orchestra.git?branch=master#554bc7d9a933b1e5298069fb8586e11d865da8e9"
 dependencies = [
  "prost",
  "serde 1.0.130",
@@ -2812,6 +2812,7 @@ dependencies = [
  "arrayref",
  "bincode",
  "cfg-if",
+ "chrono",
  "coins-bip32",
  "config",
  "crossbeam-channel",
