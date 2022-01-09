@@ -1,3 +1,4 @@
+require("dotenv").config();
 import * as dayjs from "dayjs";
 import { restClient } from "./rest_client";
 import { strict as assert } from "assert";
