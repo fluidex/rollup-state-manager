@@ -43,7 +43,7 @@ impl Processor {
         let l2_pubkey: Vec<u8> = hex::decode(l2_pubkey.trim_start_matches("0x")).unwrap();
         let bjj_compressed: [u8; 32] = l2_pubkey.try_into().unwrap();
         let l2_pubkey_point: Point = babyjubjub_rs::decompress_point(bjj_compressed).unwrap();
-        let eth_addr = Fr::from_str(&user_info.l1_address);
+        // let eth_addr = Fr::from_str(&user_info.l1_address);
         let sign = if bjj_compressed[31] & 0x80 != 0x00 { Fr::one() } else { Fr::zero() };
         // TODO: remove '0x' from eth addr?
         manager
@@ -51,7 +51,8 @@ impl Processor {
                 l2::UpdateKeyTx {
                     account_id,
                     l2key: l2::L2Key {
-                        eth_addr,
+                        // eth_addr is not used any more
+                        eth_addr: Default::default(),
                         sign,
                         ay: l2_pubkey_point.y,
                     },
